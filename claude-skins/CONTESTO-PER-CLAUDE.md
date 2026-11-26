@@ -50,6 +50,14 @@ laterale dell'app desktop), conversazione a destra.
 
 ## Com'è fatta
 
+**Temi non solo pixel (novembre 2026).** Lo stile pixel non è più del motore: `style.css` è neutro (caratteri di
+sistema, bordi sottili, `--radius`) e la pixel art sta nel kit `kits/pixel.css`, che Pergamena e Terra di Mezzo
+includono (`kits: ['pixel']`). Un tema può dare icone SVG o immagini, disegni a qualunque scala (`artScale`,
+`data-art-scale`, `data-art-smooth`), la sua anteprima nel selettore (`art.preview`) e agganci agli eventi
+(`hooks`). Il tema **Moderno** lo dimostra: niente pixel, barra laterale, fumetti, icone SVG, un punto che pulsa con
+l'azione in corso. La divisione del CSS è stata verificata confrontando pixel per pixel le foto dei due temi pixel
+prima e dopo: identiche.
+
 L'app è divisa in un **motore** comune (finestra, conversazione, permessi, cronache, gli attrezzi del disegno a
 pixel) e in **temi** che decidono tutto quello che si vede: forma della finestra (HTML e CSS), misura, scritte,
 colori, disegni e tono di Claude. Il motore non conosce la forma: cerca i pezzi per attributo (`data-part="log"`,

@@ -95,16 +95,16 @@
 
   // ------------------------------------------------------------------ disegni
 
-  // Copia un disegno a bassa risoluzione nel suo canvas; la misura a schermo la decide il CSS, o il disegno stesso
-  // (× SCALE) con data-art-fit="natural"
-  function blit(target, drawn, natural) {
+  // Copia un disegno nel suo canvas; la misura a schermo la decide il CSS, o il disegno stesso (× scala) con
+  // data-art-fit="natural"
+  function blit(target, drawn, natural, scale = Pixel.SCALE) {
     if (target.width !== drawn.width || target.height !== drawn.height) {
       target.width = drawn.width
       target.height = drawn.height
     }
     if (natural) {
-      target.style.width = `${drawn.width * Pixel.SCALE}px`
-      target.style.height = `${drawn.height * Pixel.SCALE}px`
+      target.style.width = `${drawn.width * scale}px`
+      target.style.height = `${drawn.height * scale}px`
     }
     const ctx = target.getContext('2d')
     ctx.clearRect(0, 0, target.width, target.height)
@@ -112,31 +112,55 @@
   }
 
   let frame = 0
+  // La scala di un disegno: data-art-scale sull'elemento, o quella del tema (artScale), o 3. Con data-art-smooth il
+  // disegno si ingrandisce sfumato invece che a pixel pieni (per disegni a piena risoluzione, scala 1)
+  function scaleOf(el) {
+    return Number(el.dataset.artScale) || Theming.artScale()
+  }
   function artOptions(el) {
     const width = el.clientWidth
     const height = el.clientHeight
-    return { width, height, w: Math.floor(width / Pixel.SCALE), h: Math.floor(height / Pixel.SCALE), pal: Theming.palette(scene), scene, frame, busy, el, arg: el.dataset.artArg }
+    const sc = scaleOf(el)
+    return { width, height, w: Math.floor(width / sc), h: Math.floor(height / sc), scale: sc, pal: Theming.palette(scene), scene, frame, busy, el, arg: el.dataset.artArg }
   }
 
   // <canvas data-art="nome">: il disegno del tema, nel canvas
   function drawArt(el) {
     const drawn = Theming.art(el.dataset.art, artOptions(el))
-    if (drawn) blit(el, drawn, el.dataset.artFit === 'natural')
+    if (!drawn) return
+    blit(el, drawn, el.dataset.artFit === 'natural', scaleOf(el))
+    el.style.imageRendering = el.dataset.artSmooth != null ? 'auto' : 'pixelated'
   }
-  // data-art-bg="nome" su qualunque elemento: il disegno come sfondo ripetuto, ingrandito a pixel pieni
+  // data-art-bg="nome" su qualunque elemento: il disegno come sfondo ripetuto, ingrandito della sua scala
   function drawBackground(el) {
     const drawn = Theming.art(el.dataset.artBg, artOptions(el))
     if (!drawn) return
+    const sc = scaleOf(el)
     el.style.backgroundImage = `url(${drawn.toDataURL()})`
-    el.style.backgroundSize = `${drawn.width * Pixel.SCALE}px ${drawn.height * Pixel.SCALE}px`
+    el.style.backgroundSize = `${drawn.width * sc}px ${drawn.height * sc}px`
+    el.style.imageRendering = el.dataset.artSmooth != null ? 'auto' : 'pixelated'
+  }
+
+  // L'icona di un mestiere in un <img>: a pixel pieni solo se è una bitmap
+  function setIcon(img, craft) {
+    const ic = Theming.icon(craft, Theming.palette(scene), scene)
+    img.src = ic.src
+    img.style.imageRendering = ic.pixel ? 'pixelated' : 'auto'
+  }
+
+  // Gli agganci del tema ricevono questo: la radice del layout, i suoi pezzi, lo stato, i file del tema
+  function hookContext() {
+    return { root: app, part, all, scene, busy, theme: Theming.current, asset: (p) => Theming.asset(p), t, Pixel }
+  }
+  function hook(name, ...args) {
+    Theming.hook(name, hookContext(), ...args)
   }
 
   function paint() {
     Theming.applyScene(scene)
     for (const el of all('[data-art-bg]')) drawBackground(el)
     for (const el of all('canvas[data-art]')) drawArt(el)
-    const pal = Theming.palette(scene)
-    for (const row of all('.tool')) row.querySelector('img').src = Theming.icon(row.dataset.craft, pal)
+    for (const row of all('.tool')) setIcon(row.querySelector('img'), row.dataset.craft)
     applyStrings()
   }
 
@@ -309,7 +333,7 @@
     if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
     const panel = document.createElement('div')
     panel.className = 'theme-picker'
-    panel.innerHTML = '<div class="theme-picker-box"><div class="theme-picker-head"><span></span><button class="pix small"></button></div><div class="theme-cards"></div></div>'
+    panel.innerHTML = '<div class="theme-picker-box"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="theme-cards"></div></div>'
     label(panel.querySelector('.theme-picker-head span'), 'themesTitle')
     const close = panel.querySelector('.theme-picker-head button')
     label(close, 'themesClose')
@@ -322,7 +346,12 @@
       card.className = 'theme-card' + (th.id === Theming.current.id ? ' current' : '')
       card.innerHTML = '<canvas></canvas><span class="theme-name"></span><span class="theme-desc"></span>'
       const drawn = Theming.preview(th.id, scene)
-      if (drawn) blit(card.querySelector('canvas'), drawn, true)
+      if (drawn) {
+        const cv = card.querySelector('canvas')
+        blit(cv, drawn, false)
+        // Le anteprime piccole sono pixel art: si ingrandiscono a pixel pieni
+        cv.style.imageRendering = drawn.width < 144 ? 'pixelated' : 'auto'
+      }
       card.querySelector('.theme-name').textContent = th.name
       card.querySelector('.theme-desc').textContent = th.description
       if (th.id === Theming.current.id) card.appendChild(label(Object.assign(document.createElement('span'), { className: 'theme-current' }), 'themesCurrent'))
@@ -346,6 +375,7 @@
     closeMenu()
     const items = [...all('[data-part="log"] > .item')]
     const draft = part('input') ? part('input').value : ''
+    if (app.children.length) hook('unmount')
     const theme = await Theming.use(id)
     app.innerHTML = theme.layout || '<div data-solid style="background:#000;color:#fff;padding:20px">Questo tema non ha un layout.</div>'
     const log = part('log')
@@ -358,6 +388,7 @@
     scrollDown()
     if (sessionsPinned()) refreshSessions()
     api.setTrayIcon(Theming.trayIcon(Theming.palette('notte')))
+    hook('mount')
   }
 
   // ------------------------------------------------------------------ modifiche ai file
@@ -437,6 +468,7 @@
     if (!reply) {
       reply = entry('claude')
       reply.raw = ''
+      hook('reply')
     }
     return reply
   }
@@ -448,7 +480,9 @@
   }
 
   function setBusy(on) {
+    const changed = busy !== on
     busy = on
+    if (changed) hook('busy', on)
     for (const el of all('[data-action="send"]')) el.hidden = on
     for (const el of all('[data-action="stop"]')) el.hidden = !on
     for (const el of all('[data-part="hint"]')) el.textContent = t(on ? 'busyHint' : 'hint')
@@ -478,6 +512,7 @@
     renderReply()
     reply = null
     addTool(id, name, summary, change)
+    hook('tool', { name, craft: craftOf(name), summary, change })
   })
 
   // Un'azione di Claude: icona del mestiere, nome, su che cosa; per le modifiche ai file il conto delle righe e le
@@ -486,7 +521,7 @@
     const craft = craftOf(name)
     const row = add('tool', `<img alt=""><span>${esc(name)}</span><span class="what">${esc(summary || '')}</span>`)
     row.dataset.craft = craft
-    row.querySelector('img').src = Theming.icon(craft, Theming.palette(scene))
+    setIcon(row.querySelector('img'), craft)
     tools.set(id, row)
     // Le modifiche ai file: il conto delle righe nella riga dello strumento, le differenze sotto; un clic sulla
     // riga le chiude e le riapre
@@ -514,16 +549,18 @@
     row.dataset.statusKey = error ? 'toolFail' : 'toolOk'
     row.dataset.status = t(row.dataset.statusKey)
   }
-  api.onToolDone(({ id, error }) => toolDone(id, error))
+  api.onToolDone(({ id, error }) => { toolDone(id, error); hook('toolDone', { error: !!error }) })
   api.onDone(({ durationMs }) => {
     renderReply()
     labelled('footnote', 'took', { s: Math.round((durationMs || 0) / 1000) })
+    hook('done', { durationMs })
     reply = null
     setBusy(false)
     // Una conversazione nuova compare negli annali
     if (sessionsPinned()) refreshSessions()
   })
   api.onError((msg) => {
+    hook('error', String(msg))
     renderReply()
     add('error', esc(String(msg)))
     reply = null
@@ -572,6 +609,7 @@
   api.onAsk((q) => {
     renderReply()
     reply = null
+    hook('ask', q)
     if (q.kind === 'plan') return askPlan(q)
     const { id, title, description, detail, change, canAlways } = q
     const card = add('ask', '<div class="ask-title"></div><div class="ask-desc"></div><div class="ask-detail"></div><div class="ask-buttons"></div>')
@@ -587,7 +625,7 @@
     const choice = (key, cls, allow, always, outcome) => {
       const b = document.createElement('button')
       label(b, key)
-      b.className = `pix small ${cls}`
+      b.className = `btn small ${cls}`
       b.addEventListener('click', () => {
         api.answer(id, allow, always)
         closeAsk(buttons, outcome)
@@ -613,7 +651,7 @@
     for (const [key, cls, allow, outcome] of [['planApprove', '', true, 'planApproved'], ['planKeep', 'deny', false, 'planKept']]) {
       const b = document.createElement('button')
       label(b, key)
-      b.className = `pix small ${cls}`
+      b.className = `btn small ${cls}`
       b.addEventListener('click', () => {
         api.answer(id, allow, false)
         closeAsk(buttons, outcome)
@@ -755,7 +793,7 @@
     sessions: showSessions,
     'sessions-close': () => { if (part('sessions') && !sessionsPinned()) part('sessions').hidden = true },
     themes: openThemes,
-    scene: () => { scene = scene === 'notte' ? 'giorno' : 'notte'; api.setScene(scene); paint() },
+    scene: () => { scene = scene === 'notte' ? 'giorno' : 'notte'; api.setScene(scene); paint(); hook('scene', scene) },
   }
   document.addEventListener('click', (e) => {
     // I link delle risposte si aprono nel browser di sistema
@@ -910,7 +948,7 @@
       // ?tema=<id>&scena=giorno nell'indirizzo per guardare un tema
       info: async () => {
         const q = new URLSearchParams(location.search)
-        return { scene: q.get('scena') || 'notte', chapter: n, theme: q.get('tema') || 'terra-di-mezzo', themes: ['terra-di-mezzo', 'pergamena'], workdir: 'C:/Workspace', mode: q.get('modo') || 'auto' }
+        return { scene: q.get('scena') || 'notte', chapter: n, theme: q.get('tema') || 'terra-di-mezzo', themes: ['terra-di-mezzo', 'moderno', 'pergamena'], workdir: 'C:/Workspace', mode: q.get('modo') || 'auto' }
       },
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
       setMode: (m) => fire('onMode', m, 0),

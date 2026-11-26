@@ -2,7 +2,8 @@
 
 Claude in una finestra in pixel art, grande come l'app desktop e (se si vuole) sempre in primo piano. Forma e
 aspetto vengono dal tema. Quello di partenza è **Terra di Mezzo**: il Libro Rosso aperto, con gli annali a sinistra
-e la conversazione a destra. C'è anche **Pergamena**, il rotolo fantasy senza un mondo preciso. Altri temi si
+e la conversazione a destra. C'è anche **Pergamena**, il rotolo fantasy senza un mondo preciso, e **Moderno**,
+pulito come un'app di oggi, senza pixel art. Altri temi si
 aggiungono come cartelle in `src/renderer/themes/`, ognuno con il proprio scheletro (guida:
 [`src/renderer/themes/LEGGIMI.md`](src/renderer/themes/LEGGIMI.md)).
 
@@ -26,7 +27,8 @@ npm 11 altrimenti non arriva.
   ricordata per tema. Dal vassoio: "Riporta al centro" e "Dimensione iniziale".
 - **Sempre in primo piano:** dal vassoio si può spegnere, ora che la finestra è grande.
 - **Scorciatoia:** `Ctrl+Alt+P` mostra o nasconde la finestra da qualunque programma; c'è anche l'icona nel vassoio.
-- **Tema:** dalla finestra ("temi" sotto il rotolo, "altri libri" in fondo alla pagina sinistra del Libro Rosso), con
+- **Tema:** dalla finestra ("temi" sotto il rotolo, "altri libri" in fondo alla pagina sinistra del Libro Rosso,
+  "Temi" in fondo alla barra laterale di Moderno), con
   un'anteprima di ogni tema, oppure dal vassoio, **Tema**. Cambia sul posto (forma della finestra compresa) senza perdere la conversazione;
   Claude prende il tono del nuovo tema dal messaggio successivo. Il pulsante "stelle"/"Contea" (o "notte"/"giorno")
   passa da una scena all'altra.

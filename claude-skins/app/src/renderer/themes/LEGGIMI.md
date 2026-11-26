@@ -3,7 +3,7 @@
 Ogni tema è una cartella qui dentro. Il nome della cartella è l'id del tema e deve essere uguale al campo `id` del
 suo `theme.js`. L'app trova da sola le cartelle all'avvio, e il tema si sceglie dalla finestra o dal vassoio (**Tema**).
 
-Un tema decide **tutto quello che si vede**:
+Un tema decide **tutto quello che si vede**, e non deve per forza essere in pixel art:
 - la forma della finestra (il suo HTML e il suo CSS);
 - i colori, le scritte e i disegni a pixel;
 - la misura della finestra;
@@ -19,13 +19,14 @@ il tono dal messaggio successivo.
 
 ```
 themes/
-  pergamena/        il rotolo: due capi arrotolati, foglio in mezzo, cronache in sovrimpressione
-    theme.js
-    theme.css
-  terra-di-mezzo/   il Libro Rosso aperto: annali sempre visibili a sinistra, conversazione a destra
-    theme.js
-    theme.css
+  pergamena/        pixel art: il rotolo, due capi arrotolati, foglio in mezzo, cronache in sovrimpressione
+  terra-di-mezzo/   pixel art: il Libro Rosso aperto, annali a sinistra, conversazione a destra
+  moderno/          niente pixel: un riquadro pulito con l'ombra, barra laterale, icone SVG, agganci
+kits/
+  pixel.css         lo stile pixel condiviso (caratteri, gradini, palette di pergamena): lo includono i temi pixel
 ```
+
+Ogni cartella di tema ha il suo `theme.js` e, se serve, `theme.css` e altri file (immagini, caratteri, suoni).
 
 ## Il file `theme.js`
 
@@ -53,6 +54,9 @@ funzioni, a livello del file, invece no.
 | `description` | Una riga per chi legge il codice | — |
 | `layout` | L'HTML della finestra (vedi sotto) | Un riquadro d'avviso: serve sempre |
 | `css: true` | Carica `theme.css` dalla cartella del tema | Solo lo stile comune |
+| `kits` | Stili condivisi da includere prima del `theme.css`, per esempio `['pixel']` | Nessuno: lo stile neutro di `style.css` |
+| `artScale` | Di quanto si ingrandiscono i disegni a pixel (`data-art`, `data-art-bg`) | 3 |
+| `hooks` | Funzioni chiamate quando succede qualcosa (vedi sotto) | Nessuna |
 | `window` | `{ width, height, minWidth, minHeight }` in pixel | 1080×760, minimo 360×480 |
 | `persona` | Testo aggiunto al prompt di sistema di Claude Code: il tono delle risposte | Una frase neutra |
 | `strings` | Le scritte dell'interfaccia (chiavi in `STRINGS` di `theming.js`) | Quelle di partenza |
@@ -114,8 +118,10 @@ Al cambio di tema il motore riscrive tutto.
 
 | Attributo | Che cosa fa |
 | --- | --- |
-| `<canvas data-art="nome">` | Il disegno `art.nome` del tema, a pixel. La misura a schermo la decide il CSS del canvas; il disegno riceve quella misura divisa per 3 |
-| `data-art-fit="natural"` | La misura la decide invece il disegno (ogni pixel diventa 3×3): per lumi, spille, segnalibri |
+| `<canvas data-art="nome">` | Il disegno `art.nome` del tema. La misura a schermo la decide il CSS del canvas; il disegno riceve quella misura divisa per la scala |
+| `data-art-fit="natural"` | La misura la decide invece il disegno (ogni pixel diventa scala×scala): per lumi, spille, segnalibri |
+| `data-art-scale="2"` | La scala di questo disegno, al posto di quella del tema. Con `1` il disegno è a piena risoluzione |
+| `data-art-smooth` | Ingrandito con le sfumature invece che a pixel pieni: per disegni non pixel (curve, sfumature) |
 | `data-art-anim` | Ridisegnato ogni 180 ms con un fotogramma nuovo: per la candela o l'Anello |
 | `data-art-arg="..."` | Un valore in più per il disegno, per esempio `destra` per specchiarlo |
 | `data-art-bg="nome"` | Su qualunque elemento: il disegno come sfondo ripetuto, ingrandito a pixel pieni. Si usa per carta e cuoio |
@@ -134,23 +140,55 @@ art: {
 
 L'oggetto contiene:
 - `width` e `height`: la misura dell'elemento in pixel dello schermo;
-- `w` e `h`: la stessa misura divisa per 3;
+- `w` e `h`: la stessa misura divisa per la scala, e `scale`, la scala;
 - `pal`: la palette della scena;
 - `scene`: `'notte'` o `'giorno'`;
 - `frame`, il fotogramma, e `busy`, che dice se Claude sta lavorando;
 - `arg`: il valore di `data-art-arg`;
 - `el`: l'elemento.
 
-I nomi dei disegni sono liberi: sono quelli che il layout usa. Due nomi sono speciali:
-- **`trayIcon()`** restituisce l'icona del vassoio, 16×16. Se manca, l'app usa il rotolino.
-- **`icons`** non è una funzione ma un oggetto `{ mestiere: righe 8×8 }`, con solo le icone che cambiano. I
-  mestieri sono `leggere`, `scrivere`, `forgiare`, `cercare`, `messaggi`, `compagnia`, `mappa` e `altro`;
-  `craftOf` in `renderer.js` decide quale strumento va con quale. Le lettere di colore sono `o` inchiostro tenue,
-  `p` carta chiara, `g` oro, `y` oro chiaro e `r` rosso; `palette.iconColors` ne aggiunge altre.
+I nomi dei disegni sono liberi: sono quelli che il layout usa. Tre nomi sono speciali:
+- **`trayIcon({ pal })`** restituisce l'icona del vassoio: un canvas 16×16 (pixel art, ingrandito a pixel pieni) o
+  32×32. Se manca, l'app usa il rotolino.
+- **`preview({ pal, scene, width, height })`** disegna l'anteprima del selettore dei temi (144×90; un canvas più
+  grande per lo schermo ad alta densità, uno più piccolo è pixel art e si ingrandisce a pixel pieni). Se manca, il
+  motore la compone coi disegni `paper`, `leather` o `roll`, e `trayIcon`.
+- **`icons`** non è una funzione ma un oggetto `{ mestiere: icona }`. I mestieri sono `leggere`, `scrivere`,
+  `forgiare`, `cercare`, `messaggi`, `compagnia`, `mappa` e `altro`; `craftOf` in `renderer.js` decide quale
+  strumento va con quale. Un'icona può essere:
+  - le righe di una bitmap a pixel (lettere di colore: `o` inchiostro tenue, `p` carta chiara, `g` oro, `y` oro
+    chiaro, `r` rosso, più quelle di `palette.iconColors`);
+  - un SVG scritto nel codice (`'<svg ...>'`);
+  - un file della cartella del tema (`'icone/leggere.svg'`, PNG compresi);
+  - un canvas;
+  - una funzione `({ pal, scene, craft })` che restituisce uno di questi (per esempio un SVG nei colori della scena).
+
+  Un mestiere che il tema non disegna prende l'icona a pixel di partenza se il tema usa il kit pixel, altrimenti
+  la sua icona `altro`.
 
 `window.Pixel` contiene:
 - gli attrezzi: `canvas`, `px`, `bitmap(righe, colori)`, `mirror`, `seeded`, `upscale` e `SCALE`;
 - i disegni pronti in `Pixel.lib`: `paperTile`, `roll`, `dashes`, `candle` e `trayScroll`.
+
+## Gli agganci: `hooks`
+
+Funzioni che il motore chiama quando succede qualcosa, per animazioni, suoni o un personaggio. Ricevono per primo
+un contesto `{ root, part(nome), all(selettore), scene, busy, theme, asset(percorso), t(chiave), Pixel }`. `asset`
+dà l'indirizzo di un file della cartella del tema, per esempio `new Audio(ctx.asset('penna.ogg')).play()`. Poi:
+
+| Aggancio | Quando | Dopo il contesto |
+| --- | --- | --- |
+| `mount`, `unmount` | Il layout del tema è appena montato; sta per essere tolto (cambio di tema) | — |
+| `busy` | Claude comincia o smette di lavorare | `true` o `false` |
+| `reply` | Comincia una risposta scritta | — |
+| `tool` | Claude usa uno strumento | `{ name, craft, summary, change }` |
+| `toolDone` | Uno strumento ha finito | `{ error }` |
+| `ask` | Arriva una domanda di permesso o un piano | la domanda |
+| `done`, `error` | La risposta è finita; si è fermata con un errore | `{ durationMs }`; il messaggio |
+| `scene` | Notte ↔ giorno | `'notte'` o `'giorno'` |
+
+Lo stato si vede anche dal CSS: `body.busy` mentre Claude lavora, `body.giorno` di giorno, `body[data-perm-mode]`
+col modo dei permessi, `body[data-theme]` col tema. Un aggancio che va in errore non ferma l'app.
 
 ## Colori: `palette` e `vars`
 
@@ -163,9 +201,12 @@ I nomi dei disegni sono liberi: sono quelli che il layout usa. Due nomi sono spe
 
 ## `theme.css` e `style.css`
 
-- `style.css` vale per tutti i temi. Contiene le variabili, le voci della conversazione (domande, risposte, azioni,
-  permessi, codice, differenze delle modifiche ai file), i pulsanti `.pix` e `.ctl`, le righe delle cronache e le barre di scorrimento. Non contiene
-  nessuna forma di finestra.
+- `style.css` vale per tutti i temi ed è neutro: caratteri di sistema, bordi sottili, angoli arrotondati
+  (`--radius`), colori grigi con un accento. Contiene le variabili, le voci della conversazione (domande, risposte,
+  azioni, permessi, codice, differenze, menu dei comandi, selettori), i pulsanti `.btn` e `.ctl`, le righe delle
+  cronache e le barre di scorrimento. Non contiene nessuna forma di finestra.
+- Un **kit** (`kits/<nome>.css`) è uno stile intero condiviso da più temi. `kits/pixel.css` porta i caratteri a
+  pixel, la palette di pergamena di partenza, angoli vivi e bordi a gradino, il capolettera, le barre a pixel.
 - `theme.css` è attivo solo mentre il tema è in uso, quindi le regole non hanno bisogno di prefissi. Contiene la
   forma della finestra e può ridefinire qualunque cosa di `style.css`.
 - Un carattere nuovo va nella cartella del tema e si dichiara con `@font-face` nel `theme.css`, con un percorso

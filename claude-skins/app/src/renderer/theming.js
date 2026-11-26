@@ -123,29 +123,38 @@
   async function load(ids) {
     window.SkinsThemes = window.SkinsThemes || []
     await Promise.all(ids.map((id) => loadScript(`themes/${id}/theme.js`)))
-    for (const th of window.SkinsThemes) if (th && th.id && !registry.has(th.id)) registry.set(th.id, th)
+    // Nell'ordine dato (il predefinito per primo, poi per nome), non in quello in cui i file finiscono di caricarsi
+    const loaded = new Map(window.SkinsThemes.filter((th) => th && th.id).map((th) => [th.id, th]))
+    for (const id of [...ids, ...loaded.keys()]) if (loaded.has(id) && !registry.has(id)) registry.set(id, loaded.get(id))
     return [...registry.values()].map((th) => ({ id: th.id, name: th.name || th.id }))
   }
 
-  // Sceglie il tema (se l'id non c'è, il primo caricato) e carica il suo theme.css al posto di quello del tema
-  // precedente: è attivo un solo foglio di tema alla volta, quindi le sue regole non hanno bisogno di prefissi
+  // Sceglie il tema (se l'id non c'è, il primo caricato) e carica i suoi fogli al posto di quelli del tema
+  // precedente: prima i kit che include (kits/<nome>.css, per esempio la pixel art), poi il suo theme.css. È attivo
+  // un solo tema alla volta, quindi le sue regole non hanno bisogno di prefissi
   function use(id) {
     current = registry.get(id) || registry.values().next().value || { id: 'nessuno' }
     document.body.dataset.theme = current.id
-    const old = document.getElementById('theme-css')
-    if (!current.css) {
-      if (old) old.remove()
-      return Promise.resolve(current)
-    }
-    return new Promise((resolve) => {
+    for (const old of document.querySelectorAll('link[data-theme-css]')) old.remove()
+    const sheets = [...(current.kits || []).map((k) => `kits/${k}.css`), ...(current.css ? [`themes/${current.id}/theme.css`] : [])]
+    return Promise.all(sheets.map((href) => new Promise((resolve) => {
       const link = document.createElement('link')
-      link.id = 'theme-css'
       link.rel = 'stylesheet'
-      link.href = `themes/${current.id}/theme.css`
-      link.onload = link.onerror = () => resolve(current)
-      if (old) old.replaceWith(link)
-      else document.head.appendChild(link)
-    })
+      link.href = href
+      link.dataset.themeCss = ''
+      link.onload = link.onerror = resolve
+      document.head.appendChild(link)
+    }))).then(() => current)
+  }
+
+  // Un file della cartella del tema (immagini, caratteri, suoni), come indirizzo per la pagina
+  function asset(path, theme = current) {
+    return `themes/${theme.id}/${String(path).replace(/^\.?\//, '')}`
+  }
+
+  // I disegni del tema sono ingranditi di questa scala (data-art-scale la cambia per un elemento)
+  function artScale() {
+    return Number(current.artScale) || Pixel.SCALE
   }
 
   // Le scene sono due, 'notte' e 'giorno'; un tema può definirne una sola o nessuna
@@ -197,9 +206,38 @@
     }
   }
 
-  // Le icone dei mestieri: quelle del tema, altrimenti quelle di partenza
-  function icon(craft, pal) {
-    return Pixel.icon(craft, pal, Object.assign({}, Pixel.ICONS, (current.art && current.art.icons) || {}))
+  // L'icona di un mestiere, come { src, pixel }. Un tema la dà in art.icons in uno di questi modi: righe di una bitmap
+  // (pixel art), un canvas, un SVG scritto nel codice ('<svg ...'), un file della sua cartella ('icone/leggere.svg')
+  // o una funzione ({ pal, scene, craft }) che restituisce uno di questi. Senza, l'icona a pixel di partenza
+  function icon(craft, pal, sceneName) {
+    const icons = (current.art && current.art.icons) || {}
+    // Un mestiere che il tema non disegna: per un tema pixel l'icona a pixel di partenza di quel mestiere, per gli
+    // altri la loro icona "altro" (una bitmap in mezzo a icone SVG starebbe male)
+    const pixelTheme = (current.kits || []).includes('pixel')
+    let v = icons[craft] ?? (pixelTheme ? undefined : icons.altro)
+    try {
+      if (typeof v === 'function') v = v({ pal, scene: sceneName, craft })
+    } catch {
+      v = null
+    }
+    if (Array.isArray(v)) return { src: Pixel.bitmap(v, Pixel.iconColors(pal)).toDataURL(), pixel: true }
+    if (v && typeof v.toDataURL === 'function') return { src: v.toDataURL(), pixel: v.width <= 16 }
+    if (typeof v === 'string' && v.trim().startsWith('<svg')) return { src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(v)}`, pixel: false }
+    if (typeof v === 'string' && v.startsWith('data:')) return { src: v, pixel: false }
+    if (typeof v === 'string' && v) return { src: asset(v), pixel: false }
+    return { src: Pixel.icon(craft, pal, Pixel.ICONS), pixel: true }
+  }
+
+  // Gli agganci del tema: funzioni che il motore chiama quando succede qualcosa (vedi themes/LEGGIMI.md); un errore
+  // di un tema non ferma l'app
+  function hook(name, ctx, ...args) {
+    const fn = current.hooks && current.hooks[name]
+    if (typeof fn !== 'function') return
+    try {
+      fn(ctx, ...args)
+    } catch (err) {
+      console.warn(`Tema ${current.id}, aggancio "${name}":`, err)
+    }
   }
 
   // L'icona del vassoio, 32×32: quella del tema (un canvas 16×16) o il rotolino di partenza
@@ -216,6 +254,13 @@
     if (!theme) return null
     const pal = paletteOf(theme, sceneName)
     const a = theme.art || {}
+    // Un tema può disegnare la sua anteprima (144×90, o più piccola per la pixel art)
+    if (typeof a.preview === 'function') {
+      try {
+        const own = a.preview({ pal, scene: sceneName, width: 144, height: 90 })
+        if (own) return own
+      } catch {}
+    }
     const W = 48
     const H = 30
     const c = Pixel.canvas(W, H)
@@ -246,7 +291,7 @@
     preview,
     // I temi caricati, per il selettore: id, nome, descrizione
     list: () => [...registry.values()].map((th) => ({ id: th.id, name: th.name || th.id, description: th.description || '' })),
-    load, use, applyScene, t, chapterDate, plainDate, art, icon, trayIcon, MONTHS,
+    load, use, applyScene, t, chapterDate, plainDate, art, icon, trayIcon, hook, asset, artScale, MONTHS,
     get current() { return current },
     palette: (name) => paletteOf(current, name),
   }

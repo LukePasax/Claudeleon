@@ -17,6 +17,8 @@
   // La finestra: misura di partenza e minima (il rotolo sta anche stretto)
   window: { width: 1080, height: 760, minWidth: 360, minHeight: 480 },
 
+  // Lo stile pixel (caratteri, bordi a gradino, palette di pergamena di partenza) viene dal kit, poi theme.css
+  kits: ['pixel'],
   css: true,
 
   layout: `
@@ -31,7 +33,7 @@
   </div>
   <div class="sheet" data-art-bg="paper">
     <div class="sessions" data-part="sessions" data-art-bg="paper" hidden>
-      <div class="sessions-head"><span data-s="sessionsTitle"></span><button class="pix small" data-action="sessions-close" data-s="back"></button></div>
+      <div class="sessions-head"><span data-s="sessionsTitle"></span><button class="btn small" data-action="sessions-close" data-s="back"></button></div>
       <div class="sessions-list" data-part="sessions-list"></div>
     </div>
     <div class="log" data-part="log">
@@ -47,8 +49,8 @@
       <div class="quill-row">
         <canvas class="lamp" data-art="lamp" data-art-anim data-art-fit="natural"></canvas>
         <span class="hint" data-part="hint"></span>
-        <button class="pix" data-action="send" data-s="send"></button>
-        <button class="pix" data-action="stop" data-s="stop" hidden></button>
+        <button class="btn" data-action="send" data-s="send"></button>
+        <button class="btn" data-action="stop" data-s="stop" hidden></button>
       </div>
     </div>
   </div>

@@ -1,143 +1,137 @@
-@font-face { font-family: 'Pixelify'; src: url('fonts/pixelify-sans.woff2') format('woff2'); font-weight: 400 700; }
-@font-face { font-family: 'Bastarda'; src: url('fonts/jacquarda-bastarda-9.woff2') format('woff2'); }
-/* Per il codice: a pixel e monospaziato, con cifre chiare (in Pixelify il 5 sembra una S e le colonne non si allineano) */
-@font-face { font-family: 'VT323'; src: url('fonts/vt323.woff2') format('woff2'); }
+/* Il foglio comune a tutti i temi, neutro: le variabili con valori di partenza sobri e le voci della conversazione
+   (domande, risposte, azioni, differenze, permessi, piano, comandi, cronache, selettori), con bordi sottili e angoli
+   arrotondati. La forma della finestra sta nel layout e nel theme.css di ogni tema; uno stile intero (per esempio la
+   pixel art) sta in un kit (kits/<nome>.css) che il tema include. Tema e kit possono ridefinire tutto quello che c'è qui.
 
-/* Il foglio comune a tutti i temi: variabili, voci della conversazione (domande, risposte, azioni, permessi),
-   pulsanti, righe delle cronache, barre di scorrimento. La forma della finestra no: quella sta nel layout e nel
-   theme.css di ogni tema, che può anche ridefinire tutto quello che c'è qui.
-
-   I colori e i caratteri dell'interfaccia: questi sono i valori di partenza, notte e giorno (body.giorno). Un tema
-   ridefinisce quelli che vuole nelle "vars" delle sue scene (vedi themes/LEGGIMI.md), che finiscono nello stile in
-   linea di body e quindi vincono su queste. Stanno su body e non su :root perché le variabili composte (--strong ecc.)
-   si calcolano dove sono dichiarate: così usano i colori del tema */
+   Le variabili stanno su body e non su :root perché quelle composte (--strong ecc.) si calcolano dove sono
+   dichiarate: così usano i colori del tema, che finiscono nello stile in linea di body (vars delle sue scene) */
 body {
-  --font-body: 'Pixelify', monospace; --font-display: 'Bastarda', serif; --font-code: 'VT323', monospace;
-  --ink: #e8d9b5; --ink-soft: #a8946a; --gold: #d4a338; --gold-light: #ffe7a0; --gold-dark: #7a5418; --red: #e0663a;
-  --edge: #1c160d; --edge-light: #5a4526; --field: rgba(0, 0, 0, 0.28); --code: rgba(0, 0, 0, 0.3);
+  --font-body: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-body);
+  --font-code: 'Cascadia Mono', Consolas, 'SFMono-Regular', Menlo, monospace;
+  --text-size: 15px; --code-size: 13px; --small-size: 12px;
+  /* Angoli e bordi: un kit a pixel li porta a zero e a gradino */
+  --radius: 8px; --radius-small: 5px; --line: 1px;
+  --ink: #e6e6e3; --ink-soft: #9c9c97; --gold: #d97757; --gold-light: #f0a07f; --gold-dark: #8a4a33; --red: #e5654f;
+  --edge: #1f1f1d; --edge-light: #3a3a37; --field: #2a2a27; --code: rgba(255, 255, 255, 0.05);
+  --bg: #262624; --surface: #30302d;
   /* Testi in evidenza: grassetto, titolo della domanda, cronaca aperta */
-  --strong: var(--gold-light);
-  /* Il titolo sul capo alto e il capolettera */
-  --title-ink: #2a1d0e; --title-glow: rgba(255, 240, 200, 0.6);
+  --strong: #ffffff;
+  --title-ink: var(--ink); --title-glow: transparent;
   --initial-ink: var(--gold-light); --initial-bg: var(--edge);
-  /* I pulsanti d'oro, quello del rifiuto e i due sul capo alto */
-  --btn-bg: #d4a338; --btn-hover: #e0b54a; --btn-light: #ffe7a0; --btn-dark: #9a6a1a; --btn-ink: #3d2e18; --btn-ring: #3d2e18;
-  --deny-bg: #b8542e; --deny-light: #e8906a; --deny-dark: #7a3418; --deny-ink: #fff0e0;
-  --ctl-bg: #3d2e18; --ctl-hover: #5a4526; --ctl-light: #7a5f35; --ctl-dark: #1c160d; --ctl-ink: #ffe7a0;
-  /* La riga sotto il rotolo, sopra le finestre degli altri programmi */
-  --bar-ink: var(--gold); --bar-hover: var(--gold-light); --bar-shadow: rgba(0, 0, 0, 0.7);
+  /* I pulsanti, quello del rifiuto e quelli della finestra */
+  --btn-bg: var(--gold); --btn-hover: var(--gold-light); --btn-light: var(--gold-light); --btn-dark: var(--gold-dark); --btn-ink: #ffffff; --btn-ring: transparent;
+  --deny-bg: #4a4a46; --deny-light: #5c5c57; --deny-dark: #333330; --deny-ink: #f0f0ec;
+  --ctl-bg: transparent; --ctl-hover: rgba(255, 255, 255, 0.08); --ctl-light: transparent; --ctl-dark: transparent; --ctl-ink: var(--ink-soft);
+  --bar-ink: var(--gold); --bar-hover: var(--gold-light); --bar-shadow: transparent;
   /* Le modifiche ai file: righe aggiunte e tolte, e i loro conti */
-  --add-bg: rgba(120, 170, 70, 0.2); --add-ink: var(--ink); --del-bg: rgba(210, 80, 50, 0.2); --del-ink: var(--ink);
-  --plus: #8fbf5a; --minus: var(--red);
+  --add-bg: rgba(80, 180, 110, 0.16); --add-ink: var(--ink); --del-bg: rgba(230, 90, 70, 0.16); --del-ink: var(--ink);
+  --plus: #6cc28a; --minus: var(--red);
+  /* I pannelli sopra la conversazione (menu dei comandi, selettore dei temi) */
+  --menu-bg: var(--surface); --veil: rgba(0, 0, 0, 0.5); --shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
 }
 body.giorno {
-  --ink: #3a2a18; --ink-soft: #7b6343; --gold: #9a6a1a; --gold-light: #c8963a; --red: #a0381a;
-  --edge: #a8783f; --edge-light: #c8a462; --field: rgba(255, 255, 255, 0.35); --code: rgba(120, 90, 30, 0.15);
-  --strong: var(--gold); --initial-ink: #ffe7a0; --initial-bg: #5a4526;
-  --add-bg: rgba(80, 140, 40, 0.18); --del-bg: rgba(190, 60, 30, 0.16); --plus: #3f6a2e;
+  --ink: #1f1f1d; --ink-soft: #6b6b66; --gold: #c15f3c; --gold-light: #d97757; --gold-dark: #9a4a2c; --red: #c2412d;
+  --edge: #f5f4ef; --edge-light: #dedcd4; --field: #ffffff; --code: rgba(0, 0, 0, 0.04);
+  --bg: #faf9f5; --surface: #ffffff; --strong: #000000;
+  --deny-bg: #e8e6df; --deny-light: #f0eee8; --deny-dark: #d6d3ca; --deny-ink: #1f1f1d;
+  --ctl-hover: rgba(0, 0, 0, 0.06);
+  --add-bg: rgba(40, 150, 80, 0.12); --del-bg: rgba(200, 60, 40, 0.1); --plus: #2c8a4e;
+  --menu-bg: #ffffff; --veil: rgba(30, 30, 28, 0.25); --shadow: 0 8px 28px rgba(0, 0, 0, 0.15);
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; }
-/* Senza legature: in Pixelify "fi" diventa un segno solo che sembra una A */
-body { font-family: var(--font-body); font-size: 16px; color: var(--ink); font-variant-ligatures: none; font-feature-settings: 'liga' 0, 'clig' 0; }
+body { font-family: var(--font-body); font-size: var(--text-size); color: var(--ink); -webkit-font-smoothing: antialiased; }
 #app { position: absolute; inset: 0; }
-canvas { image-rendering: pixelated; display: block; }
-[data-art-bg] { image-rendering: pixelated; background-repeat: repeat; }
-button { font-family: inherit; }
+canvas { display: block; }
+[data-art-bg] { background-repeat: repeat; }
+button { font-family: inherit; color: inherit; }
 [hidden] { display: none !important; }
 
 /* I pezzi che il motore usa, con il minimo perché funzionino in qualunque layout */
 [data-part="log"] { overflow-y: auto; user-select: text; }
-[data-part="input"] { resize: none; border: none; outline: none; font: inherit; user-select: text; }
+[data-part="input"] { resize: none; border: none; outline: none; font: inherit; color: inherit; user-select: text; }
 [data-drag] { cursor: grab; }
 [data-drag].dragging { cursor: grabbing; }
 [data-grip] { cursor: nwse-resize; }
 
-/* Le barre di scorrimento a pixel: binario incavato, cursore d'oro a rilievo, niente frecce */
-::-webkit-scrollbar { width: 12px; height: 12px; }
+/* Barre di scorrimento sottili */
+::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-button { display: none; }
-::-webkit-scrollbar-track { background: var(--code); box-shadow: inset 3px 0 0 var(--edge); }
-::-webkit-scrollbar-thumb { background: var(--gold); box-shadow: inset -3px -3px 0 var(--gold-dark), inset 3px 3px 0 var(--gold-light); }
-::-webkit-scrollbar-thumb:hover { background: var(--gold-light); }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--edge-light); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--ink-soft); }
 ::-webkit-scrollbar-corner { background: transparent; }
 
 /* Il titolo del capitolo (dove il layout lo mette) */
-.chapter-title { font-family: var(--font-display); font-size: 36px; line-height: 1; }
-/* Il numero romano col carattere a pixel normale: in gotico "III" si legge "333" */
-.chapter-title .num { font-family: var(--font-body); font-weight: 700; font-size: 30px; margin-left: 6px; }
-.chapter-date { font-size: 14px; color: var(--ink-soft); margin-top: 4px; }
+.chapter-title { font-family: var(--font-display); font-size: 22px; font-weight: 600; line-height: 1.15; }
+.chapter-title .num { margin-left: 6px; }
+.chapter-date { font-size: var(--small-size); color: var(--ink-soft); margin-top: 4px; }
 
 /* Le voci della conversazione */
-.entry { margin: 0 0 16px; line-height: 1.45; }
-.who { font-size: 14px; color: var(--ink-soft); margin-bottom: 2px; }
+.entry { margin: 0 0 18px; line-height: 1.55; }
+.who { font-size: var(--small-size); color: var(--ink-soft); margin-bottom: 3px; }
 .entry.you { padding-left: 14%; }
-.entry.you .text { color: var(--ink-soft); white-space: pre-wrap; padding-left: 10px; box-shadow: inset 3px 0 0 var(--edge-light); }
+.entry.you .text { white-space: pre-wrap; padding: 8px 12px; background: var(--code); border-radius: var(--radius); }
 .entry.claude .who { color: var(--gold); }
-.entry.claude .text p { margin: 0 0 8px; }
-/* Il capolettera: una maiuscola a pixel in grassetto, in un riquadro d'oro a gradino; il testo le gira intorno */
-.entry.claude .text > p:first-child::first-letter {
-  float: left; font-weight: 700; font-size: 32px; line-height: 1; padding: 6px 8px 4px; margin: 4px 8px 0 0;
-  color: var(--initial-ink); background: var(--initial-bg);
-  box-shadow: inset 0 0 0 3px var(--gold), inset 0 0 0 6px var(--initial-bg);
-}
-.text code { font-family: var(--font-code); font-size: 1.2em; line-height: 1; background: var(--code); padding: 0 4px; }
-.text pre { background: var(--code); padding: 8px 10px; overflow-x: auto; font-size: 15px; box-shadow: inset 3px 0 0 var(--gold); }
-.text pre code { background: none; padding: 0; line-height: 1.25; }
-.text ul, .text ol { margin: 0 0 8px 20px; padding: 0; }
+.entry.claude .text p { margin: 0 0 10px; }
+.text code { font-family: var(--font-code); font-size: 0.88em; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+.text pre { position: relative; background: var(--code); padding: 10px 12px; overflow-x: auto; font-size: var(--code-size); border-radius: var(--radius-small); border: var(--line) solid var(--edge-light); }
+.text pre code { background: none; padding: 0; font-size: 1em; line-height: 1.45; border-radius: 0; }
+.text pre[data-lang]::before { content: attr(data-lang); position: absolute; right: 8px; top: 4px; font-family: var(--font-body); font-size: 11px; color: var(--ink-soft); opacity: 0.8; }
+.text ul, .text ol { margin: 0 0 10px 22px; padding: 0; }
 .text b { color: var(--strong); font-weight: 600; }
 .text s { opacity: 0.7; }
 /* I titoli: # e ## nel carattere dei titoli, ### e #### in quello del testo */
-.text h2, .text h3 { font-family: var(--font-display); font-weight: normal; color: var(--gold); line-height: 1.1; }
-.text h2 { font-size: 30px; margin: 14px 0 6px; }
-.text h3 { font-size: 27px; margin: 12px 0 4px; }
-.text h4, .text h5 { font-weight: 700; margin: 10px 0 4px; }
-.text h4 { font-size: 17px; color: var(--gold); }
-.text h5 { font-size: 16px; color: var(--strong); }
+.text h2, .text h3 { font-family: var(--font-display); font-weight: 600; color: var(--strong); line-height: 1.2; }
+.text h2 { font-size: 1.45em; margin: 16px 0 6px; }
+.text h3 { font-size: 1.25em; margin: 14px 0 4px; }
+.text h4, .text h5 { font-weight: 600; margin: 12px 0 4px; }
+.text h4 { font-size: 1.05em; color: var(--strong); }
+.text h5 { font-size: 1em; color: var(--ink-soft); }
 .text > :first-child { margin-top: 0; }
 /* Gli elenchi annidati e le caselle */
-.text li { margin: 1px 0; }
+.text li { margin: 2px 0; }
 .text li > ul, .text li > ol { margin: 2px 0 2px 18px; }
 .text li > p { margin: 0 0 6px; }
-.text li.has-task { list-style: none; margin-left: -18px; }
-.text .task { display: inline-block; width: 12px; height: 12px; margin-right: 8px; vertical-align: -1px; box-shadow: inset 0 0 0 2px var(--ink-soft); }
-.text .task.done { background: var(--plus); box-shadow: inset 0 0 0 2px var(--ink-soft), inset 0 0 0 4px var(--code); }
-/* La citazione, la linea, il nome del linguaggio sul blocco di codice */
-.text blockquote { margin: 0 0 8px; padding: 2px 0 2px 12px; color: var(--ink-soft); box-shadow: inset 3px 0 0 var(--gold-dark); }
+.text li.has-task { list-style: none; margin-left: -20px; }
+.text .task { display: inline-block; width: 13px; height: 13px; margin-right: 8px; vertical-align: -1px; border: 1.5px solid var(--ink-soft); border-radius: 3px; }
+.text .task.done { background: var(--plus); border-color: var(--plus); }
+/* La citazione, la linea */
+.text blockquote { margin: 0 0 10px; padding: 2px 0 2px 12px; color: var(--ink-soft); border-left: 3px solid var(--edge-light); }
 .text blockquote p:last-child { margin-bottom: 0; }
-.text hr { border: none; height: 3px; margin: 12px 0; opacity: 0.6; background: repeating-linear-gradient(90deg, var(--ink-soft) 0 9px, transparent 9px 15px); }
-.text pre { position: relative; }
-.text pre[data-lang]::before { content: attr(data-lang); position: absolute; right: 8px; top: 2px; font-family: var(--font-body); font-size: 11px; color: var(--ink-soft); opacity: 0.8; }
-/* Le tabelle: a pixel, con l'intestazione d'oro; se sono larghe scorrono */
-.text .table { overflow-x: auto; margin: 0 0 10px; }
-.text table { border-collapse: collapse; font-size: 14px; }
-.text th, .text td { padding: 4px 10px; text-align: left; box-shadow: inset 0 -2px 0 var(--edge-light); }
-.text th { color: var(--gold); font-weight: 700; box-shadow: inset 0 -3px 0 var(--gold-dark); }
-.text tbody tr:nth-child(even) td { background: var(--code); }
+.text hr { border: none; border-top: var(--line) solid var(--edge-light); margin: 14px 0; }
+/* Le tabelle; se sono larghe scorrono */
+.text .table { overflow-x: auto; margin: 0 0 12px; }
+.text table { border-collapse: collapse; font-size: 0.93em; }
+.text th, .text td { padding: 5px 12px; text-align: left; border-bottom: var(--line) solid var(--edge-light); }
+.text th { font-weight: 600; color: var(--strong); border-bottom-width: 2px; }
 /* I link si aprono nel browser; quelli non sicuri (o percorsi di file) restano testo */
-.text a { color: var(--gold); text-decoration: none; box-shadow: inset 0 -2px 0 var(--gold-dark); cursor: pointer; }
-.text a:hover { color: var(--strong); box-shadow: inset 0 -2px 0 var(--gold); }
-.text .link-off { box-shadow: inset 0 -2px 0 var(--edge-light); }
+.text a { color: var(--gold); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.text a:hover { color: var(--gold-light); }
+.text .link-off { text-decoration: underline dotted; }
 
-.tool { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--ink-soft); margin: 2px 0; }
-.tool img { width: 24px; height: 24px; image-rendering: pixelated; flex: none; }
-.tool .what { opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Le azioni di Claude */
+.tool { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--ink-soft); margin: 3px 0; }
+.tool img { width: 18px; height: 18px; flex: none; }
+.tool .what { opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-code); font-size: 0.95em; }
 /* "ok" ed "errore" vengono dalle scritte del tema, nell'attributo data-status */
-.tool.done::after, .tool.fail::after { content: attr(data-status); color: var(--ink-soft); font-size: 12px; margin-left: auto; }
+.tool.done::after, .tool.fail::after { content: attr(data-status); color: var(--ink-soft); font-size: var(--small-size); margin-left: auto; }
 .tool.fail::after { color: var(--red); }
-.footnote { font-size: 13px; color: var(--ink-soft); text-align: right; margin: -8px 0 16px; }
+.footnote { font-size: var(--small-size); color: var(--ink-soft); text-align: right; margin: -8px 0 16px; }
 .error { color: var(--red); white-space: pre-wrap; margin: 0 0 14px; }
 
 /* Le modifiche ai file: il conto nella riga dello strumento (un clic chiude e riapre), le differenze sotto */
 .tool.has-change { cursor: pointer; }
-.tool .counts { flex: none; font-size: 12px; }
+.tool .counts { flex: none; font-size: var(--small-size); }
 .tool .counts .plus { color: var(--plus); }
 .tool .counts .minus { color: var(--minus); }
-.change { margin: 2px 0 12px 32px; }
-.diff { background: var(--code); box-shadow: inset 3px 0 0 var(--edge-light); user-select: text; }
-.diff-note { font-size: 12px; color: var(--ink-soft); padding: 5px 10px 0; }
-.diff-body { overflow-x: auto; padding: 5px 0; }
-.dl { display: flex; min-width: max-content; white-space: pre; font-family: var(--font-code); font-size: 19px; line-height: 1.1; tab-size: 4; }
+.change { margin: 2px 0 12px 26px; }
+.diff { background: var(--code); border: var(--line) solid var(--edge-light); border-radius: var(--radius-small); overflow: hidden; user-select: text; }
+.diff-note { font-size: var(--small-size); color: var(--ink-soft); padding: 6px 10px 0; }
+.diff-body { overflow-x: auto; padding: 6px 0; }
+.dl { display: flex; min-width: max-content; white-space: pre; font-family: var(--font-code); font-size: var(--code-size); line-height: 1.5; tab-size: 4; }
 .dl .ln { flex: none; width: 5ch; padding-right: 8px; text-align: right; color: var(--ink-soft); opacity: 0.7; user-select: none; }
 .dl .sg { flex: none; width: 2ch; user-select: none; }
 .dl .tx { padding-right: 10px; }
@@ -147,94 +141,91 @@ button { font-family: inherit; }
 .dl.del .sg { color: var(--minus); }
 .dl.ctx { color: var(--ink-soft); }
 .dl.gap { color: var(--ink-soft); opacity: 0.75; }
-.dl.sep { height: 0; margin: 4px 0; box-shadow: 0 -1px 0 var(--edge-light); }
+.dl.sep { height: 0; margin: 4px 0; border-top: var(--line) solid var(--edge-light); }
 .diff:not(.open) .dl.more { display: none; }
-.diff-more { display: block; width: 100%; border: none; background: none; cursor: pointer; color: var(--gold); font-size: 12px; text-align: left; padding: 2px 10px 6px; }
-.diff-more:hover { color: var(--strong); }
+.diff-more { display: block; width: 100%; border: none; background: none; cursor: pointer; color: var(--gold); font-size: var(--small-size); text-align: left; padding: 2px 10px 8px; }
+.diff-more:hover { color: var(--gold-light); }
 .ask .diff { margin-bottom: 10px; }
 
-/* Il menu dei comandi con /, sopra la penna: nome d'oro, argomenti, descrizione; i comandi propri (skill, plugin,
-   progetto) con una tacca verde */
+/* Il menu dei comandi con /, sopra la penna; i comandi propri (skill, plugin, progetto) con un punto verde */
 .cmd-menu {
-  position: absolute; z-index: 5; max-height: 280px; overflow-y: auto; padding: 4px 0;
-  background: var(--edge); color: var(--ink); box-shadow: inset 0 0 0 3px var(--gold-dark), 0 4px 0 rgba(0, 0, 0, 0.35);
+  position: absolute; z-index: 5; max-height: 280px; overflow-y: auto; padding: 4px;
+  background: var(--menu-bg); color: var(--ink); border: var(--line) solid var(--edge-light); border-radius: var(--radius); box-shadow: var(--shadow);
 }
-body.giorno .cmd-menu { background: #f4e6c0; }
-.cmd { display: flex; align-items: baseline; gap: 8px; padding: 3px 12px; cursor: pointer; white-space: nowrap; }
-.cmd.active { background: var(--code); box-shadow: inset 3px 0 0 var(--gold); }
-.cmd.custom .cmd-name::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 6px; background: var(--plus); vertical-align: 2px; }
-.cmd-name { font-family: var(--font-code); font-size: 19px; color: var(--gold); flex: none; }
+.cmd { display: flex; align-items: baseline; gap: 8px; padding: 5px 10px; cursor: pointer; white-space: nowrap; border-radius: var(--radius-small); }
+.cmd.active { background: var(--code); }
+.cmd.custom .cmd-name::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 6px; background: var(--plus); border-radius: 50%; vertical-align: 2px; }
+.cmd-name { font-family: var(--font-code); font-size: var(--code-size); color: var(--gold); flex: none; }
 .cmd.active .cmd-name { color: var(--strong); }
-.cmd-args { font-family: var(--font-code); font-size: 17px; color: var(--ink-soft); flex: none; }
-.cmd-desc { font-size: 13px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.cmd-empty { padding: 4px 12px; font-size: 13px; color: var(--ink-soft); }
+.cmd-args { font-family: var(--font-code); font-size: var(--code-size); color: var(--ink-soft); flex: none; }
+.cmd-desc { font-size: var(--small-size); color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.cmd-empty { padding: 5px 10px; font-size: var(--small-size); color: var(--ink-soft); }
 /* L'uscita di un comando locale */
 .cmd-output {
-  margin: 0 0 14px; padding: 8px 12px; white-space: pre-wrap; font-family: var(--font-code); font-size: 18px; line-height: 1.15;
-  background: var(--code); box-shadow: inset 3px 0 0 var(--gold-dark); user-select: text;
+  margin: 0 0 14px; padding: 10px 12px; white-space: pre-wrap; font-family: var(--font-code); font-size: var(--code-size); line-height: 1.45;
+  background: var(--code); border: var(--line) solid var(--edge-light); border-radius: var(--radius-small); user-select: text;
 }
 
 /* Il selettore dei temi: un velo sopra il layout e un riquadro con una scheda per tema */
-.theme-picker { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: rgba(10, 6, 2, 0.55); }
+.theme-picker { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: var(--veil); }
 .theme-picker-box {
-  max-width: min(760px, calc(100% - 40px)); max-height: calc(100% - 40px); overflow-y: auto; padding: 16px 20px 20px;
-  background: var(--edge); color: var(--ink); box-shadow: inset 0 0 0 3px var(--gold-dark), 0 6px 0 rgba(0, 0, 0, 0.4);
+  max-width: min(760px, calc(100% - 40px)); max-height: calc(100% - 40px); overflow-y: auto; padding: 18px 20px 20px;
+  background: var(--menu-bg); color: var(--ink); border: var(--line) solid var(--edge-light); border-radius: var(--radius); box-shadow: var(--shadow);
 }
-body.giorno .theme-picker-box { background: #f4e6c0; }
-.theme-picker-head { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 14px; font-family: var(--font-display); font-size: 27px; color: var(--gold); }
+.theme-picker-head { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 14px; font-family: var(--font-display); font-size: 20px; font-weight: 600; color: var(--strong); }
 .theme-picker-head button { font-family: var(--font-body); }
 .theme-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
 .theme-card {
   position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 10px; text-align: left;
-  border: none; cursor: pointer; font: inherit; color: var(--ink); background: var(--code); box-shadow: inset 0 0 0 2px var(--edge-light);
+  cursor: pointer; font: inherit; color: var(--ink); background: var(--code); border: var(--line) solid var(--edge-light); border-radius: var(--radius);
 }
-.theme-card:hover { box-shadow: inset 0 0 0 2px var(--gold); }
-.theme-card.current { box-shadow: inset 0 0 0 3px var(--gold); }
-.theme-card canvas { align-self: center; margin-bottom: 4px; }
-.theme-name { font-size: 16px; color: var(--strong); }
-.theme-desc { font-size: 12px; color: var(--ink-soft); line-height: 1.35; }
-.theme-current { position: absolute; top: 8px; right: 10px; font-size: 11px; color: var(--btn-ink); background: var(--btn-bg); padding: 1px 6px; }
+.theme-card:hover { border-color: var(--gold); }
+.theme-card.current { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+.theme-card canvas { align-self: center; margin-bottom: 4px; width: 144px; height: 90px; border-radius: var(--radius-small); }
+.theme-name { font-size: 15px; font-weight: 600; color: var(--strong); }
+.theme-desc { font-size: var(--small-size); color: var(--ink-soft); line-height: 1.4; }
+.theme-current { position: absolute; top: 8px; right: 10px; font-size: 11px; color: var(--btn-ink); background: var(--btn-bg); padding: 1px 7px; border-radius: 10px; }
 
-/* Il modo dei permessi: l'etichetta e un pulsante per modo, quello attivo d'oro */
-.modes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-bottom: 8px; }
+/* Il modo dei permessi: l'etichetta e un pulsante per modo, quello attivo pieno */
+.modes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--small-size); margin-bottom: 8px; }
 .modes-label { color: var(--ink-soft); margin-right: 2px; }
-.mode { border: none; background: none; cursor: pointer; font-size: 12px; padding: 2px 7px; color: var(--ink-soft); box-shadow: inset 0 0 0 2px var(--edge-light); }
+.mode { cursor: pointer; font-size: var(--small-size); padding: 2px 9px; color: var(--ink-soft); background: none; border: var(--line) solid var(--edge-light); border-radius: 20px; }
 .mode:hover { color: var(--ink); }
-.mode.active { background: var(--btn-bg); color: var(--btn-ink); box-shadow: inset -2px -2px 0 var(--btn-dark), inset 2px 2px 0 var(--btn-light); }
+.mode.active { background: var(--btn-bg); color: var(--btn-ink); border-color: var(--btn-bg); }
 
 /* Il piano proposto: il testo in un foglio a parte dentro la domanda */
-.ask.plan .plan-body { background: var(--field); padding: 8px 12px; margin: 6px 0 10px; max-height: 420px; overflow-y: auto; line-height: 1.45; }
+.ask.plan .plan-body { background: var(--field); padding: 10px 14px; margin: 6px 0 10px; max-height: 420px; overflow-y: auto; line-height: 1.5; border-radius: var(--radius-small); }
 
-/* La domanda di permesso: un riquadro a gradino con i tre pulsanti */
-.ask { margin: 6px 0 16px; padding: 10px 12px; background: var(--code); box-shadow: inset 3px 3px 0 var(--gold), inset -3px -3px 0 var(--edge); }
-.ask .ask-title { color: var(--strong); margin-bottom: 4px; }
-.ask .ask-desc { font-size: 14px; color: var(--ink-soft); margin-bottom: 6px; }
-.ask .ask-detail { font-family: var(--font-code); font-size: 18px; background: var(--code); padding: 4px 6px; margin-bottom: 8px; word-break: break-all; }
-.ask .ask-buttons { display: flex; gap: 12px; margin: 4px 0 2px 3px; }
-.ask .ask-outcome { font-size: 14px; color: var(--ink-soft); }
+/* La domanda di permesso: un riquadro con i pulsanti */
+.ask { margin: 6px 0 16px; padding: 12px 14px; background: var(--code); border: var(--line) solid var(--gold-dark); border-radius: var(--radius); }
+.ask .ask-title { color: var(--strong); font-weight: 600; margin-bottom: 4px; }
+.ask .ask-desc { font-size: 13px; color: var(--ink-soft); margin-bottom: 6px; }
+.ask .ask-detail { font-family: var(--font-code); font-size: var(--code-size); background: var(--code); padding: 5px 8px; margin-bottom: 10px; word-break: break-all; border-radius: var(--radius-small); }
+.ask .ask-buttons { display: flex; gap: 10px; margin: 4px 0 2px; }
+.ask .ask-outcome { font-size: 13px; color: var(--ink-soft); }
 
 /* Le righe delle cronache */
-.session-row { padding: 6px 8px; cursor: pointer; margin-bottom: 4px; box-shadow: inset 3px 0 0 var(--edge-light); }
-.session-row:hover { background: var(--code); box-shadow: inset 3px 0 0 var(--gold); }
+.session-row { padding: 6px 10px; cursor: pointer; margin-bottom: 2px; border-radius: var(--radius-small); }
+.session-row:hover { background: var(--code); }
 .session-row.note { cursor: default; }
-.session-row.note:hover { background: none; box-shadow: inset 3px 0 0 var(--edge-light); }
-.session-row .when { font-size: 12px; color: var(--ink-soft); }
+.session-row.note:hover { background: none; }
+.session-row .title { overflow: hidden; text-overflow: ellipsis; }
+.session-row .when { font-size: var(--small-size); color: var(--ink-soft); }
+.session-row.current { background: var(--code); }
 .session-row.current .title { color: var(--strong); }
 
-/* I pulsanti a gradino */
-.pix {
-  border: none; cursor: pointer; padding: 6px 12px; font-size: 16px; color: var(--btn-ink); background: var(--btn-bg);
-  box-shadow: inset -3px -3px 0 var(--btn-dark), inset 3px 3px 0 var(--btn-light), 0 0 0 3px var(--btn-ring);
+/* I pulsanti */
+.btn {
+  border: none; cursor: pointer; padding: 7px 14px; font-size: 14px; color: var(--btn-ink); background: var(--btn-bg); border-radius: var(--radius-small);
 }
-.pix:hover { background: var(--btn-hover); }
-.pix:active { box-shadow: inset 3px 3px 0 var(--btn-dark), inset -3px -3px 0 var(--btn-light), 0 0 0 3px var(--btn-ring); }
-.pix[disabled] { opacity: 0.5; cursor: default; }
-.pix.small { font-size: 14px; padding: 3px 8px; }
-.pix.deny { background: var(--deny-bg); box-shadow: inset -3px -3px 0 var(--deny-dark), inset 3px 3px 0 var(--deny-light), 0 0 0 3px var(--btn-ring); color: var(--deny-ink); }
-.pix.deny:hover { filter: brightness(1.1); }
-/* I pulsanti quadrati della finestra (nascondi, chiudi) */
+.btn:hover { background: var(--btn-hover); }
+.btn[disabled] { opacity: 0.5; cursor: default; }
+.btn.small { font-size: 13px; padding: 4px 10px; }
+.btn.deny { background: var(--deny-bg); color: var(--deny-ink); }
+.btn.deny:hover { background: var(--deny-light); }
+/* I pulsanti della finestra (nascondi, chiudi) */
 .ctl {
-  width: 24px; height: 24px; border: none; cursor: pointer; font-size: 16px; line-height: 20px; padding: 0;
-  background: var(--ctl-bg); color: var(--ctl-ink); box-shadow: inset -3px -3px 0 var(--ctl-dark), inset 3px 3px 0 var(--ctl-light);
+  width: 28px; height: 24px; border: none; cursor: pointer; font-size: 14px; line-height: 20px; padding: 0;
+  background: var(--ctl-bg); color: var(--ctl-ink); border-radius: var(--radius-small);
 }
-.ctl:hover { background: var(--ctl-hover); }
+.ctl:hover { background: var(--ctl-hover); color: var(--ink); }

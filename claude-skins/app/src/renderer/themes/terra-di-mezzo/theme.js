@@ -15,6 +15,8 @@
   // La finestra: grande come l'app desktop; sotto i 760 px le due pagine non ci stanno
   window: { width: 1180, height: 780, minWidth: 760, minHeight: 520 },
 
+  // Lo stile pixel (caratteri, bordi a gradino, palette di pergamena di partenza) viene dal kit, poi theme.css
+  kits: ['pixel'],
   css: true,
 
   layout: `
@@ -35,7 +37,7 @@
         <div class="chapter-date" data-part="chapter-date"></div>
         <canvas class="chapter-divider" data-art="divider"></canvas>
       </div>
-      <button class="pix small new-chapter" data-action="new" data-s="newChapter"></button>
+      <button class="btn small new-chapter" data-action="new" data-s="newChapter"></button>
       <div class="annali" data-part="sessions" data-mode="always">
         <div class="annali-head" data-s="sessionsTitle"></div>
         <div class="sessions-list" data-part="sessions-list"></div>
@@ -51,8 +53,8 @@
         <div class="quill-row">
           <canvas class="lamp" data-art="lamp" data-art-anim data-art-fit="natural"></canvas>
           <span class="hint" data-part="hint"></span>
-          <button class="pix" data-action="send" data-s="send"></button>
-          <button class="pix" data-action="stop" data-s="stop" hidden></button>
+          <button class="btn" data-action="send" data-s="send"></button>
+          <button class="btn" data-action="stop" data-s="stop" hidden></button>
         </div>
       </div>
     </section>
