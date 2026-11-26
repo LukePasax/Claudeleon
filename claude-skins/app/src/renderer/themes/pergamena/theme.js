@@ -60,6 +60,8 @@
     <button data-action="new" data-s="newChapter"></button>
     <span>&middot;</span>
     <button data-action="sessions" data-s="sessions"></button>
+    <span>&middot;</span>
+    <button data-action="themes" data-s="themes"></button>
   </div>
 </div>`,
 

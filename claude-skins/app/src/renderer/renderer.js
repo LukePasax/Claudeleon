@@ -299,6 +299,46 @@
     for (const el of all('[data-part="hint"]')) el.textContent = t(st === 'compacting' ? 'cmdCompacting' : busy ? 'busyHint' : 'hint')
   })
 
+  // ------------------------------------------------------------------ il selettore dei temi
+
+  // data-action="themes" apre un pannello sopra il layout (dentro il suo primo elemento data-solid): una scheda per
+  // tema con l'anteprima a pixel nei suoi colori, il nome e la descrizione. Un clic cambia tema come dal vassoio
+  function openThemes() {
+    closeThemes()
+    const host = app.querySelector('[data-solid]') || app
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+    const panel = document.createElement('div')
+    panel.className = 'theme-picker'
+    panel.innerHTML = '<div class="theme-picker-box"><div class="theme-picker-head"><span></span><button class="pix small"></button></div><div class="theme-cards"></div></div>'
+    label(panel.querySelector('.theme-picker-head span'), 'themesTitle')
+    const close = panel.querySelector('.theme-picker-head button')
+    label(close, 'themesClose')
+    close.addEventListener('click', closeThemes)
+    // Un clic fuori dal riquadro chiude
+    panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    const cards = panel.querySelector('.theme-cards')
+    for (const th of Theming.list()) {
+      const card = document.createElement('button')
+      card.className = 'theme-card' + (th.id === Theming.current.id ? ' current' : '')
+      card.innerHTML = '<canvas></canvas><span class="theme-name"></span><span class="theme-desc"></span>'
+      const drawn = Theming.preview(th.id, scene)
+      if (drawn) blit(card.querySelector('canvas'), drawn, true)
+      card.querySelector('.theme-name').textContent = th.name
+      card.querySelector('.theme-desc').textContent = th.description
+      if (th.id === Theming.current.id) card.appendChild(label(Object.assign(document.createElement('span'), { className: 'theme-current' }), 'themesCurrent'))
+      card.addEventListener('click', () => {
+        closeThemes()
+        if (th.id !== Theming.current.id) api.setTheme(th.id)
+      })
+      cards.appendChild(card)
+    }
+    host.appendChild(panel)
+  }
+
+  function closeThemes() {
+    for (const el of document.querySelectorAll('.theme-picker')) el.remove()
+  }
+
   // ------------------------------------------------------------------ il layout del tema
 
   // Monta il tema: il suo HTML prende il posto del precedente, la conversazione, la bozza e lo stato passano al nuovo
@@ -714,6 +754,7 @@
     new: newChapter,
     sessions: showSessions,
     'sessions-close': () => { if (part('sessions') && !sessionsPinned()) part('sessions').hidden = true },
+    themes: openThemes,
     scene: () => { scene = scene === 'notte' ? 'giorno' : 'notte'; api.setScene(scene); paint() },
   }
   document.addEventListener('click', (e) => {
@@ -726,6 +767,7 @@
     if (b && app.contains(b) && actions[b.dataset.action]) actions[b.dataset.action](e)
   })
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.querySelector('.theme-picker')) { closeThemes(); return }
     if (!e.target.matches('[data-part="input"]')) return
     if (menuKey(e)) { e.preventDefault(); return }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
@@ -872,6 +914,7 @@
       },
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
       setMode: (m) => fire('onMode', m, 0),
+      setTheme: (id) => fire('onTheme', id, 0),
       openLink: (url) => window.open(url, '_blank', 'noopener'),
       commands: async () => FAKE_COMMANDS,
       sessions: async () => [

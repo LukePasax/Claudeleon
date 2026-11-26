@@ -26,6 +26,11 @@
     grantedAlways: 'Permesso concesso, anche per le prossime volte.',
     denied: 'Permesso negato.',
     cancelled: 'Richiesta annullata.',
+    // Il selettore dei temi
+    themes: 'temi',
+    themesTitle: 'Scegli il tema',
+    themesCurrent: 'in uso',
+    themesClose: 'Chiudi',
     // I comandi con /
     cmdNone: 'Nessun comando con questo nome.',
     cmdLoading: 'Chiedo i comandi a Claude Code...',
@@ -144,9 +149,13 @@
   }
 
   // Le scene sono due, 'notte' e 'giorno'; un tema può definirne una sola o nessuna
-  function scene(name) {
+  function scene(name, theme = current) {
     const key = name === 'giorno' ? 'giorno' : 'notte'
-    return (current.scenes && current.scenes[key]) || {}
+    return (theme.scenes && theme.scenes[key]) || {}
+  }
+
+  function paletteOf(theme, name) {
+    return Object.assign({}, PALETTES[name === 'giorno' ? 'giorno' : 'notte'], scene(name, theme).palette || {})
   }
 
   // Le variabili CSS della scena, in linea su body: le precedenti si tolgono, così un tema non lascia colori a quello dopo
@@ -200,9 +209,45 @@
     return Pixel.upscale(drawn, 32, 32)
   }
 
+  // L'anteprima di un tema qualunque (anche non in uso) per il selettore: 48×30 pixel con la sua carta, il suo
+  // capo o la sua copertina (un tratto del disegno roll o leather), un filo d'oro e la sua icona del vassoio
+  function preview(id, sceneName) {
+    const theme = registry.get(id)
+    if (!theme) return null
+    const pal = paletteOf(theme, sceneName)
+    const a = theme.art || {}
+    const W = 48
+    const H = 30
+    const c = Pixel.canvas(W, H)
+    const ctx = c.getContext('2d')
+    const tryArt = (name, opts) => {
+      try { return typeof a[name] === 'function' ? a[name](Object.assign({ pal, scene: sceneName, frame: 0, busy: false }, opts)) : null } catch { return null }
+    }
+    const paper = tryArt('paper', { width: 96, height: 96, w: 32, h: 32 }) || Pixel.lib.paperTile(pal)
+    ctx.fillStyle = ctx.createPattern(paper, 'repeat')
+    ctx.fillRect(0, 0, W, H)
+    const band = tryArt('leather', { width: 72, height: 72, w: 24, h: 24 })
+    if (band) {
+      ctx.fillStyle = ctx.createPattern(band, 'repeat')
+      ctx.fillRect(0, 0, W, 7)
+    } else {
+      const roll = tryArt('roll', { width: W * 3, height: 36, w: W, h: 12 }) || Pixel.lib.roll(W, pal)
+      ctx.drawImage(roll, 0, 0, W, 12, 0, -3, W, 12)
+    }
+    ctx.fillStyle = pal.gold
+    ctx.fillRect(0, 7, W, 1)
+    let icon = null
+    try { icon = typeof a.trayIcon === 'function' ? a.trayIcon({ pal }) : Pixel.lib.trayScroll() } catch {}
+    if (icon) ctx.drawImage(icon, (W - icon.width) / 2, 10)
+    return c
+  }
+
   window.Theming = {
+    preview,
+    // I temi caricati, per il selettore: id, nome, descrizione
+    list: () => [...registry.values()].map((th) => ({ id: th.id, name: th.name || th.id, description: th.description || '' })),
     load, use, applyScene, t, chapterDate, plainDate, art, icon, trayIcon, MONTHS,
     get current() { return current },
-    palette: (name) => Object.assign({}, PALETTES[name === 'giorno' ? 'giorno' : 'notte'], scene(name).palette || {}),
+    palette: (name) => paletteOf(current, name),
   }
 })()

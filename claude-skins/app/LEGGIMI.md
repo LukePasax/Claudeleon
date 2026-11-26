@@ -26,7 +26,8 @@ npm 11 altrimenti non arriva.
   ricordata per tema. Dal vassoio: "Riporta al centro" e "Dimensione iniziale".
 - **Sempre in primo piano:** dal vassoio si può spegnere, ora che la finestra è grande.
 - **Scorciatoia:** `Ctrl+Alt+P` mostra o nasconde la finestra da qualunque programma; c'è anche l'icona nel vassoio.
-- **Tema:** dal vassoio, **Tema**. Cambia sul posto (forma della finestra compresa) senza perdere la conversazione;
+- **Tema:** dalla finestra ("temi" sotto il rotolo, "altri libri" in fondo alla pagina sinistra del Libro Rosso), con
+  un'anteprima di ogni tema, oppure dal vassoio, **Tema**. Cambia sul posto (forma della finestra compresa) senza perdere la conversazione;
   Claude prende il tono del nuovo tema dal messaggio successivo. Il pulsante "stelle"/"Contea" (o "notte"/"giorno")
   passa da una scena all'altra.
 - **Conversazione:** Invio spedisce, Maiusc+Invio va a capo. "nuovo capitolo" ricomincia la conversazione; quella

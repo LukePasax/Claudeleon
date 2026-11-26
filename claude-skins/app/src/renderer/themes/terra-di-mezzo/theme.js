@@ -40,7 +40,7 @@
         <div class="annali-head" data-s="sessionsTitle"></div>
         <div class="sessions-list" data-part="sessions-list"></div>
       </div>
-      <div class="page-foot"><button class="scene" data-action="scene"></button></div>
+      <div class="page-foot"><button class="scene" data-action="scene"></button><span>&middot;</span><button class="scene" data-action="themes" data-s="themes"></button></div>
     </section>
     <canvas class="spine" data-art="spine"></canvas>
     <section class="page right" data-art-bg="paper">
@@ -92,6 +92,8 @@
     notte: 'stelle',
     giorno: 'Contea',
     newChapter: 'Nuovo capitolo',
+    themes: 'altri libri',
+    themesTitle: 'Gli altri libri',
     planTitle: 'Lo scriba traccia la via',
     planApprove: 'Approva la via',
     planKeep: 'Continua a tracciarla',

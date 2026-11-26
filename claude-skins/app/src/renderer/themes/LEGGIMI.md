@@ -1,7 +1,7 @@
 # I temi
 
 Ogni tema è una cartella qui dentro. Il nome della cartella è l'id del tema e deve essere uguale al campo `id` del
-suo `theme.js`. L'app trova da sola le cartelle all'avvio, e il tema si sceglie dal vassoio (**Tema**).
+suo `theme.js`. L'app trova da sola le cartelle all'avvio, e il tema si sceglie dalla finestra o dal vassoio (**Tema**).
 
 Un tema decide **tutto quello che si vede**:
 - la forma della finestra (il suo HTML e il suo CSS);
@@ -12,6 +12,7 @@ Un tema decide **tutto quello che si vede**:
 Il motore non sa se la finestra è un rotolo, un libro o una mappa. Trova i pezzi che gli servono attraverso gli
 attributi `data-*`, ovunque il tema li metta.
 
+Il tema si sceglie anche dalla finestra, col pulsante che ogni layout mette dove vuole (`data-action="themes"`).
 Il cambio di tema avviene sul posto. L'HTML del nuovo tema prende il posto del vecchio, ma la conversazione, la
 bozza nella penna e lo stato passano al nuovo tema. La finestra prende la misura del nuovo tema, e Claude ne prende
 il tono dal messaggio successivo.
@@ -89,6 +90,7 @@ Su un qualunque elemento cliccabile (anche più di uno per azione):
 | `send`, `stop` | Spedisce il messaggio; ferma Claude. Il motore mostra l'uno o l'altro (`hidden`) |
 | `new` | Nuovo capitolo |
 | `sessions`, `sessions-close` | Apre e chiude le cronache in sovrimpressione |
+| `themes` | Apre il selettore dei temi: un pannello sopra il layout (dentro il primo elemento `data-solid`) con una scheda per tema, anteprima, nome e `description`. L'anteprima la disegna il motore coi disegni del tema: `paper`, poi `leather` o `roll` per la fascia in alto, e `trayIcon` |
 | `scene` | Notte ↔ giorno. Se l'elemento è vuoto, il motore ci scrive il nome dell'altra scena |
 | `hide`, `quit` | Nasconde la finestra; chiude l'app |
 

@@ -160,7 +160,7 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
    - Caratteri propri per tema, già possibili con `@font-face` nel `theme.css`: per la Terra di Mezzo, un carattere
      a pixel in stile onciale o runico con licenza libera.
    - Suoni e personaggio per tema.
-   - La scelta del tema anche dalla finestra, oltre che dal vassoio: `skins.setTheme(id)` c'è già nel preload.
+   - ~~La scelta del tema dalla finestra~~: fatto (`data-action="themes"`, pannello con le anteprime).
    - Un'eredità fra temi (`extends`), se nasceranno varianti dello stesso scheletro.
 1. **Più conversazioni in schede**, ognuna col suo `query()` e la sua sessione.
 2. ~~**Modifiche ai file**~~: fatto (riquadro delle differenze nella conversazione, nei permessi e nelle cronache
