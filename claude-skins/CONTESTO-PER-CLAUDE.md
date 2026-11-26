@@ -58,6 +58,13 @@ includono (`kits: ['pixel']`). Un tema può dare icone SVG o immagini, disegni a
 l'azione in corso. La divisione del CSS è stata verificata confrontando pixel per pixel le foto dei due temi pixel
 prima e dopo: identiche.
 
+**Pixel art più fine.** Pergamena e Terra di Mezzo disegnano a ×2 invece che a ×3 (`artScale: 2`), e i disegni sono
+quasi tutti procedurali: carta a macchie morbide senza giunture (rumore a valori periodico, `Pixel.valueNoise`, con
+le macchie che decidono solo la probabilità dei pixel chiari e scuri: le soglie nette facevano forme che si
+ripetevano), capi del rotolo a 18 fasce con pomelli sferici (`Pixel.sphere`), candela a goccia, grana del cuoio,
+spilla a foglia come lente inclinata, rune tracciate a linee (`Pixel.line`) con ombra, Anello 19×19, segnalibro in
+seta. Le icone degli strumenti restano 8×8, a ×2 (16 px).
+
 L'app è divisa in un **motore** comune (finestra, conversazione, permessi, cronache, gli attrezzi del disegno a
 pixel) e in **temi** che decidono tutto quello che si vede: forma della finestra (HTML e CSS), misura, scritte,
 colori, disegni e tono di Claude. Il motore non conosce la forma: cerca i pezzi per attributo (`data-part="log"`,

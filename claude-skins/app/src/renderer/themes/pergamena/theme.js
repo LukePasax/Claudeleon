@@ -19,6 +19,8 @@
 
   // Lo stile pixel (caratteri, bordi a gradino, palette di pergamena di partenza) viene dal kit, poi theme.css
   kits: ['pixel'],
+  // Pixel ×2: più fini di quelli di partenza (×3), con più dettaglio nei disegni
+  artScale: 2,
   css: true,
 
   layout: `
@@ -70,7 +72,7 @@
   art: {
     paper: ({ pal }) => Pixel.lib.paperTile(pal),
     roll: ({ w, pal }) => Pixel.lib.roll(w, pal),
-    divider: ({ w, pal }) => Pixel.lib.dashes(w, pal.gold),
+    divider: ({ w, pal }) => Pixel.lib.dashes(w, pal.gold, pal.knob[1]),
     lamp: ({ pal, frame, busy }) => Pixel.lib.candle(pal, frame, busy),
     trayIcon: () => Pixel.lib.trayScroll(),
   },

@@ -17,6 +17,8 @@
 
   // Lo stile pixel (caratteri, bordi a gradino, palette di pergamena di partenza) viene dal kit, poi theme.css
   kits: ['pixel'],
+  // Pixel ×2: più fini di quelli di partenza (×3), con più dettaglio nei disegni
+  artScale: 2,
   css: true,
 
   layout: `
@@ -166,17 +168,31 @@
   },
 
   art: {
-    // La grana del cuoio della copertina: riquadro 24×24 a toni di rosso, con qualche piega più scura
+    // La grana del cuoio della copertina: riquadro 48×48 senza giunture. Un retino fine e tenue: la grana (rumore a
+    // celle piccole) decide quanto è probabile un pixel più scuro o più chiaro, l'usura (celle grandi) schiarisce a
+    // chiazze
     leather({ pal }) {
       const P = window.Pixel
-      const c = P.canvas(24, 24)
+      const S = 48
+      const c = P.canvas(S, S)
       const ctx = c.getContext('2d')
       const rand = P.seeded(5)
-      const [, mid, light, , base, dark] = pal.roll
-      for (let y = 0; y < 24; y++) {
-        for (let x = 0; x < 24; x++) {
+      const grain = P.valueNoise(S, 3, 4)
+      const wear = P.valueNoise(S, 24, 9)
+      // Toni del cuoio (pal.roll): 4 la base, 1 appena più scuro, 5 i solchi, 2 la luce
+      const base = pal.roll[4]
+      const shade = pal.roll[1]
+      const deep = pal.roll[5]
+      const light = pal.roll[2]
+      for (let y = 0; y < S; y++) {
+        for (let x = 0; x < S; x++) {
+          const g = grain(x, y)
+          const w = wear(x, y)
           const r = rand()
-          P.px(ctx, x, y, r < 0.72 ? base : r < 0.9 ? mid : r < 0.98 ? dark : light)
+          let col = base
+          if (r < (0.5 - g) * 1.6) col = r < (0.5 - g) * 0.35 ? deep : shade
+          else if (r > 1 - (g - 0.5) * 1.3 - Math.max(0, w - 0.65) * 0.8) col = light
+          P.px(ctx, x, y, col)
         }
       }
       return c
@@ -184,11 +200,49 @@
 
     paper: ({ pal }) => window.Pixel.lib.paperTile(pal),
 
-    // La spilla a foglia; arg "destra" la specchia
+    // La spilla a foglia, 13×15: una foglia vera (lente appuntita, inclinata), bordo d'argento, nervatura chiara,
+    // verde più chiaro verso la luce, un picciolo; arg "destra" la specchia
     leaf({ pal, arg }) {
       const P = window.Pixel
-      const leaf = ['......ss', '....svvs', '...svlvs', '..svlvvs', '.svlvvs.', 'svlvvs..', 'svvss...', 'dss.....', 'd.......']
-      return P.bitmap(arg === 'destra' ? P.mirror(leaf) : leaf, pal.leaf)
+      const W = 13
+      const H = 15
+      const c = P.canvas(W, H)
+      const ctx = c.getContext('2d')
+      const { d, v, l, s } = pal.leaf
+      const cx = 6.5
+      const cy = 7
+      const ang = -Math.PI / 4
+      const L = 7.4
+      const B = 3.3
+      const inside = (x, y) => {
+        const dx = x - cx
+        const dy = y - cy
+        const u = dx * Math.cos(ang) - dy * Math.sin(ang)
+        const w = dx * Math.sin(ang) + dy * Math.cos(ang)
+        return { u, w, ok: Math.abs(u) <= L && Math.abs(w) <= B * (1 - (u / L) * (u / L)) }
+      }
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const p = inside(x + 0.5, y + 0.5)
+          if (!p.ok) continue
+          // Sul bordo se un vicino è fuori
+          const rim = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ox, oy]) => !inside(x + 0.5 + ox, y + 0.5 + oy).ok)
+          let col = p.w < 0 ? l : v
+          if (Math.abs(p.w) < 0.55) col = s
+          if (rim) col = p.w < 0 ? s : d
+          P.px(ctx, x, y, col)
+        }
+      }
+      // Il picciolo, in basso a sinistra
+      P.line(ctx, 0, 14, 2, 12, d)
+      const flip = arg === 'destra'
+      if (!flip) return c
+      const m = P.canvas(W, H)
+      const mc = m.getContext('2d')
+      mc.translate(W, 0)
+      mc.scale(-1, 1)
+      mc.drawImage(c, 0, 0)
+      return m
     },
 
     // Il dorso fra le due pagine: la carta che si piega verso la cucitura, con il cuoio che si vede in mezzo
@@ -209,41 +263,60 @@
       return c
     },
 
-    // Una riga di rune d'oro fra due rombi: segni inventati, sempre gli stessi (seme fisso)
+    // Una riga di rune d'oro fra due rombi, alte 9 pixel, tracciate a linee con un'ombra sotto: segni inventati
+    // (un'asta e qualche ramo), sempre gli stessi (seme fisso)
     divider({ w, pal }) {
       const P = window.Pixel
+      // Ogni runa: segmenti [x0, y0, x1, y1] su una griglia 5×9
       const RUNES = [
-        ['.g.', 'gg.', '.g.', '.gg', '.g.'], ['g.g', '.g.', '.g.', '.g.', '.g.'], ['.g.', '.gg', '.g.', 'gg.', '.g.'],
-        ['g..', 'gg.', 'g.g', 'g..', 'g..'], ['..g', '.gg', 'g.g', '..g', '..g'], ['g.g', 'g.g', '.g.', 'g.g', 'g.g'],
-        ['.g.', 'g.g', '.g.', '.g.', '.g.'], ['gg.', 'g.g', 'gg.', 'g.g', 'g..'], ['.g.', '.g.', 'ggg', '.g.', '.g.'],
+        [[2, 0, 2, 8], [2, 2, 4, 0], [2, 5, 0, 3]],
+        [[2, 0, 2, 8], [0, 0, 2, 2], [4, 0, 2, 2]],
+        [[2, 0, 2, 8], [2, 3, 4, 5], [2, 6, 0, 8]],
+        [[0, 0, 0, 8], [0, 2, 3, 0], [0, 4, 3, 2]],
+        [[4, 0, 4, 8], [4, 3, 1, 5], [1, 5, 1, 2]],
+        [[0, 0, 4, 8], [4, 0, 0, 8], [2, 0, 2, 2]],
+        [[2, 0, 2, 8], [0, 4, 4, 4], [0, 4, 2, 2]],
+        [[1, 0, 1, 8], [1, 0, 4, 2], [4, 2, 1, 4], [1, 4, 4, 7]],
+        [[2, 0, 2, 8], [0, 2, 2, 4], [4, 2, 2, 4], [0, 6, 2, 8]],
       ]
-      w = Math.max(20, w)
-      const c = P.canvas(w, 5)
+      w = Math.max(40, w)
+      const H = 11
+      const c = P.canvas(w, H)
       const ctx = c.getContext('2d')
-      const colors = { g: pal.gold, y: pal.goldLight }
-      const diamond = ['..y..', '.ygy.', 'ygggy', '.ygy.', '..y..']
-      ctx.drawImage(P.bitmap(diamond, colors), 0, 0)
-      ctx.drawImage(P.bitmap(diamond, colors), w - 5, 0)
+      const shade = pal.knob ? pal.knob[1] : pal.inkSoft
+      const draw = (x0, gold, dy) => RUNES[gold].forEach(([a, b, e, f]) => P.line(ctx, x0 + a, 1 + b + dy, x0 + e, 1 + f + dy, dy ? shade : pal.gold))
+      const diamond = (x) => ctx.drawImage(P.bitmap(['...y...', '..ygy..', '.ygggy.', 'ygggggs', '.sgggs.', '..sgs..', '...s...'], { y: pal.goldLight, g: pal.gold, s: shade }), x, 2)
+      diamond(0)
+      diamond(w - 7)
       const rand = P.seeded(11)
-      let x = 8
+      const glyphs = []
+      let x = 11
       let n = 0
-      while (x + 3 <= w - 8) {
-        if (n > 0 && n % 4 === 0) { P.px(ctx, x, 2, pal.inkSoft); x += 2 }
-        if (x + 3 > w - 8) break
-        ctx.drawImage(P.bitmap(RUNES[Math.floor(rand() * RUNES.length)], colors), x, 0)
-        x += 4
+      while (x + 5 <= w - 11) {
+        if (n > 0 && n % 4 === 0) { glyphs.push(['dot', x]); x += 4 }
+        if (x + 5 > w - 11) break
+        glyphs.push([Math.floor(rand() * RUNES.length), x])
+        x += 8
         n++
+      }
+      // Prima le ombre, poi l'oro sopra
+      for (const dy of [1, 0]) {
+        for (const [g, gx] of glyphs) {
+          if (g === 'dot') { P.px(ctx, gx + 1, 5 + dy, dy ? shade : pal.goldLight); continue }
+          draw(gx, g, dy)
+        }
       }
       return c
     },
 
-    // Il segnalibro di seta verde che pende sotto il libro, con la coda a coda di rondine
+    // Il segnalibro di seta verde che pende sotto il libro, 8×24: un riflesso lungo la seta, la coda a coda di rondine
     ribbon({ pal }) {
       const P = window.Pixel
+      const { d, v, l } = pal.leaf
       const rows = []
-      for (let i = 0; i < 9; i++) rows.push(i % 4 === 1 ? 'dllvd' : 'dlvvd')
-      rows.push('dlvvd', 'dv.vd', 'd...d')
-      return P.bitmap(rows, { d: pal.leaf.d, v: pal.leaf.v, l: pal.leaf.l })
+      for (let i = 0; i < 20; i++) rows.push(i % 6 === 2 ? 'ddllvvvd' : 'dvllvvvd')
+      rows.push('dvlvvvvd', 'dvv..vvd', 'dv....vd', 'd......d')
+      return P.bitmap(rows, { d, v, l })
     },
 
     // Le icone che cambiano; le altre (penna, incudine, rosa dei venti) restano quelle di partenza.
@@ -256,35 +329,37 @@
       altro: ['........', '..gyyg..', '.g....y.', '.y....g.', '.g....g.', '.g....g.', '..gggg..', '........'],
     },
 
-    // L'Anello, 13×13: a riposo un riflesso gira lungo il cerchio; mentre Claude lavora, sulla fascia compaiono
+    // L'Anello, 19×19: a riposo un riflesso gira lungo il cerchio; mentre Claude lavora, sulla fascia compaiono
     // lettere di fuoco che tremolano
     lamp({ pal, frame, busy }) {
       const P = window.Pixel
-      const S = 13
+      const S = 19
       const c = P.canvas(S, S)
       const ctx = c.getContext('2d')
       const [dark, gold, light, glint] = pal.ring
-      const cx = 6
-      const cy = 6
+      const cx = 9
+      const cy = 9
       const glintAt = (frame % 16) / 16 * Math.PI * 2
       for (let y = 0; y < S; y++) {
         for (let x = 0; x < S; x++) {
           const dx = x - cx
           const dy = y - cy
           const d = Math.hypot(dx, dy)
-          if (d < 3.9 || d > 6.3) continue
+          if (d < 5.6 || d > 9.2) continue
           // Luce da in alto a sinistra
           const lit = (-dx - dy) / (d * Math.SQRT2)
-          let color = lit > 0.45 ? light : lit < -0.35 ? dark : gold
+          // Il bordo interno ed esterno più scuri: la fascia sembra tonda
+          const edge = d < 6.1 || d > 8.7
+          let color = edge ? (lit > 0.5 ? gold : dark) : lit > 0.45 ? light : lit < -0.35 ? dark : gold
           const a = Math.atan2(dy, dx) + Math.PI
-          if (busy && d > 4.4 && d < 5.7) {
+          if (busy && d > 6.4 && d < 8.4) {
             // Le lettere: tratti fissi lungo la fascia, il colore del fuoco cambia a ogni fotogramma
-            const k = Math.floor(a / (Math.PI * 2) * 28)
+            const k = Math.floor(a / (Math.PI * 2) * 40)
             if ((k * 7) % 5 < 3) color = pal.flame[(k + frame) % 3]
-          } else if (!busy && d > 5.2) {
+          } else if (!busy && d > 7.4 && !edge) {
             let diff = Math.abs(a - glintAt)
             diff = Math.min(diff, Math.PI * 2 - diff)
-            if (diff < 0.28) color = glint
+            if (diff < 0.2) color = glint
           }
           P.px(ctx, x, y, color)
         }

@@ -75,4 +75,5 @@ npm 11 altrimenti non arriva.
   uno screenshot della finestra ed esce, senza chiamare Claude. Per guardare un tema senza Electron basta aprire
   `src/renderer/index.html?tema=<id>` nel browser.
 
-Caratteri: Pixelify Sans, Jacquarda Bastarda 9 e VT323 (per il codice) (Google Fonts, licenza SIL Open Font License).
+Caratteri dei temi pixel: Pixelify Sans, Jacquarda Bastarda 9 e VT323 (per il codice); il tema Moderno usa
+quelli di sistema (Google Fonts, licenza SIL Open Font License).

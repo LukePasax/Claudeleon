@@ -87,7 +87,8 @@ canvas, [data-art-bg], .tool img { image-rendering: pixelated; }
 .text .link-off { text-decoration: none; box-shadow: inset 0 -2px 0 var(--edge-light); }
 
 .tool { font-size: 14px; margin: 2px 0; }
-.tool img { width: 24px; height: 24px; }
+/* Le icone a pixel 8×8, a ×2 come i disegni dei temi */
+.tool img { width: 16px; height: 16px; }
 .tool .what { font-family: inherit; font-size: inherit; }
 .footnote { font-size: 13px; }
 
