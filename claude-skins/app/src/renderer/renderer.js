@@ -4,7 +4,7 @@
 // delegati al documento, così un cambio di tema sostituisce tutto l'HTML senza perdere la conversazione.
 // Senza Electron (aperta in un browser) la chat risponde con un'eco finta, per guardare la grafica.
 (function () {
-  const api = window.pergamena || fakeApi()
+  const api = window.skins || fakeApi()
   const app = document.getElementById('app')
   const t = Theming.t
   const MONTHS = Theming.MONTHS

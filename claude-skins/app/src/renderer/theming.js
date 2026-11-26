@@ -80,11 +80,11 @@
     })
   }
 
-  // ids: le cartelle dei temi. Ogni theme.js si registra in window.PergamenaThemes
+  // ids: le cartelle dei temi. Ogni theme.js si registra in window.SkinsThemes
   async function load(ids) {
-    window.PergamenaThemes = window.PergamenaThemes || []
+    window.SkinsThemes = window.SkinsThemes || []
     await Promise.all(ids.map((id) => loadScript(`themes/${id}/theme.js`)))
-    for (const th of window.PergamenaThemes) if (th && th.id && !registry.has(th.id)) registry.set(th.id, th)
+    for (const th of window.SkinsThemes) if (th && th.id && !registry.has(th.id)) registry.set(th.id, th)
     return [...registry.values()].map((th) => ({ id: th.id, name: th.name || th.id }))
   }
 

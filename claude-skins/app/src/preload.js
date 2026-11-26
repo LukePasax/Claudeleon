@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 const listen = (channel) => (cb) => ipcRenderer.on(channel, (_e, payload) => cb(payload))
 
-contextBridge.exposeInMainWorld('pergamena', {
+contextBridge.exposeInMainWorld('skins', {
   info: () => ipcRenderer.invoke('app:info'),
   setInteractive: (on) => ipcRenderer.send('mouse:interactive', on),
   gestureStart: (kind) => ipcRenderer.send('gesture:start', kind),

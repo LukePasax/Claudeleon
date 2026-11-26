@@ -1,4 +1,4 @@
-# Pergamena
+# Claude Skins
 
 Claude in una finestra in pixel art, grande come l'app desktop e (se si vuole) sempre in primo piano. Forma e
 aspetto vengono dal tema. Quello di partenza è **Terra di Mezzo**: il Libro Rosso aperto, con gli annali a sinistra
@@ -41,7 +41,7 @@ npm 11 altrimenti non arriva.
   desktop coi loro titoli. Nel Libro Rosso sono sempre visibili sulla pagina sinistra; nel rotolo si aprono col
   pulsante "cronache". Aprendone una si vedono gli ultimi scambi e i messaggi dopo continuano quella. Non aprire qui
   una sessione che è aperta anche nell'app desktop.
-- **Configurazione:** `%APPDATA%\pergamena-app\config.json`: `workdir` (la cartella in cui lavora Claude e di cui si
+- **Configurazione:** `%APPDATA%\Claude Skins\config.json`: `workdir` (la cartella in cui lavora Claude e di cui si
   elencano le cronache; vuota, la cartella utente), posizione, dimensione per tema, scena, capitolo, sessione, tema,
   sempre in primo piano.
 - **Prove:** `node_modules\electron\dist\electron.exe . --cattura <file.png> [notte|giorno] [chat|cronache]

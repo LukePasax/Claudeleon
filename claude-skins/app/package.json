@@ -1,5 +1,6 @@
 {
-  "name": "pergamena-app",
+  "name": "claude-skins",
+  "productName": "Claude Skins",
   "version": "0.1.0",
   "description": "Claude in una finestra in pixel art, a temi",
   "main": "src/main.js",

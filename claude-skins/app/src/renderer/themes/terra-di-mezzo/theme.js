@@ -6,7 +6,7 @@
 // a pixel: nessuna immagine, logo o testo preso dai libri o dai film; le rune sono segni inventati, non un alfabeto.
 ;(function (theme) {
   if (typeof module === 'object' && module.exports) module.exports = theme
-  else (window.PergamenaThemes = window.PergamenaThemes || []).push(theme)
+  else (window.SkinsThemes = window.SkinsThemes || []).push(theme)
 })({
   id: 'terra-di-mezzo',
   name: 'Terra di Mezzo',

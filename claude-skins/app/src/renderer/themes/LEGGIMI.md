@@ -34,7 +34,7 @@ nome, misure e `persona`). Per questo comincia sempre con questo involucro:
 ```js
 ;(function (theme) {
   if (typeof module === 'object' && module.exports) module.exports = theme
-  else (window.PergamenaThemes = window.PergamenaThemes || []).push(theme)
+  else (window.SkinsThemes = window.SkinsThemes || []).push(theme)
 })({
   id: 'mio-tema',
   name: 'Il mio tema',

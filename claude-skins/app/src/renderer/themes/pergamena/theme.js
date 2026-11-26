@@ -2,7 +2,7 @@
 // (non li ridefinisce); il layout è il rotolo con due capi, e i disegni vengono dalla libreria di pixel.js.
 ;(function (theme) {
   if (typeof module === 'object' && module.exports) module.exports = theme
-  else (window.PergamenaThemes = window.PergamenaThemes || []).push(theme)
+  else (window.SkinsThemes = window.SkinsThemes || []).push(theme)
 })({
   id: 'pergamena',
   name: 'Pergamena',

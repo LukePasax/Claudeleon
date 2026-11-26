@@ -1,6 +1,8 @@
-# Pergamena — come è nata, per riprenderla ed espanderla
+# Claude Skins — come è nata, per riprenderla ed espanderla
 
-Questo documento è per Claude (Claude Code), che lo legge prima di lavorare sull'app nella cartella `pergamena-app/`.
+Questo documento è per Claude (Claude Code), che lo legge prima di lavorare sull'app nella cartella `app/`.
+L'app si chiamava **Pergamena** finché aveva un solo aspetto; con i temi è diventata **Claude Skins** (cartelle,
+finestra, pacchetto e configurazione), e "Pergamena" è rimasto il nome del tema del rotolo.
 Racconta cosa si voleva, quali strade sono state provate e perché sono state lasciate, com'è fatta l'app, cosa è stato
 verificato e cosa resta da fare. I sorgenti sono la fonte di verità; questo è la mappa.
 
@@ -59,7 +61,7 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
   quando attivarla). Spostamento e ridimensionamento seguiti dal processo principale col cursore a 60 Hz
   (`gesture:start/end`): con una finestra trasparente il trascinamento nativo (`-webkit-app-region`) e i bordi di
   ridimensionamento di Windows non sono affidabili. Vassoio, `Ctrl+Alt+P`, configurazione in
-  `%APPDATA%\pergamena-app\config.json`, modalità `--cattura` per gli screenshot di prova.
+  `%APPDATA%\Claude Skins\config.json`, modalità `--cattura` per gli screenshot di prova.
 - `src/claude-bridge.js` — il "messaggero": `query()` dell'Agent SDK con `cwd`, `pathToClaudeCodeExecutable` (la CLI
   installata, così valgono il suo login e la sua versione), `permissionMode: 'auto'`, `systemPrompt: { type:
   'preset', preset: 'claude_code', append: <tono da cronista> }`, `settings: { disableAllHooks: true }`,
@@ -122,7 +124,7 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
    - Caratteri propri per tema, già possibili con `@font-face` nel `theme.css`: per la Terra di Mezzo, un carattere
      a pixel in stile onciale o runico con licenza libera.
    - Suoni e personaggio per tema.
-   - La scelta del tema anche dalla finestra, oltre che dal vassoio: `pergamena.setTheme(id)` c'è già nel preload.
+   - La scelta del tema anche dalla finestra, oltre che dal vassoio: `skins.setTheme(id)` c'è già nel preload.
    - Un'eredità fra temi (`extends`), se nasceranno varianti dello stesso scheletro.
 1. **Più conversazioni in schede**, ognuna col suo `query()` e la sua sessione.
 2. **Modifiche ai file**: mostrare le differenze degli `Edit`/`Write` (l'`input` dello strumento ha `old_string`,

@@ -124,7 +124,7 @@ function createWindow() {
     hasShadow: false,
     alwaysOnTop: config.onTop !== false,
     backgroundColor: '#00000000',
-    title: 'Pergamena',
+    title: 'Claude Skins',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -133,7 +133,7 @@ function createWindow() {
     },
   })
   if (config.onTop !== false) win.setAlwaysOnTop(true, 'floating')
-  // Finché il mouse non è sul rotolo, i clic attraversano la finestra (lo segnala la pagina)
+  // Finché il mouse non è sopra una parte disegnata del tema, i clic attraversano la finestra (lo segnala la pagina)
   win.setIgnoreMouseEvents(true, { forward: true })
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'))
   // Nessun link si apre dentro la finestra
@@ -261,7 +261,7 @@ function registerIpc() {
     const img = nativeImage.createFromDataURL(dataUrl)
     if (tray) { tray.setImage(img); return }
     tray = new Tray(img)
-    tray.setToolTip('Pergamena')
+    tray.setToolTip('Claude Skins')
     tray.on('click', toggleVisible)
     refreshTray()
   })
@@ -331,7 +331,7 @@ app.whenReady().then(() => {
   const capture = captureArgs()
   if (capture) {
     // Le prove non toccano la configurazione vera
-    configFile = path.join(app.getPath('temp'), 'pergamena-prova.json')
+    configFile = path.join(app.getPath('temp'), 'claude-skins-prova.json')
     config = { workdir: config.workdir, position: { x: 20, y: 20 }, sizes: {}, sessionId: null, scene: capture.scene, chapter: 3, theme: capture.theme || config.theme }
   }
   themes = listThemes()
