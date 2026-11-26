@@ -1,26 +1,11 @@
-// La pixel art dell'app, disegnata dal codice a bassa risoluzione e ingrandita senza sfumature (image-rendering:
-// pixelated): grana della carta, capi del rotolo, icone delle azioni, candela, icona del vassoio.
+// Il motore della pixel art: disegna dal codice a bassa risoluzione e ingrandisce senza sfumature (image-rendering:
+// pixelated). Qui ci sono gli attrezzi comuni (bitmap, grana con seme) e i disegni di partenza: grana della carta, capi
+// del rotolo, divisore del capitolo, icone dei mestieri, lume (la candela), icona del vassoio. Ogni tema può
+// sostituire uno qualunque dei disegni con il suo (vedi themes/LEGGIMI.md); quelli che non sostituisce restano questi.
 (function () {
   const SCALE = 3
 
-  const PALETTES = {
-    notte: {
-      paper: ['#3a2f1f', '#342a1b', '#2f2618', '#403422'], paperEdge: '#1c160d',
-      roll: ['#5a4526', '#7a5f35', '#9c7c46', '#b8955a', '#8a6c3c', '#5f4828', '#3d2e18'],
-      knob: ['#5a3d10', '#9a6a1a', '#d4a338', '#ffe7a0'],
-      ink: '#e8d9b5', inkSoft: '#a8946a', gold: '#d4a338', goldLight: '#ffe7a0', red: '#c0441e', blue: '#5b8590',
-      flame: ['#ff6a2a', '#ffb347', '#ffe7a0'], wax: '#e8d9b5', waxShade: '#b8a684',
-    },
-    giorno: {
-      paper: ['#ead9ad', '#e3cf9e', '#dcc690', '#f0e2bc'], paperEdge: '#a8783f',
-      roll: ['#8a6a3a', '#b08a52', '#d4b07a', '#ecd3a0', '#c29c62', '#94723e', '#6b5230'],
-      knob: ['#5a3d10', '#9a6a1a', '#c8963a', '#f6d98a'],
-      ink: '#3a2a18', inkSoft: '#7b6343', gold: '#9a6a1a', goldLight: '#c8963a', red: '#a0381a', blue: '#3f6670',
-      flame: ['#e0663a', '#f0a040', '#fff0b0'], wax: '#fff8e6', waxShade: '#d8c9a5',
-    },
-  }
-
-  // Numeri pseudo-casuali con seme: la carta ha sempre la stessa grana
+  // Numeri pseudo-casuali con seme: la stessa grana a ogni avvio
   function seeded(seed) {
     let s = seed
     return () => {
@@ -41,13 +26,29 @@
     ctx.fillRect(x, y, 1, 1)
   }
 
-  // Disegna una bitmap di caratteri: ogni carattere è un colore della mappa, '.' è trasparente
+  // Disegna una bitmap di caratteri: ogni carattere è un colore della mappa, '.' (o un carattere senza colore) è trasparente
   function bitmap(rows, colors) {
-    const c = canvas(rows[0].length, rows.length)
+    const c = canvas(Math.max(...rows.map((r) => r.length)), rows.length)
     const ctx = c.getContext('2d')
     rows.forEach((row, y) => [...row].forEach((ch, x) => { if (colors[ch]) px(ctx, x, y, colors[ch]) }))
     return c
   }
+
+  // La stessa bitmap specchiata in orizzontale
+  function mirror(rows) {
+    return rows.map((r) => [...r].reverse().join(''))
+  }
+
+  // Ingrandisce a pixel pieni e restituisce un data URL (per il vassoio, che vuole 32×32)
+  function upscale(c, w, h) {
+    const big = canvas(w, h)
+    const ctx = big.getContext('2d')
+    ctx.imageSmoothingEnabled = false
+    ctx.drawImage(c, 0, 0, w, h)
+    return big.toDataURL()
+  }
+
+  // ------------------------------------------------------------------ i disegni di partenza
 
   // La grana della carta: un riquadro 32×32 a toni sparsi, ripetuto sullo sfondo
   function paperTile(pal) {
@@ -63,7 +64,8 @@
     return c.toDataURL()
   }
 
-  // Un capo arrotolato: un cilindro di carta a fasce di luce, con due pomelli d'oro alle estremità
+  // Un capo arrotolato, alto 12 pixel: un cilindro di carta a fasce di luce, con due pomelli d'oro alle estremità.
+  // where: 'top' o 'bottom', per i temi che disegnano i due capi in modo diverso
   function roll(widthCss, pal) {
     const w = Math.floor(widthCss / SCALE)
     const h = 12
@@ -85,7 +87,17 @@
     return c
   }
 
-  // Le icone dei mestieri, 8×8
+  // Il divisore sotto il titolo del capitolo, alto pochi pixel: un tratteggio d'oro
+  function divider(widthCss, pal) {
+    const w = Math.floor(widthCss / SCALE)
+    const c = canvas(w, 1)
+    const ctx = c.getContext('2d')
+    for (let x = 0; x < w; x++) if (x % 5 < 3) px(ctx, x, 0, pal.gold)
+    return c
+  }
+
+  // Le icone dei mestieri, 8×8. Colori: o inchiostro tenue, p carta chiara, g oro, y oro chiaro, r rosso; un tema
+  // può aggiungere lettere sue con palette.iconColors
   const ICONS = {
     leggere: ['........', '.oooooo.', 'opppppo.', '.opppppo', '.opoopo.', '.opppppo', 'opppppo.', '.oooooo.'],
     scrivere: ['......go', '.....ggo', '....ggo.', '...ggo..', '..ggo...', '..go....', '.o......', 'o.......'],
@@ -97,14 +109,18 @@
     altro: ['...o....', '..ogo...', '.oggo...', 'oggggo..', '.oggo...', '..ogo...', '...o....', '........'],
   }
 
-  function icon(craft, pal) {
-    const colors = { o: pal.inkSoft, p: pal.paper[3], g: pal.gold, y: pal.goldLight, r: pal.red }
-    return bitmap(ICONS[craft] || ICONS.altro, colors).toDataURL()
+  function iconColors(pal) {
+    return Object.assign({ o: pal.inkSoft, p: pal.paper[3], g: pal.gold, y: pal.goldLight, r: pal.red }, pal.iconColors || {})
   }
 
-  // La candela: tre fotogrammi di fiamma, più alta quando il messaggero è in viaggio
-  function candle(pal, frame, tall) {
-    const flames = tall
+  function icon(craft, pal, icons) {
+    const set = icons || ICONS
+    return bitmap(set[craft] || ICONS[craft] || ICONS.altro, iconColors(pal)).toDataURL()
+  }
+
+  // Il lume accanto alla penna: una candela a tre fotogrammi, con la fiamma più alta mentre Claude lavora
+  function lamp(pal, frame, busy) {
+    const flames = busy
       ? [['...1....', '..121...', '..121...', '.12321..', '..232...'], ['....1...', '...121..', '..1221..', '..1321..', '..232...'], ['..1.....', '..121...', '.1221...', '.12321..', '..232...']]
       : [['........', '...1....', '..121...', '..131...', '..232...'], ['........', '....1...', '...121..', '...131..', '..232...'], ['........', '..1.....', '..121...', '..131...', '..232...']]
     const body = ['...k....', '.wwwww..', '.wwwws..', '.wwwws..', '.wwwws..', '.wwwws..', 'ooooooo.', '.ooooo..']
@@ -112,20 +128,21 @@
     return bitmap(rows, { 1: pal.flame[0], 2: pal.flame[1], 3: pal.flame[2], k: pal.inkSoft, w: pal.wax, s: pal.waxShade, o: pal.gold })
   }
 
-  // L'icona del vassoio di Windows: un rotolino 16×16
-  function trayIcon(pal) {
+  // L'icona del vassoio di Windows: un rotolino 16×16, ingrandito a 32×32
+  function trayIcon() {
     const rows = [
       '................', '.kkkkkkkkkkkkkk.', 'kggppppppppppggk', '.kkkkkkkkkkkkkk.', '..kppppppppppk..', '..kpiiiiiiiipk..',
-      '..kppppppppppk..', '..kpiiiiiiipk...'.padEnd(16, '.'), '..kppppppppppk..', '..kpiiiiiiiipk..', '..kppppppppppk..',
-      '..kpiiiiipppk...'.padEnd(16, '.'), '.kkkkkkkkkkkkkk.', 'kggppppppppppggk', '.kkkkkkkkkkkkkk.', '................',
+      '..kppppppppppk..', '..kpiiiiiiipk...', '..kppppppppppk..', '..kpiiiiiiiipk..', '..kppppppppppk..',
+      '..kpiiiiipppk...', '.kkkkkkkkkkkkkk.', 'kggppppppppppggk', '.kkkkkkkkkkkkkk.', '................',
     ]
-    const c = bitmap(rows, { k: '#3d2e18', g: '#d4a338', p: '#ead9ad', i: '#7b6343' })
-    const big = canvas(32, 32)
-    const ctx = big.getContext('2d')
-    ctx.imageSmoothingEnabled = false
-    ctx.drawImage(c, 0, 0, 32, 32)
-    return big.toDataURL()
+    return upscale(bitmap(rows, { k: '#3d2e18', g: '#d4a338', p: '#ead9ad', i: '#7b6343' }), 32, 32)
   }
 
-  window.Pixel = { SCALE, PALETTES, paperTile, roll, icon, candle, trayIcon }
+  window.Pixel = {
+    SCALE, ICONS,
+    // Gli attrezzi, per i temi che disegnano da sé
+    seeded, canvas, px, bitmap, mirror, upscale, iconColors,
+    // I disegni di partenza
+    defaults: { paperTile, roll, divider, icon, lamp, trayIcon },
+  }
 })()

@@ -1,0 +1,15 @@
+/* Tema "Terra di Mezzo": ritocchi oltre alle variabili. Ogni regola comincia con body[data-theme="terra-di-mezzo"],
+   così non tocca gli altri temi (i fogli di tutti i temi sono caricati insieme). */
+
+/* Il viandante scrive in verde Contea; le azioni riuscite in verde, quelle fallite restano rosse */
+body[data-theme="terra-di-mezzo"] .entry.you .who { color: var(--green); }
+body[data-theme="terra-di-mezzo"] .tool.done::after { color: var(--green); }
+
+/* Il capolettera rubricato: lettera d'oro su cuoio rosso, come nei manoscritti */
+body[data-theme="terra-di-mezzo"] .entry.claude .text > p:first-child::first-letter {
+  box-shadow: inset 0 0 0 3px var(--gold), inset 0 0 0 6px var(--initial-bg), inset 0 0 0 9px var(--gold-dark);
+  padding: 9px 11px 7px;
+}
+
+/* La domanda di permesso come un cancello: bordo d'oro tutto intorno, il rifiuto in pietra */
+body[data-theme="terra-di-mezzo"] .ask { box-shadow: inset 0 0 0 3px var(--gold), inset 0 0 0 6px var(--edge); padding: 12px 14px; }

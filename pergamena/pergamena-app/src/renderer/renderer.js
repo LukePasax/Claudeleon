@@ -1,16 +1,20 @@
 // La pagina del rotolo: disegna la pixel art, mostra la conversazione e passa i messaggi al processo principale.
+// Scritte, colori e disegni vengono dal tema in uso (theming.js); cambiando tema si ridisegna tutto sul posto.
 // Senza Electron (aperta in un browser) la chat risponde con un'eco finta, per guardare la grafica.
 (function () {
   const api = window.pergamena || fakeApi()
   const $ = (id) => document.getElementById(id)
   const log = $('log')
   const input = $('input')
-  const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre']
+  const t = Theming.t
+  const MONTHS = Theming.MONTHS
 
   let scene = 'notte'
   let busy = false
   let reply = null
   let pending = false
+  let chapter = 1
+  let workdir = ''
   const tools = new Map()
 
   function craftOf(tool) {
@@ -71,37 +75,78 @@
     return d
   }
 
+  // Un elemento con una scritta del tema: la chiave resta nell'attributo, così al cambio di tema si riscrive
+  function label(el, key, vars) {
+    el.dataset.s = key
+    if (vars) el.dataset.sVars = JSON.stringify(vars)
+    el.textContent = t(key, vars)
+    return el
+  }
+  function labelled(cls, key, vars) {
+    return label(add(cls, ''), key, vars)
+  }
+  // Una voce della conversazione: chi scrive (dal tema) e il testo
+  function entry(who) {
+    const d = add(`entry ${who}`, '<div class="who"></div><div class="text"></div>')
+    label(d.querySelector('.who'), who === 'you' ? 'you' : 'claude')
+    return d
+  }
+
+  function applyStrings() {
+    for (const el of document.querySelectorAll('[data-s]')) el.textContent = t(el.dataset.s, el.dataset.sVars ? JSON.parse(el.dataset.sVars) : undefined)
+    for (const el of document.querySelectorAll('[data-s-placeholder]')) el.placeholder = t(el.dataset.sPlaceholder)
+    for (const el of document.querySelectorAll('[data-s-title]')) el.title = t(el.dataset.sTitle)
+    for (const el of document.querySelectorAll('[data-status-key]')) el.dataset.status = t(el.dataset.statusKey)
+    $('hint').textContent = t(busy ? 'busyHint' : 'hint')
+    $('btn-scene').textContent = t(scene === 'notte' ? 'giorno' : 'notte')
+    document.title = t('title')
+  }
+
   // ------------------------------------------------------------------ pixel art e scena
 
-  function paint() {
-    const pal = Pixel.PALETTES[scene]
-    document.body.classList.toggle('giorno', scene === 'giorno')
-    $('sheet').style.backgroundImage = `url(${Pixel.paperTile(pal)})`
-    for (const id of ['roll-top', 'roll-bottom']) {
-      const target = $(id)
-      const drawn = Pixel.roll(target.clientWidth || 452, pal)
+  // Copia un disegno a bassa risoluzione nel suo canvas; la misura a schermo la decide il CSS o, se cssSize, il disegno
+  function blit(target, drawn, cssSize) {
+    if (target.width !== drawn.width || target.height !== drawn.height) {
       target.width = drawn.width
       target.height = drawn.height
-      target.getContext('2d').drawImage(drawn, 0, 0)
     }
-    for (const row of log.querySelectorAll('.tool')) row.querySelector('img').src = Pixel.icon(row.dataset.craft, pal)
-    $('btn-scene').textContent = scene === 'notte' ? 'giorno' : 'notte'
+    if (cssSize) {
+      target.style.width = `${drawn.width * Pixel.SCALE}px`
+      target.style.height = `${drawn.height * Pixel.SCALE}px`
+    }
+    const ctx = target.getContext('2d')
+    ctx.clearRect(0, 0, target.width, target.height)
+    ctx.drawImage(drawn, 0, 0)
   }
 
-  let flameFrame = 0
-  function drawCandle() {
-    const c = $('candle')
-    const ctx = c.getContext('2d')
-    ctx.clearRect(0, 0, c.width, c.height)
-    ctx.drawImage(Pixel.candle(Pixel.PALETTES[scene], flameFrame++, busy), 0, 0)
+  function paint() {
+    const pal = Theming.palette(scene)
+    Theming.applyScene(scene)
+    $('sheet').style.backgroundImage = `url(${Theming.draw.paperTile(pal)})`
+    for (const [id, where] of [['roll-top', 'top'], ['roll-bottom', 'bottom']]) {
+      const target = $(id)
+      blit(target, Theming.draw.roll(target.clientWidth || 452, pal, where))
+    }
+    const div = $('chapter-divider')
+    const drawn = Theming.draw.divider(div.clientWidth || 240, pal)
+    blit(div, drawn)
+    div.style.height = `${drawn.height * Pixel.SCALE}px`
+    for (const row of log.querySelectorAll('.tool')) row.querySelector('img').src = Theming.draw.icon(row.dataset.craft, pal)
+    drawLamp()
+    applyStrings()
   }
-  setInterval(drawCandle, 180)
+
+  let lampFrame = 0
+  function drawLamp() {
+    blit($('lamp'), Theming.draw.lamp(Theming.palette(scene), lampFrame, busy), true)
+  }
+  setInterval(() => { lampFrame++; drawLamp() }, 180)
 
   // ------------------------------------------------------------------ conversazione
 
   function startReply() {
     if (!reply) {
-      reply = add('entry claude', '<div class="who">Claude scrive:</div><div class="text"></div>')
+      reply = entry('claude')
       reply.raw = ''
     }
     return reply
@@ -117,7 +162,7 @@
     busy = on
     $('btn-send').hidden = on
     $('btn-stop').hidden = !on
-    $('hint').textContent = on ? 'Il messaggero è in viaggio...' : 'Invio spedisce, Maiusc+Invio va a capo'
+    $('hint').textContent = t(on ? 'busyHint' : 'hint')
   }
 
   function sendMessage() {
@@ -125,7 +170,7 @@
     if (!text || busy) return
     input.value = ''
     reply = null
-    add('entry you', '<div class="who">Tu scrivi:</div><div class="text"></div>').querySelector('.text').textContent = text
+    entry('you').querySelector('.text').textContent = text
     setBusy(true)
     api.send(text)
   }
@@ -141,13 +186,19 @@
     const craft = craftOf(name)
     const row = add('tool', `<img alt=""><span>${esc(name)}</span><span class="what">${esc(summary || '')}</span>`)
     row.dataset.craft = craft
-    row.querySelector('img').src = Pixel.icon(craft, Pixel.PALETTES[scene])
+    row.querySelector('img').src = Theming.draw.icon(craft, Theming.palette(scene))
     tools.set(id, row)
   })
-  api.onToolDone(({ id, error }) => { const row = tools.get(id); if (row) row.classList.add(error ? 'fail' : 'done') })
+  api.onToolDone(({ id, error }) => {
+    const row = tools.get(id)
+    if (!row) return
+    row.classList.add(error ? 'fail' : 'done')
+    row.dataset.statusKey = error ? 'toolFail' : 'toolOk'
+    row.dataset.status = t(row.dataset.statusKey)
+  })
   api.onDone(({ durationMs }) => {
     renderReply()
-    add('footnote', `Vergato in ${Math.round((durationMs || 0) / 1000)} s`)
+    labelled('footnote', 'took', { s: Math.round((durationMs || 0) / 1000) })
     reply = null
     setBusy(false)
   })
@@ -168,10 +219,20 @@
     input.focus()
   }
 
+  // Il titolo del capitolo: "Capitolo" e la data vengono dal tema. Con una cronaca aperta il titolo è il suo
   function setChapter(n) {
-    const today = new Date()
-    $('chapter-title').innerHTML = `Capitolo<span class="num">${roman(n || 1)}</span>`
-    $('chapter-date').textContent = `${today.getDate()} ${MONTHS[today.getMonth()]} ${today.getFullYear()}`
+    chapter = n || 1
+    renderChapterHead()
+  }
+  function renderChapterHead() {
+    if (currentSession) return
+    const title = $('chapter-title')
+    title.textContent = t('chapter')
+    const num = document.createElement('span')
+    num.className = 'num'
+    num.textContent = roman(chapter)
+    title.appendChild(num)
+    $('chapter-date').textContent = Theming.chapterDate(new Date())
   }
 
   // ------------------------------------------------------------------ permessi
@@ -188,28 +249,36 @@
     if (!description) card.querySelector('.ask-desc').remove()
     if (!detail) card.querySelector('.ask-detail').remove()
     const buttons = card.querySelector('.ask-buttons')
-    const choice = (label, cls, allow, always, outcome) => {
+    const choice = (key, cls, allow, always, outcome) => {
       const b = document.createElement('button')
+      label(b, key)
       b.className = `pix small ${cls}`
-      b.textContent = label
       b.addEventListener('click', () => {
         api.answer(id, allow, always)
-        buttons.outerHTML = `<div class="ask-outcome">${esc(outcome)}</div>`
+        closeAsk(buttons, outcome)
         asks.delete(id)
       })
       buttons.appendChild(b)
     }
-    choice('Permetti', '', true, false, 'Permesso concesso.')
-    if (canAlways) choice('Sempre', '', true, true, 'Permesso concesso, anche per le prossime volte.')
-    choice('Nega', 'deny', false, false, 'Permesso negato.')
+    choice('allow', '', true, false, 'granted')
+    if (canAlways) choice('always', '', true, true, 'grantedAlways')
+    choice('deny', 'deny', false, false, 'denied')
     asks.set(id, card)
   })
+
+  // Al posto dei pulsanti resta l'esito
+  function closeAsk(buttons, outcome) {
+    const out = document.createElement('div')
+    out.className = 'ask-outcome'
+    label(out, outcome)
+    buttons.replaceWith(out)
+  }
 
   api.onAskClosed(({ id }) => {
     const card = asks.get(id)
     if (!card) return
     const buttons = card.querySelector('.ask-buttons')
-    if (buttons) buttons.outerHTML = '<div class="ask-outcome">Richiesta annullata.</div>'
+    if (buttons) closeAsk(buttons, 'cancelled')
     asks.delete(id)
   })
 
@@ -226,7 +295,8 @@
     if (busy) return
     const panel = $('sessions')
     const list = $('sessions-list')
-    list.innerHTML = '<div class="session-row"><span class="when">Sfoglio le cronache...</span></div>'
+    list.innerHTML = '<div class="session-row"><span class="when"></span></div>'
+    list.querySelector('.when').textContent = t('sessionsLoading')
     panel.hidden = false
     try {
       const sessions = await api.sessions()
@@ -240,7 +310,10 @@
         row.addEventListener('click', () => openSession(s))
         list.appendChild(row)
       }
-      if (!sessions.length) list.innerHTML = '<div class="session-row"><span class="when">Nessuna cronaca in C:\\Workspace.</span></div>'
+      if (!sessions.length) {
+        list.innerHTML = '<div class="session-row"><span class="when"></span></div>'
+        list.querySelector('.when').textContent = t('sessionsEmpty', { dir: workdir || 'cartella di lavoro' })
+      }
     } catch (err) {
       list.innerHTML = `<div class="error">${esc(String(err.message || err))}</div>`
     }
@@ -253,16 +326,16 @@
     currentSession = s.id
     $('chapter-title').textContent = s.title.length > 34 ? s.title.slice(0, 33) + '…' : s.title
     $('chapter-date').textContent = formatWhen(s.lastModified)
-    const loading = add('footnote', 'Ricopio la cronaca...')
+    const loading = labelled('footnote', 'copying')
     try {
       const history = await api.openSession(s.id)
       loading.remove()
       // Delle cronache lunghe bastano gli ultimi scambi
       for (const m of history.slice(-40)) {
-        if (m.role === 'user') add('entry you', '<div class="who">Tu scrivi:</div><div class="text"></div>').querySelector('.text').textContent = m.text
-        else add('entry claude', '<div class="who">Claude scrive:</div><div class="text"></div>').querySelector('.text').innerHTML = markdown(m.text)
+        if (m.role === 'user') entry('you').querySelector('.text').textContent = m.text
+        else entry('claude').querySelector('.text').innerHTML = markdown(m.text)
       }
-      add('footnote', 'Da qui in poi si scrive nella stessa cronaca.')
+      labelled('footnote', 'continueHere')
     } catch (err) {
       loading.remove()
       add('error', esc(String(err.message || err)))
@@ -274,7 +347,7 @@
 
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } })
   $('btn-send').addEventListener('click', sendMessage)
-  $('btn-stop').addEventListener('click', () => { api.stop(); add('error', 'Il messaggero è stato richiamato.'); reply = null; setBusy(false) })
+  $('btn-stop').addEventListener('click', () => { api.stop(); labelled('error', 'stopped'); reply = null; setBusy(false) })
   $('btn-hide').addEventListener('click', () => api.hide())
   $('btn-quit').addEventListener('click', () => api.quit())
   $('btn-new').addEventListener('click', newChapter)
@@ -282,6 +355,8 @@
   $('btn-back').addEventListener('click', () => { $('sessions').hidden = true })
   $('btn-scene').addEventListener('click', () => { scene = scene === 'notte' ? 'giorno' : 'notte'; api.setScene(scene); paint() })
   api.onReset(newChapter)
+  // Il tema scelto dal vassoio: si cambia sul posto, la conversazione resta
+  api.onTheme((id) => { Theming.use(id); paint(); renderChapterHead(); api.setTrayIcon(Theming.draw.trayIcon(Theming.palette('notte'))) })
 
   // Spostare dal capo alto (non dai suoi pulsanti) e ridimensionare dalla maniglia: il gesto lo segue il processo
   // principale, la pagina dice solo quando comincia e quando finisce
@@ -320,11 +395,14 @@
   })
   document.addEventListener('mouseleave', () => { interactive = false; api.setInteractive(false) })
 
-  api.info().then((info) => {
+  api.info().then(async (info) => {
     scene = info.scene === 'giorno' ? 'giorno' : 'notte'
+    workdir = info.workdir || ''
+    await Theming.load(info.themes || [])
+    Theming.use(info.theme)
     setChapter(info.chapter)
     paint()
-    api.setTrayIcon(Pixel.trayIcon(Pixel.PALETTES.notte))
+    api.setTrayIcon(Theming.draw.trayIcon(Theming.palette('notte')))
     input.focus()
   })
 
@@ -335,8 +413,17 @@
     const on = (name) => (cb) => { handlers[name] = cb }
     const fire = (name, v, ms) => setTimeout(() => handlers[name] && handlers[name](v), ms)
     let chapter = 1
+    // Dalla console dell'anteprima: anteprima.tema('pergamena'), anteprima.permesso()
+    window.anteprima = {
+      tema: (id) => fire('onTheme', id, 0),
+      permesso: () => fire('onAsk', { id: Date.now(), title: 'Claude vuole modificare un file', description: '', detail: 'src/MapView.cpp', canAlways: true }, 0),
+    }
     return {
-      info: async () => ({ scene: 'notte', chapter }),
+      // ?tema=<id>&scena=giorno nell'indirizzo per guardare un tema
+      info: async () => {
+        const q = new URLSearchParams(location.search)
+        return { scene: q.get('scena') || 'notte', chapter, theme: q.get('tema') || 'terra-di-mezzo', themes: ['terra-di-mezzo', 'pergamena'], workdir: 'C:/Workspace' }
+      },
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
       sessions: async () => [{ id: 's1', title: '10/11 · Mod desktop Signore degli Anelli', lastModified: Date.now() }],
       openSession: async () => [{ role: 'user', text: 'Ciao' }, { role: 'assistant', text: 'Salve, viandante.' }],
@@ -348,8 +435,9 @@
         const answer = `Ecco quanto mi chiedi: "${text}".\n\nLa risposta arriva a pezzi, come in una vera conversazione, con **grassetto** e \`codice\`.`
         ;[...answer].forEach((ch, i) => fire('onDelta', ch, 900 + i * 15))
         fire('onDone', { durationMs: 2400 }, 900 + answer.length * 15 + 100)
+        fire('onAsk', { id: 1, title: 'Claude vuole eseguire un comando', description: 'Il comando scrive fuori dalla cartella di lavoro.', detail: 'git push origin feature/sentieri', canAlways: true }, 900 + answer.length * 15 + 200)
       },
-      onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'),
+      onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'),
     }
   }
 })()

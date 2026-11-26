@@ -1,20 +1,36 @@
 @font-face { font-family: 'Pixelify'; src: url('fonts/pixelify-sans.woff2') format('woff2'); font-weight: 400 700; }
 @font-face { font-family: 'Bastarda'; src: url('fonts/jacquarda-bastarda-9.woff2') format('woff2'); }
 
-/* I colori della scena: notte di default, giorno con body.giorno */
-:root {
-  --ink: #e8d9b5; --ink-soft: #a8946a; --gold: #d4a338; --gold-light: #ffe7a0; --red: #e0663a;
+/* I colori e i caratteri dell'interfaccia: questi sono i valori di partenza, notte e giorno (body.giorno). Un tema
+   ridefinisce quelli che vuole nelle "vars" delle sue scene (vedi themes/LEGGIMI.md), che finiscono nello stile in
+   linea di body e quindi vincono su queste. Stanno su body e non su :root perché le variabili composte (--strong ecc.)
+   si calcolano dove sono dichiarate: così usano i colori del tema */
+body {
+  --font-body: 'Pixelify', monospace; --font-display: 'Bastarda', serif;
+  --ink: #e8d9b5; --ink-soft: #a8946a; --gold: #d4a338; --gold-light: #ffe7a0; --gold-dark: #7a5418; --red: #e0663a;
   --edge: #1c160d; --edge-light: #5a4526; --field: rgba(0, 0, 0, 0.28); --code: rgba(0, 0, 0, 0.3);
+  /* Testi in evidenza: grassetto, titolo della domanda, cronaca aperta */
+  --strong: var(--gold-light);
+  /* Il titolo sul capo alto e il capolettera */
+  --title-ink: #2a1d0e; --title-glow: rgba(255, 240, 200, 0.6);
+  --initial-ink: var(--gold-light); --initial-bg: var(--edge);
+  /* I pulsanti d'oro, quello del rifiuto e i due sul capo alto */
+  --btn-bg: #d4a338; --btn-hover: #e0b54a; --btn-light: #ffe7a0; --btn-dark: #9a6a1a; --btn-ink: #3d2e18; --btn-ring: #3d2e18;
+  --deny-bg: #b8542e; --deny-light: #e8906a; --deny-dark: #7a3418; --deny-ink: #fff0e0;
+  --ctl-bg: #3d2e18; --ctl-hover: #5a4526; --ctl-light: #7a5f35; --ctl-dark: #1c160d; --ctl-ink: #ffe7a0;
+  /* La riga sotto il rotolo, sopra le finestre degli altri programmi */
+  --bar-ink: var(--gold); --bar-hover: var(--gold-light); --bar-shadow: rgba(0, 0, 0, 0.7);
 }
 body.giorno {
   --ink: #3a2a18; --ink-soft: #7b6343; --gold: #9a6a1a; --gold-light: #c8963a; --red: #a0381a;
   --edge: #a8783f; --edge-light: #c8a462; --field: rgba(255, 255, 255, 0.35); --code: rgba(120, 90, 30, 0.15);
+  --strong: var(--gold); --initial-ink: #ffe7a0; --initial-bg: #5a4526;
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; }
 /* Senza legature: in Pixelify "fi" diventa un segno solo che sembra una A */
-body { font-family: 'Pixelify', monospace; font-size: 16px; color: var(--ink); font-variant-ligatures: none; font-feature-settings: 'liga' 0, 'clig' 0; }
+body { font-family: var(--font-body); font-size: 16px; color: var(--ink); font-variant-ligatures: none; font-feature-settings: 'liga' 0, 'clig' 0; }
 canvas { image-rendering: pixelated; display: block; }
 button { font-family: inherit; }
 
@@ -41,19 +57,19 @@ button { font-family: inherit; }
 ::-webkit-scrollbar { width: 12px; height: 12px; }
 ::-webkit-scrollbar-button { display: none; }
 ::-webkit-scrollbar-track { background: var(--code); box-shadow: inset 3px 0 0 var(--edge); }
-::-webkit-scrollbar-thumb { background: var(--gold); box-shadow: inset -3px -3px 0 #7a5418, inset 3px 3px 0 var(--gold-light); }
+::-webkit-scrollbar-thumb { background: var(--gold); box-shadow: inset -3px -3px 0 var(--gold-dark), inset 3px 3px 0 var(--gold-light); }
 ::-webkit-scrollbar-thumb:hover { background: var(--gold-light); }
 ::-webkit-scrollbar-corner { background: transparent; }
 .roll .title {
   position: absolute; left: 0; right: 0; top: 0; line-height: 36px; text-align: center;
-  font-family: 'Bastarda', serif; font-size: 27px; color: #2a1d0e; text-shadow: 0 2px 0 rgba(255, 240, 200, 0.6); pointer-events: none;
+  font-family: var(--font-display); font-size: 27px; color: var(--title-ink); text-shadow: 0 2px 0 var(--title-glow); pointer-events: none;
 }
 .controls { position: absolute; right: 34px; top: 6px; display: flex; gap: 6px; -webkit-app-region: no-drag; }
 .controls button {
   width: 24px; height: 24px; border: none; cursor: pointer; font-size: 16px; line-height: 20px; padding: 0;
-  background: #3d2e18; color: #ffe7a0; box-shadow: inset -3px -3px 0 #1c160d, inset 3px 3px 0 #7a5f35;
+  background: var(--ctl-bg); color: var(--ctl-ink); box-shadow: inset -3px -3px 0 var(--ctl-dark), inset 3px 3px 0 var(--ctl-light);
 }
-.controls button:hover { background: #5a4526; }
+.controls button:hover { background: var(--ctl-hover); }
 
 /* Il foglio: grana a pixel, bordi a gradino scuri, rientrato sotto i capi */
 .sheet {
@@ -65,11 +81,12 @@ button { font-family: inherit; }
 .log { flex: 1; overflow-y: auto; padding: 24px 26px 8px; user-select: text; }
 
 .chapter { text-align: center; color: var(--gold); margin: 0 0 18px; }
-.chapter-title { font-family: 'Bastarda', serif; font-size: 36px; line-height: 1; }
+.chapter-title { font-family: var(--font-display); font-size: 36px; line-height: 1; }
 /* Il numero romano col carattere a pixel normale: in gotico "III" si legge "333" */
-.chapter-title .num { font-family: 'Pixelify', monospace; font-weight: 700; font-size: 30px; margin-left: 6px; }
+.chapter-title .num { font-family: var(--font-body); font-weight: 700; font-size: 30px; margin-left: 6px; }
 .chapter-date { font-size: 14px; color: var(--ink-soft); margin-top: 4px; }
-.chapter::after { content: ''; display: block; height: 3px; margin: 10px auto 0; width: 60%; background: repeating-linear-gradient(90deg, var(--gold) 0 9px, transparent 9px 15px); }
+/* Il divisore lo disegna il tema, a pixel: qui solo la sua misura */
+.chapter-divider { width: 60%; margin: 10px auto 0; }
 
 .entry { margin: 0 0 16px; line-height: 1.45; }
 .who { font-size: 14px; color: var(--ink-soft); margin-bottom: 2px; }
@@ -80,47 +97,45 @@ button { font-family: inherit; }
 /* Il capolettera: una maiuscola a pixel in grassetto, in un riquadro d'oro a gradino; il testo le gira intorno */
 .entry.claude .text > p:first-child::first-letter {
   float: left; font-weight: 700; font-size: 32px; line-height: 1; padding: 6px 8px 4px; margin: 4px 8px 0 0;
-  color: var(--gold-light); background: var(--edge);
-  box-shadow: inset 0 0 0 3px var(--gold), inset 0 0 0 6px var(--edge);
+  color: var(--initial-ink); background: var(--initial-bg);
+  box-shadow: inset 0 0 0 3px var(--gold), inset 0 0 0 6px var(--initial-bg);
 }
-body.giorno .entry.claude .text > p:first-child::first-letter { color: #ffe7a0; background: #5a4526; }
-.text code { font-family: 'Pixelify', monospace; background: var(--code); padding: 0 4px; }
+.text code { font-family: var(--font-body); background: var(--code); padding: 0 4px; }
 .text pre { background: var(--code); padding: 8px 10px; overflow-x: auto; font-size: 14px; box-shadow: inset 3px 0 0 var(--gold); }
 .text pre code { background: none; padding: 0; }
 .text ul, .text ol { margin: 0 0 8px 20px; padding: 0; }
-.text h3 { font-family: 'Bastarda', serif; font-weight: normal; font-size: 27px; color: var(--gold); margin: 10px 0 4px; }
-.text b { color: var(--gold-light); font-weight: 600; }
-body.giorno .text b { color: var(--gold); }
+.text h3 { font-family: var(--font-display); font-weight: normal; font-size: 27px; color: var(--gold); margin: 10px 0 4px; }
+.text b { color: var(--strong); font-weight: 600; }
 
 .tool { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--ink-soft); margin: 2px 0; }
 .tool img { width: 24px; height: 24px; image-rendering: pixelated; flex: none; }
 .tool .what { opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tool.done::after { content: 'ok'; color: var(--ink-soft); font-size: 12px; margin-left: auto; }
-.tool.fail::after { content: 'errore'; color: var(--red); font-size: 12px; margin-left: auto; }
+/* "ok" ed "errore" vengono dalle scritte del tema, nell'attributo data-status */
+.tool.done::after, .tool.fail::after { content: attr(data-status); color: var(--ink-soft); font-size: 12px; margin-left: auto; }
+.tool.fail::after { color: var(--red); }
 .footnote { font-size: 13px; color: var(--ink-soft); text-align: right; margin: -8px 0 16px; }
 .error { color: var(--red); white-space: pre-wrap; margin: 0 0 14px; }
 
 /* La domanda di permesso: un riquadro a gradino con i tre pulsanti */
 .ask { margin: 6px 0 16px; padding: 10px 12px; background: var(--code); box-shadow: inset 3px 3px 0 var(--gold), inset -3px -3px 0 var(--edge); }
-.ask .ask-title { color: var(--gold-light); margin-bottom: 4px; }
-body.giorno .ask .ask-title { color: var(--gold); }
+.ask .ask-title { color: var(--strong); margin-bottom: 4px; }
 .ask .ask-desc { font-size: 14px; color: var(--ink-soft); margin-bottom: 6px; }
 .ask .ask-detail { font-size: 14px; background: var(--code); padding: 4px 6px; margin-bottom: 8px; word-break: break-all; }
 .ask .ask-buttons { display: flex; gap: 12px; margin: 4px 0 2px 3px; }
 .ask .ask-outcome { font-size: 14px; color: var(--ink-soft); }
 .pix.small { font-size: 14px; padding: 3px 8px; }
-.pix.deny { background: #b8542e; box-shadow: inset -3px -3px 0 #7a3418, inset 3px 3px 0 #e8906a, 0 0 0 3px #3d2e18; color: #fff0e0; }
+.pix.deny { background: var(--deny-bg); box-shadow: inset -3px -3px 0 var(--deny-dark), inset 3px 3px 0 var(--deny-light), 0 0 0 3px var(--btn-ring); color: var(--deny-ink); }
 
 /* Le cronache: l'elenco delle sessioni, sopra il foglio */
 .sessions { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; background: inherit; background-size: 96px 96px; padding: 16px 22px; }
 .sessions[hidden] { display: none; }
-.sessions-head { display: flex; justify-content: space-between; align-items: center; font-family: 'Bastarda', serif; font-size: 27px; color: var(--gold); margin-bottom: 10px; }
+.sessions-head { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-display); font-size: 27px; color: var(--gold); margin-bottom: 10px; }
+.sessions-head button { font-family: var(--font-body); }
 .sessions-list { flex: 1; overflow-y: auto; }
 .session-row { padding: 6px 8px; cursor: pointer; margin-bottom: 4px; box-shadow: inset 3px 0 0 var(--edge-light); }
 .session-row:hover { background: var(--code); box-shadow: inset 3px 0 0 var(--gold); }
 .session-row .when { font-size: 12px; color: var(--ink-soft); }
-.session-row.current .title { color: var(--gold-light); }
-body.giorno .session-row.current .title { color: var(--gold); }
+.session-row.current .title { color: var(--strong); }
 
 /* La penna */
 .quill { padding: 8px 24px 12px; box-shadow: inset 0 3px 0 var(--edge-light); }
@@ -131,16 +146,18 @@ body.giorno .session-row.current .title { color: var(--gold); }
 }
 .quill textarea::placeholder { color: var(--ink-soft); }
 .quill-row { display: flex; align-items: flex-end; gap: 10px; margin-top: 8px; }
-#candle { width: 24px; height: 39px; flex: none; }
+/* Il lume: la sua misura la decide il disegno del tema (pixel × 3) */
+#lamp { flex: none; }
 .hint { flex: 1; font-size: 12px; color: var(--ink-soft); line-height: 1.2; }
 .pix {
-  border: none; cursor: pointer; padding: 6px 12px; font-size: 16px; color: #3d2e18; background: #d4a338;
-  box-shadow: inset -3px -3px 0 #9a6a1a, inset 3px 3px 0 #ffe7a0, 0 0 0 3px #3d2e18;
+  border: none; cursor: pointer; padding: 6px 12px; font-size: 16px; color: var(--btn-ink); background: var(--btn-bg);
+  box-shadow: inset -3px -3px 0 var(--btn-dark), inset 3px 3px 0 var(--btn-light), 0 0 0 3px var(--btn-ring);
 }
-.pix:hover { background: #e0b54a; }
-.pix:active { box-shadow: inset 3px 3px 0 #9a6a1a, inset -3px -3px 0 #ffe7a0, 0 0 0 3px #3d2e18; }
+.pix:hover { background: var(--btn-hover); }
+.pix.deny:hover { filter: brightness(1.1); }
+.pix:active { box-shadow: inset 3px 3px 0 var(--btn-dark), inset -3px -3px 0 var(--btn-light), 0 0 0 3px var(--btn-ring); }
 .pix[disabled] { opacity: 0.5; cursor: default; }
 
-.bar { text-align: center; font-size: 16px; color: var(--gold); padding-top: 2px; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7); }
-.bar button { background: none; border: none; color: var(--gold); cursor: pointer; font-size: 16px; padding: 0 4px; text-shadow: inherit; }
-.bar button:hover { color: var(--gold-light); }
+.bar { text-align: center; font-size: 16px; color: var(--bar-ink); padding-top: 2px; text-shadow: 0 2px 0 var(--bar-shadow); }
+.bar button { background: none; border: none; color: var(--bar-ink); cursor: pointer; font-size: 16px; padding: 0 4px; text-shadow: inherit; }
+.bar button:hover { color: var(--bar-hover); }

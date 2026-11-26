@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('pergamena', {
   hide: () => ipcRenderer.send('window:hide'),
   quit: () => ipcRenderer.send('app:quit'),
   setScene: (scene) => ipcRenderer.send('scene:set', scene),
+  setTheme: (id) => ipcRenderer.send('theme:set', id),
   newChapter: () => ipcRenderer.invoke('chapter:new'),
   send: (text) => ipcRenderer.send('chat:send', text),
   stop: () => ipcRenderer.send('chat:stop'),
@@ -27,4 +28,5 @@ contextBridge.exposeInMainWorld('pergamena', {
   onDone: listen('claude:done'),
   onError: listen('claude:error'),
   onReset: listen('chat:reset'),
+  onTheme: listen('theme:apply'),
 })

@@ -4,6 +4,7 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, globalShor
 const fs = require('fs')
 const path = require('path')
 const { ClaudeBridge } = require('./claude-bridge')
+const { listThemes, DEFAULT_THEME } = require('./themes')
 
 const WIN_W = 460
 const WIN_H = 720
@@ -21,7 +22,9 @@ let tray = null
 let bridge = null
 let configFile = null
 // workdir: la cartella in cui lavora Claude Code e di cui si elencano le cronache; vuota, la cartella utente
-let config = { workdir: '', position: null, size: null, sessionId: null, scene: 'notte', chapter: 0 }
+// theme: l'id del tema in uso (una cartella di src/renderer/themes)
+let config = { workdir: '', position: null, size: null, sessionId: null, scene: 'notte', chapter: 0, theme: DEFAULT_THEME }
+let themes = []
 // Il trascinamento o il ridimensionamento in corso: il processo principale segue il cursore
 let gesture = null
 
@@ -56,6 +59,21 @@ function visiblePosition(pos) {
   const cx = pos.x + windowSize().w / 2
   const cy = pos.y + 40
   return screen.getAllDisplays().some(({ workArea: wa }) => cx >= wa.x && cx <= wa.x + wa.width && cy >= wa.y && cy <= wa.y + wa.height) ? pos : null
+}
+
+// Il tema in uso, o il predefinito se quello salvato non c'è più
+function currentTheme() {
+  return themes.find((t) => t.id === config.theme) || themes.find((t) => t.id === DEFAULT_THEME) || themes[0] || { id: DEFAULT_THEME, name: DEFAULT_THEME, persona: '' }
+}
+
+// Cambia tema: la pagina lo applica sul posto, Claude riceve la nuova personalità dal messaggio successivo
+function setTheme(id) {
+  if (!themes.some((t) => t.id === id)) return
+  config.theme = id
+  saveConfig()
+  bridge.persona = currentTheme().persona
+  send('theme:apply', id)
+  refreshTray()
 }
 
 function send(channel, payload) {
@@ -142,6 +160,7 @@ function trayMenu() {
   return Menu.buildFromTemplate([
     { label: win && win.isVisible() ? 'Nascondi il rotolo' : 'Mostra il rotolo', click: toggleVisible },
     { label: 'Nuovo capitolo', click: () => send('chat:reset') },
+    { label: 'Tema', submenu: themes.map((t) => ({ label: t.name, type: 'radio', checked: t.id === currentTheme().id, click: () => setTheme(t.id) })) },
     { label: 'Riporta in basso a destra', click: () => { const p = defaultPosition(); win.setPosition(p.x, p.y); config.position = p; saveConfig() } },
     { label: 'Dimensione iniziale', click: () => { win.setSize(WIN_W, WIN_H); config.size = null; saveConfig() } },
     { type: 'separator' },
@@ -159,7 +178,15 @@ function registerIpc() {
   ipcMain.on('gesture:end', stopGesture)
   ipcMain.on('window:hide', () => { win.hide(); refreshTray() })
   ipcMain.on('app:quit', () => app.quit())
-  ipcMain.handle('app:info', () => ({ scene: config.scene, chapter: config.chapter, shortcut: TOGGLE_SHORTCUT.replace('Control', 'Ctrl') }))
+  ipcMain.handle('app:info', () => ({
+    scene: config.scene,
+    chapter: config.chapter,
+    shortcut: TOGGLE_SHORTCUT.replace('Control', 'Ctrl'),
+    theme: currentTheme().id,
+    themes: themes.map((t) => t.id),
+    workdir: bridge.workdir,
+  }))
+  ipcMain.on('theme:set', (_e, id) => setTheme(String(id)))
   ipcMain.on('scene:set', (_e, scene) => { config.scene = scene === 'giorno' ? 'giorno' : 'notte'; saveConfig() })
   // Un capitolo per conversazione: il numero cresce, la sessione di Claude Code ricomincia
   ipcMain.handle('chapter:new', () => {
@@ -202,14 +229,21 @@ app.on('second-instance', () => {
   if (win) { win.show(); win.focus() }
 })
 
-// --cattura <file.png> [notte|giorno]: per le prove, una conversazione finta, uno screenshot della finestra e uscita.
-// Claude non viene chiamato.
+// --cattura <file.png> [notte|giorno] [chat|cronache] [LxA] [--tema <id>]: per le prove, una conversazione finta, uno
+// screenshot della finestra e uscita. Claude non viene chiamato.
 function captureArgs() {
   const i = process.argv.indexOf('--cattura')
   if (i < 0) return null
+  const ti = process.argv.indexOf('--tema')
   // Quinto argomento facoltativo: la dimensione, es. 760x820
   const [w, h] = String(process.argv[i + 4] || '').split('x').map(Number)
-  return { file: process.argv[i + 1], scene: process.argv[i + 2] === 'giorno' ? 'giorno' : 'notte', view: process.argv[i + 3] || 'chat', size: w && h ? { w, h } : null }
+  return {
+    file: process.argv[i + 1],
+    scene: process.argv[i + 2] === 'giorno' ? 'giorno' : 'notte',
+    view: process.argv[i + 3] || 'chat',
+    size: w && h ? { w, h } : null,
+    theme: ti > 0 ? process.argv[ti + 1] : null,
+  }
 }
 
 function fakeConversation(capture) {
@@ -248,13 +282,14 @@ app.whenReady().then(() => {
   if (capture) {
     // Le prove non toccano la configurazione vera
     configFile = path.join(app.getPath('temp'), 'pergamena-prova.json')
-    config = { position: { x: 20, y: 20 }, size: capture.size, sessionId: null, scene: capture.scene, chapter: 3 }
+    config = { workdir: config.workdir, position: { x: 20, y: 20 }, size: capture.size, sessionId: null, scene: capture.scene, chapter: 3, theme: capture.theme || config.theme }
   }
+  themes = listThemes()
   if (!config.chapter) { config.chapter = 1; saveConfig() }
   bridge = new ClaudeBridge({
     getSession: () => config.sessionId,
     setSession: (id) => { config.sessionId = id; saveConfig() },
-  }, config.workdir)
+  }, config.workdir, currentTheme().persona)
   if (capture) bridge.send = () => {}
   registerIpc()
   createWindow()

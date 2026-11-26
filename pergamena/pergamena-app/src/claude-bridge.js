@@ -6,11 +6,11 @@ const { EventEmitter } = require('events')
 
 const CLAUDE = path.join(os.homedir(), '.local', 'bin', process.platform === 'win32' ? 'claude.exe' : 'claude')
 
-// Un tocco di cronista, senza togliere precisione: la risposta compare in un rotolo stretto
-const PERSONA = [
+// La personalità che si aggiunge al prompt di sistema viene dal tema (campo persona del suo theme.js); questa vale per
+// un tema che non ne ha una
+const FALLBACK_PERSONA = [
   'Le tue risposte compaiono in una piccola finestra a forma di rotolo di pergamena, in pixel art.',
-  'Tieni il tono appena di un cronista garbato, ma resta preciso e conciso: la sostanza viene prima dello stile.',
-  'Usa markdown leggero (grassetto, `codice`, blocchi di codice, elenchi).',
+  'Resta preciso e conciso. Usa markdown leggero (grassetto, `codice`, blocchi di codice, elenchi).',
 ].join(' ')
 
 // L'SDK è un modulo ES: si carica una volta sola
@@ -37,9 +37,11 @@ function plainText(message) {
 }
 
 class ClaudeBridge extends EventEmitter {
-  // session: getSession/setSession della conversazione corrente; workdir: la cartella in cui lavora Claude Code
-  constructor(session, workdir) {
+  // session: getSession/setSession della conversazione corrente; workdir: la cartella in cui lavora Claude Code;
+  // persona: il tono del tema in uso, si può cambiare fra un messaggio e l'altro
+  constructor(session, workdir, persona) {
     super()
+    this.persona = persona
     this.session = session
     this.workdir = (workdir || os.homedir()).replace(/\\/g, '/')
     this.query = null
@@ -82,7 +84,7 @@ class ClaudeBridge extends EventEmitter {
           cwd: this.workdir,
           pathToClaudeCodeExecutable: CLAUDE,
           permissionMode: this.mode,
-          systemPrompt: { type: 'preset', preset: 'claude_code', append: PERSONA },
+          systemPrompt: { type: 'preset', preset: 'claude_code', append: this.persona || FALLBACK_PERSONA },
           // Queste conversazioni non fanno partire gli hook dell'utente (log di sessione, backup)
           settings: { disableAllHooks: true },
           includePartialMessages: true,
