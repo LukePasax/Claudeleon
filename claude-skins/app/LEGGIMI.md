@@ -59,7 +59,8 @@ npm 11 altrimenti non arriva.
 - **Cronache (annali):** le sessioni di Claude Code di tutte le cartelle, le più recenti prima, come nella barra
   laterale dell'app desktop (le sue comprese, coi loro titoli); accanto alla data c'è la cartella. Nel Libro Rosso
   sono sempre visibili sulla pagina sinistra; nel rotolo si aprono col pulsante "cronache". Aprendone una si vedono
-  gli ultimi scambi, e i messaggi dopo la continuano nella sua cartella. Non aprire qui una sessione che è aperta
+  gli ultimi 40 messaggi con le azioni di Claude e il loro esito, le modifiche ai file (chiuse: si aprono con un
+  clic sulla riga), i comandi con `/` e la loro uscita; i messaggi dopo la continuano nella sua cartella. Non aprire qui una sessione che è aperta
   anche nell'app desktop.
 - **Cartella di lavoro:** dal vassoio, "Cartella di lavoro…": è dove nascono le conversazioni nuove (quelle riprese
   restano nella loro cartella).

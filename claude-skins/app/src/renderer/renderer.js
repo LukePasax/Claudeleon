@@ -333,6 +333,7 @@
     const notes = []
     if (change.created) notes.push('diffNew')
     if (change.whole) notes.push('diffWhole')
+    if (change.then) notes.push('diffThen')
     if (change.hunks.some((h) => h.all)) notes.push('diffAll')
     if (change.tooBig) notes.push('diffTooBig')
     for (const key of notes) {
@@ -436,6 +437,12 @@
   api.onTool(({ id, name, summary, change }) => {
     renderReply()
     reply = null
+    addTool(id, name, summary, change)
+  })
+
+  // Un'azione di Claude: icona del mestiere, nome, su che cosa; per le modifiche ai file il conto delle righe e le
+  // differenze sotto (un clic sulla riga le chiude e le riapre). La usano la conversazione e le cronache riaperte
+  function addTool(id, name, summary, change) {
     const craft = craftOf(name)
     const row = add('tool', `<img alt=""><span>${esc(name)}</span><span class="what">${esc(summary || '')}</span>`)
     row.dataset.craft = craft
@@ -457,14 +464,17 @@
       row.addEventListener('click', () => { item.hidden = !item.hidden })
       scrollDown()
     }
-  })
-  api.onToolDone(({ id, error }) => {
+    return row
+  }
+
+  function toolDone(id, error) {
     const row = tools.get(id)
     if (!row) return
     row.classList.add(error ? 'fail' : 'done')
     row.dataset.statusKey = error ? 'toolFail' : 'toolOk'
     row.dataset.status = t(row.dataset.statusKey)
-  })
+  }
+  api.onToolDone(({ id, error }) => toolDone(id, error))
   api.onDone(({ durationMs }) => {
     renderReply()
     labelled('footnote', 'took', { s: Math.round((durationMs || 0) / 1000) })
@@ -669,11 +679,23 @@
     try {
       const history = await api.openSession(s.id, s.cwd || null)
       loading.remove()
-      // Delle cronache lunghe bastano gli ultimi scambi
-      for (const m of history.slice(-40)) {
-        if (m.role === 'user') entry('you').querySelector('.text').textContent = m.text
-        else entry('claude').querySelector('.text').innerHTML = markdown(m.text)
+      // Delle cronache lunghe bastano gli ultimi 40 messaggi, con le azioni che stanno in mezzo
+      let from = 0
+      let texts = 0
+      for (let k = history.length - 1; k >= 0; k--) {
+        if (history[k].role !== 'tool' && ++texts === 40) { from = k; break }
       }
+      for (const m of history.slice(from)) {
+        if (m.role === 'user') entry('you').querySelector('.text').textContent = m.text
+        else if (m.role === 'assistant') entry('claude').querySelector('.text').innerHTML = markdown(m.text)
+        else if (m.role === 'output') add('cmd-output', '').textContent = m.text
+        else if (m.role === 'tool') {
+          addTool(m.id, m.name, m.summary, m.change)
+          if (m.error !== null) toolDone(m.id, m.error)
+        }
+      }
+      // Le differenze delle cronache restano chiuse: si aprono con un clic sulla riga dell'azione
+      for (const el of all('[data-part="log"] > .item.change')) el.hidden = true
       labelled('footnote', 'continueHere')
     } catch (err) {
       loading.remove()
@@ -858,7 +880,16 @@
         { id: 's3', title: 'Mod desktop Signore degli Anelli', lastModified: Date.now() - 4 * day, cwd: 'C:/Workspace' },
         { id: 's4', title: 'Profilo di Windows Terminal', lastModified: Date.now() - 9 * day, cwd: 'C:/Users/luca' },
       ],
-      openSession: async () => [{ role: 'user', text: 'Ciao' }, { role: 'assistant', text: 'Salve, viandante.' }],
+      openSession: async () => [
+        { role: 'user', text: 'Aggiungi i fiumi alla mappa' },
+        { role: 'assistant', text: 'Guardo prima come si disegna la mappa.' },
+        { role: 'tool', id: 'h1', name: 'Read', summary: 'src/MapView.cpp', change: null, error: false },
+        { role: 'tool', id: 'h2', name: 'Edit', summary: 'src/MapView.cpp', change: FAKE_EDIT, error: false },
+        { role: 'tool', id: 'h3', name: 'Bash', summary: 'cmake --build build', change: null, error: true },
+        { role: 'assistant', text: 'Fatto: i fiumi ora si disegnano **prima** delle strade. La compilazione però si è fermata su un errore di `MapLoader`.' },
+        { role: 'user', text: '/usage' },
+        { role: 'output', text: 'Sessione corrente\n  Token in ingresso   12.408\n  Costo stimato       0,21 $' },
+      ],
       onAsk: on('onAsk'), onAskClosed: on('onAskClosed'),
       newChapter: async () => ++n,
       send(text) {

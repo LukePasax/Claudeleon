@@ -124,6 +124,10 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
   primo avvio, e la cartella di lavoro si sceglie dal vassoio.
 - **Permessi in modo `auto`:** il classificatore approva da solo le azioni chiare, quindi la domanda nella finestra
   compare di rado. Per provarla, il modo "chiedi sempre" dal selettore sopra la penna.
+- **Cronache riaperte:** `history()` ricostruisce la sessione da `getSessionMessages` in voci ordinate (domande,
+  risposte, azioni con l'esito dal `tool_result`, comandi con `/` da `<command-name>`/`<command-args>`, uscite da
+  `<local-command-stdout>`); i sottoagenti (`parent_tool_use_id`) restano fuori. Le differenze sono "del passato"
+  (`change(..., true)`): di un `Write` il contenuto scritto allora, di un `Edit` la riga si cerca col testo nuovo.
 - **Comandi con `/`:** si eseguono spedendo il testo `/nome argomenti` come prompt. L'elenco viene da
   `Query.supportedCommands()` (nome, descrizione, `argumentHint`, alias, `builtin`), aggiornato dai messaggi
   `system` `commands_changed`; quelli di `terminal_slash_commands` (nel messaggio `init`) non si offrono. Per averlo
@@ -159,9 +163,8 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
    - La scelta del tema anche dalla finestra, oltre che dal vassoio: `skins.setTheme(id)` c'è già nel preload.
    - Un'eredità fra temi (`extends`), se nasceranno varianti dello stesso scheletro.
 1. **Più conversazioni in schede**, ognuna col suo `query()` e la sua sessione.
-2. ~~**Modifiche ai file**~~: fatto (riquadro delle differenze nella conversazione e nei permessi). Restano: le
-   modifiche anche nelle cronache riaperte (oggi si ricopia solo il testo), e un riepilogo dei file toccati nel
-   capitolo.
+2. ~~**Modifiche ai file**~~: fatto (riquadro delle differenze nella conversazione, nei permessi e nelle cronache
+   riaperte). Resta un riepilogo dei file toccati nel capitolo.
 3. ~~**Scelta del modo dei permessi**~~: fatto (selettore sopra la penna, scheda del piano). Resta l'interruzione
    più fine (fermare un solo strumento, non tutta la risposta).
 4. ~~**Comandi con `/`, skill e plugin**~~: fatto (menu sopra la penna, uscita dei comandi locali). Resta da provare

@@ -56,6 +56,7 @@
     diffGap: '··· {n} righe uguali',
     diffNew: 'File nuovo.',
     diffWhole: 'Scritto per intero: ecco il contenuto.',
+    diffThen: 'Il contenuto scritto allora (il file può essere cambiato da così).',
     diffAll: 'In tutte le occorrenze nel file.',
     diffTooBig: 'Modifica troppo grande da mostrare qui.',
     diffSame: 'Nessuna differenza.',

@@ -157,11 +157,13 @@ class ClaudeBridge extends EventEmitter {
   // La modifica che uno strumento fa a un file, da mostrare riga per riga: { file, created?, whole?, tooBig?,
   // hunks: [{ before, after, line, all }] }. line è la riga d'inizio nel file, se si trova. Il "prima" di un Write
   // si legge dal disco: se il file è già stato scritto (uguale al nuovo contenuto) si mostra il contenuto intero
-  change(toolName, input) {
+  // Per una cronaca riaperta (past: true) il file su disco può essere cambiato da allora: di un Write si mostra il
+  // contenuto scritto allora, di un Edit si cerca la riga del testo nuovo
+  change(toolName, input, past) {
     if (!input || typeof input !== 'object') return null
     const file = input.file_path || input.notebook_path
     if (!file || !/^(Edit|MultiEdit|Write|NotebookEdit)$/.test(toolName)) return null
-    const abs = path.isAbsolute(file) ? file : path.join(this.workdir, file)
+    const abs = path.isAbsolute(file) ? file : path.join(this.sessionCwd || this.workdir, file)
     const shown = summary(input)
     const big = (...texts) => texts.some((t) => typeof t === 'string' && t.length > MAX_CHANGE)
     if (toolName === 'Edit' || toolName === 'MultiEdit') {
@@ -174,7 +176,7 @@ class ClaudeBridge extends EventEmitter {
           before: String(e.old_string ?? ''),
           after: String(e.new_string ?? ''),
           // Prima della modifica si trova il vecchio testo, dopo il nuovo
-          line: lineOf(current, e.old_string) ?? lineOf(current, e.new_string),
+          line: past ? lineOf(current, e.new_string) ?? lineOf(current, e.old_string) : lineOf(current, e.old_string) ?? lineOf(current, e.new_string),
           all: !!e.replace_all,
         })),
       }
@@ -182,6 +184,7 @@ class ClaudeBridge extends EventEmitter {
     if (toolName === 'Write') {
       const content = String(input.content ?? '')
       if (big(content)) return { file: shown, tooBig: true, hunks: [] }
+      if (past) return { file: shown, then: true, hunks: [{ before: '', after: content, line: 1 }] }
       const current = readText(abs)
       if (current == null) {
         // Il file c'è ma non si legge (troppo grande, binario, bloccato): niente confronto
@@ -361,14 +364,55 @@ class ClaudeBridge extends EventEmitter {
     }))
   }
 
-  // I messaggi di una sessione, solo il testo: le domande della persona e le risposte di Claude
+  // Una sessione salvata, nell'ordine in cui è andata: le domande della persona (anche i comandi con /), le risposte
+  // di Claude, le sue azioni con l'esito e, per le modifiche ai file, le differenze; l'uscita dei comandi locali.
+  // Voci: { role: 'user' | 'assistant' | 'output', text } e { role: 'tool', id, name, summary, change, error }
   async history(sessionId, cwd) {
     const { getSessionMessages } = await loadSdk()
     const messages = await getSessionMessages(sessionId, cwd ? { dir: cwd } : {})
-    return messages
-      .filter((m) => (m.type === 'user' || m.type === 'assistant') && !m.parent_tool_use_id)
-      .map((m) => ({ role: m.type, text: plainText(m.message) }))
-      .filter((m) => m.text.trim() && !(m.role === 'user' && /^<(command|local-command|system-reminder|task-notification)/.test(m.text.trim())))
+    const items = []
+    const tools = new Map()
+    for (const m of messages) {
+      // Le conversazioni dei sottoagenti restano fuori: si vede l'azione che li ha lanciati
+      if ((m.type !== 'user' && m.type !== 'assistant') || m.parent_tool_use_id) continue
+      const content = m.message && m.message.content
+      const blocks = Array.isArray(content) ? content : [{ type: 'text', text: typeof content === 'string' ? content : '' }]
+      if (m.type === 'assistant') {
+        const text = plainText(m.message)
+        if (text.trim()) items.push({ role: 'assistant', text })
+        for (const b of blocks) {
+          if (b.type !== 'tool_use') continue
+          const item = { role: 'tool', id: b.id, name: b.name, summary: summary(b.input), change: this.change(b.name, b.input, true), error: null }
+          tools.set(b.id, item)
+          items.push(item)
+        }
+        continue
+      }
+      for (const b of blocks) {
+        if (b.type === 'tool_result') {
+          const t = tools.get(b.tool_use_id)
+          if (t) t.error = !!b.is_error
+        }
+      }
+      const text = plainText(m.message).trim()
+      if (!text) continue
+      // Un comando con /: si mostra come lo si era scritto
+      const name = /<command-name>\s*\/?([^<\s]+)\s*<\/command-name>/.exec(text)
+      if (name) {
+        const args = /<command-args>([\s\S]*?)<\/command-args>/.exec(text)
+        items.push({ role: 'user', text: `/${name[1]}${args && args[1].trim() ? ` ${args[1].trim()}` : ''}` })
+        continue
+      }
+      const out = localStdout(m.message)
+      if (out != null) {
+        if (plainOutput(out)) items.push({ role: 'output', text: plainOutput(out) })
+        continue
+      }
+      // Promemoria di sistema e notifiche non sono della persona
+      if (/^<(command|local-command|system-reminder|task-notification)/.test(text)) continue
+      items.push({ role: 'user', text })
+    }
+    return items
   }
 }
 
