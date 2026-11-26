@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'">
+<title>Pergamena</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="scroll" id="scroll">
+  <div class="roll top">
+    <canvas id="roll-top"></canvas>
+    <div class="title">Pergamena</div>
+    <div class="controls">
+      <button id="btn-hide" title="Nascondi (si riapre col vassoio o con la scorciatoia)">_</button>
+      <button id="btn-quit" title="Chiudi">x</button>
+    </div>
+  </div>
+  <div class="sheet" id="sheet">
+    <div class="sessions" id="sessions" hidden>
+      <div class="sessions-head"><span>Le cronache</span><button class="pix small" id="btn-back">Torna</button></div>
+      <div class="sessions-list" id="sessions-list"></div>
+    </div>
+    <div class="log" id="log">
+      <div class="chapter">
+        <div class="chapter-title" id="chapter-title">Capitolo I</div>
+        <div class="chapter-date" id="chapter-date"></div>
+      </div>
+    </div>
+    <div class="quill">
+      <textarea id="input" placeholder="Intingi la penna e scrivi..." spellcheck="false"></textarea>
+      <div class="quill-row">
+        <canvas id="candle" width="8" height="13"></canvas>
+        <span class="hint" id="hint">Invio spedisce, Maiusc+Invio va a capo</span>
+        <button class="pix" id="btn-send">Spedisci</button>
+        <button class="pix" id="btn-stop" hidden>Ferma</button>
+      </div>
+    </div>
+  </div>
+  <div class="roll bottom">
+    <canvas id="roll-bottom"></canvas>
+  </div>
+  <div class="grip" id="grip" title="Trascina per allargare o allungare il rotolo"></div>
+  <div class="bar">
+    <button id="btn-scene">giorno</button>
+    <span>&middot;</span>
+    <button id="btn-new">nuovo capitolo</button>
+    <span>&middot;</span>
+    <button id="btn-sessions">cronache</button>
+  </div>
+</div>
+<script src="pixel.js"></script>
+<script src="renderer.js"></script>
+</body>
+</html>
