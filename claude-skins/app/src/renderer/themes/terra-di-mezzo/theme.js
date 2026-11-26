@@ -169,31 +169,26 @@
   },
 
   art: {
-    // La grana del cuoio della copertina: riquadro 48×48 senza giunture. Un retino fine e tenue: la grana (rumore a
-    // celle piccole) decide quanto è probabile un pixel più scuro o più chiaro, l'usura (celle grandi) schiarisce a
-    // chiazze
+    // La grana del cuoio della copertina: riquadro 48×48 senza giunture, appena accennata (il cuoio quasi liscio si
+    // legge meglio): pochi pixel un filo più scuri dove la grana è bassa, qualche riflesso dove è alta
     leather({ pal }) {
       const P = window.Pixel
       const S = 48
       const c = P.canvas(S, S)
       const ctx = c.getContext('2d')
       const rand = P.seeded(5)
-      const grain = P.valueNoise(S, 3, 4)
-      const wear = P.valueNoise(S, 24, 9)
-      // Toni del cuoio (pal.roll): 4 la base, 1 appena più scuro, 5 i solchi, 2 la luce
+      const grain = P.valueNoise(S, 4, 4)
       const base = pal.roll[4]
       const shade = pal.roll[1]
-      const deep = pal.roll[5]
       const light = pal.roll[2]
+      ctx.fillStyle = base
+      ctx.fillRect(0, 0, S, S)
       for (let y = 0; y < S; y++) {
         for (let x = 0; x < S; x++) {
           const g = grain(x, y)
-          const w = wear(x, y)
           const r = rand()
-          let col = base
-          if (r < (0.5 - g) * 1.6) col = r < (0.5 - g) * 0.35 ? deep : shade
-          else if (r > 1 - (g - 0.5) * 1.3 - Math.max(0, w - 0.65) * 0.8) col = light
-          P.px(ctx, x, y, col)
+          if (r < (0.4 - g) * 0.6) P.px(ctx, x, y, shade)
+          else if (r > 1 - (g - 0.62) * 0.35) P.px(ctx, x, y, light)
         }
       }
       return c

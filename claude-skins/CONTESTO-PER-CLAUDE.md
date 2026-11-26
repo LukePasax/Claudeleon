@@ -58,6 +58,13 @@ includono (`kits: ['pixel']`). Un tema può dare icone SVG o immagini, disegni a
 l'azione in corso. La divisione del CSS è stata verificata confrontando pixel per pixel le foto dei due temi pixel
 prima e dopo: identiche.
 
+**Libro Rosso più leggibile.** I caratteri a pixel stancavano nella lettura: il tema Terra di Mezzo tiene la pixel
+art nelle decorazioni (copertina, spille, rune, Anello, icone) ma il testo è in Alegreya (un carattere da libro), i
+titoli in Uncial Antiqua (onciale da manoscritto), il codice nel monospaziato di sistema; i file sono nella cartella
+del tema, licenza OFL. Il capolettera è una grande iniziale onciale rossa senza riquadro, e in tutti i temi compare
+solo su un primo paragrafo lungo (classe `long-start`, da 160 caratteri): su una frase breve staccava la prima
+lettera ("cco quanto mi chiedi"). Cuoio della copertina appena granulato.
+
 **Pixel art più fine.** Pergamena e Terra di Mezzo disegnano a ×2 invece che a ×3 (`artScale: 2`), e i disegni sono
 quasi tutti procedurali: carta a macchie morbide senza giunture (rumore a valori periodico, `Pixel.valueNoise`, con
 le macchie che decidono solo la probabilità dei pixel chiari e scuri: le soglie nette facevano forme che si

@@ -1,6 +1,51 @@
 /* Tema "Terra di Mezzo": il Libro Rosso aperto. È attivo solo con questo tema, quindi le regole non hanno prefissi.
    Il libro lascia libera una striscia in basso, trasparente: lì pende il segnalibro e sta la maniglia. */
 
+/* I caratteri: la pixel art resta nelle decorazioni (copertina, spille, rune, Anello), il testo è da leggere.
+   Alegreya per il testo, un carattere da libro fatto per le letture lunghe; Uncial Antiqua per i titoli, una
+   scrittura onciale da manoscritto che resta leggibile; il codice nel monospaziato di sistema.
+   Entrambi i caratteri sono sotto licenza SIL Open Font License. */
+@font-face { font-family: 'Alegreya'; src: url('fonts/alegreya-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-style: normal; }
+@font-face { font-family: 'Alegreya'; src: url('fonts/alegreya-latin-400-italic.woff2') format('woff2'); font-weight: 400; font-style: italic; }
+@font-face { font-family: 'Alegreya'; src: url('fonts/alegreya-latin-700-normal.woff2') format('woff2'); font-weight: 600 700; font-style: normal; }
+@font-face { font-family: 'Alegreya'; src: url('fonts/alegreya-latin-700-italic.woff2') format('woff2'); font-weight: 600 700; font-style: italic; }
+@font-face { font-family: 'Uncial Antiqua'; src: url('fonts/uncial-antiqua-latin-400-normal.woff2') format('woff2'); }
+
+body {
+  --font-body: 'Alegreya', Georgia, serif; --font-display: 'Uncial Antiqua', 'Alegreya', serif;
+  --font-code: 'Cascadia Mono', Consolas, monospace;
+  --text-size: 17px; --code-size: 14px;
+  /* Il rosso dei capilettera e delle rubriche, come nei manoscritti */
+  --rubric: #d8573a;
+  font-variant-ligatures: common-ligatures; font-feature-settings: normal; -webkit-font-smoothing: antialiased;
+}
+body.giorno { --rubric: #a32d17; }
+
+/* Le misure del kit pixel erano per i caratteri a pixel: qui tornano a quelle di un libro */
+.entry { line-height: 1.55; }
+.who { font-size: 14px; font-style: italic; }
+.book-head .title { font-size: 28px; letter-spacing: 0; }
+.chapter-title { font-size: 30px; }
+.chapter-title .num { font-size: 24px; font-weight: 700; }
+.chapter-date { font-size: 14px; }
+.annali-head { font-size: 22px; }
+.text code { font-size: 0.82em; line-height: 1.2; padding: 1px 5px; }
+.text pre { font-size: var(--code-size); }
+.text pre code { font-size: 1em; line-height: 1.45; }
+.text h2 { font-size: 26px; }
+.text h3 { font-size: 22px; }
+.text h4 { font-size: 18px; }
+.tool { font-size: 14px; }
+.tool .what { font-family: var(--font-code); font-size: 12px; }
+.dl { line-height: 1.45; }
+.ask .ask-detail { font-size: var(--code-size); }
+.cmd-name, .cmd-args { font-size: var(--code-size); }
+.cmd-output { font-size: var(--code-size); line-height: 1.45; }
+.session-row .title { font-size: 15px; }
+.modes, .mode, .hint { font-size: 13px; }
+.btn { font-size: 15px; }
+.btn.small { font-size: 14px; }
+
 .book {
   position: absolute; left: 4px; right: 4px; top: 4px; bottom: 26px;
   display: flex; flex-direction: column; padding: 0 16px 16px;
@@ -75,10 +120,12 @@
 .entry.you .who { color: var(--green); }
 .tool.done::after { color: var(--green); }
 
-/* Il capolettera rubricato: lettera d'oro su cuoio rosso, come nei manoscritti */
-.entry.claude .text > p:first-child::first-letter {
-  box-shadow: inset 0 0 0 3px var(--gold), inset 0 0 0 6px var(--initial-bg), inset 0 0 0 9px var(--gold-dark);
-  padding: 9px 11px 7px;
+/* Il capolettera: una grande iniziale onciale rossa, senza riquadro, come nei manoscritti; solo su un primo
+   paragrafo lungo (long-start) */
+.entry.claude .text.long-start > p:first-child::first-letter {
+  float: left; font-family: var(--font-display); font-weight: normal; font-size: 3.2em; line-height: 0.82;
+  padding: 6px 8px 0 0; margin: 0; color: var(--rubric); background: none; box-shadow: none;
+  text-shadow: 1px 1px 0 var(--gold-dark);
 }
 
 /* La domanda di permesso come un cancello: bordo d'oro tutto intorno, il rifiuto in pietra */

@@ -78,5 +78,5 @@ npm 11 altrimenti non arriva.
   uno screenshot della finestra ed esce, senza chiamare Claude. Per guardare un tema senza Electron basta aprire
   `src/renderer/index.html?tema=<id>` nel browser.
 
-Caratteri dei temi pixel: Pixelify Sans, Jacquarda Bastarda 9 e VT323 (per il codice); il tema Moderno usa
-quelli di sistema (Google Fonts, licenza SIL Open Font License).
+Caratteri (tutti sotto SIL Open Font License): Pixelify Sans, Jacquarda Bastarda 9 e VT323 (per il codice) nel kit
+pixel; Alegreya e Uncial Antiqua nel tema Terra di Mezzo; il tema Moderno usa quelli di sistema (Google Fonts, licenza SIL Open Font License).

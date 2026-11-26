@@ -194,6 +194,9 @@ dà l'indirizzo di un file della cartella del tema, per esempio `new Audio(ctx.a
 | `done`, `error` | La risposta è finita; si è fermata con un errore | `{ durationMs }`; il messaggio |
 | `scene` | Notte ↔ giorno | `'notte'` o `'giorno'` |
 
+Il testo di una risposta ha la classe `long-start` quando il suo primo paragrafo è lungo: i temi che hanno un
+capolettera lo mettono solo lì (`.entry.claude .text.long-start > p:first-child::first-letter`).
+
 Lo stato si vede anche dal CSS: `body.busy` mentre Claude lavora, `body.giorno` di giorno, `body[data-perm-mode]`
 col modo dei permessi, `body[data-theme]` col tema. Un aggancio che va in errore non ferma l'app.
 

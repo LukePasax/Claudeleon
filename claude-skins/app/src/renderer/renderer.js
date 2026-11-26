@@ -47,6 +47,14 @@
   // Il markdown delle risposte è in markdown.js
   const markdown = (src) => Markdown.render(src)
 
+  // Il testo di una risposta. long-start dice se il primo paragrafo è abbastanza lungo per un capolettera (i temi
+  // che ne hanno uno lo mettono solo lì: su una frase breve staccherebbe la prima lettera dalla parola)
+  function setReplyText(textEl, src) {
+    textEl.innerHTML = markdown(src)
+    const first = textEl.firstElementChild
+    textEl.classList.toggle('long-start', !!first && first.tagName === 'P' && first.textContent.length >= 160)
+  }
+
   // ------------------------------------------------------------------ la conversazione nel log
 
   function scrollDown() { const l = part('log'); if (l) l.scrollTop = l.scrollHeight }
@@ -520,7 +528,7 @@
   // Il testo arriva a pezzi: si ridisegna al più una volta per fotogramma
   function renderReply() {
     pending = false
-    if (reply) { reply.querySelector('.text').innerHTML = markdown(reply.raw); scrollDown() }
+    if (reply) { setReplyText(reply.querySelector('.text'), reply.raw); scrollDown() }
   }
 
   function setBusy(on) {
@@ -809,7 +817,7 @@
       }
       for (const m of history.slice(from)) {
         if (m.role === 'user') entry('you').querySelector('.text').textContent = m.text
-        else if (m.role === 'assistant') entry('claude').querySelector('.text').innerHTML = markdown(m.text)
+        else if (m.role === 'assistant') setReplyText(entry('claude').querySelector('.text'), m.text)
         else if (m.role === 'output') add('cmd-output', '').textContent = m.text
         else if (m.role === 'tool') {
           addTool(m.id, m.name, m.summary, m.change)
@@ -991,9 +999,12 @@
     const fire = (name, v, ms) => setTimeout(() => handlers[name] && handlers[name](v), ms)
     let n = 1
     let fakeWin = 'normal'
-    // Dalla console dell'anteprima: anteprima.tema('pergamena'), anteprima.permesso(), anteprima.piano()
+    // Dalla console dell'anteprima: anteprima.tema('pergamena'), anteprima.permesso(), anteprima.piano(),
+    // anteprima.risposta('testo in markdown')
     window.anteprima = {
       tema: (id) => fire('onTheme', id, 0),
+      // Una risposta di Claude con il testo dato, come se arrivasse adesso
+      risposta: (text) => { fire('onDelta', String(text), 0); fire('onDone', { durationMs: 1000 }, 10) },
       piano: () => fire('onAsk', { id: Date.now(), kind: 'plan', plan: '## Fiumi sulla mappa\n\n1. Aggiungere `DrawRivers()` in **MapView.cpp**, prima delle strade\n2. Leggere i fiumi dal file della mappa in `MapLoader`\n3. Un interruttore `m_showRivers` nel menu Vista\n\nNessun file cambia finché non approvi.' }, 0),
       permesso: () => fire('onAsk', { id: Date.now(), title: 'Claude vuole modificare un file', description: '', detail: 'src/MapView.cpp', canAlways: true }, 0),
     }
