@@ -92,6 +92,9 @@ class ClaudeBridge extends EventEmitter {
     this.persona = persona
     this.session = session
     this.workdir = (workdir || os.homedir()).replace(/\\/g, '/')
+    // La cartella della conversazione in corso: quella in cui è nata, perché Claude Code la riprende solo da lì.
+    // Vuota per un capitolo nuovo, che nasce nella cartella di lavoro
+    this.sessionCwd = null
     this.query = null
     this.pending = new Map()
     this.nextAsk = 1
@@ -232,10 +235,12 @@ class ClaudeBridge extends EventEmitter {
     try {
       const { query } = await loadSdk()
       const resume = this.session.getSession()
+      // Una conversazione si riprende nella sua cartella; una nuova nasce nella cartella di lavoro
+      const cwd = (resume && this.sessionCwd) || this.workdir
       current = query({
         prompt,
         options: {
-          cwd: this.workdir,
+          cwd,
           pathToClaudeCodeExecutable: CLAUDE,
           permissionMode: this.mode,
           systemPrompt: { type: 'preset', preset: 'claude_code', append: this.persona || FALLBACK_PERSONA },
@@ -254,7 +259,10 @@ class ClaudeBridge extends EventEmitter {
       let sawOutput = false
       for await (const msg of current) {
         if (this.query !== current) break
-        if (msg.session_id) this.session.setSession(msg.session_id)
+        if (msg.session_id) {
+          this.sessionCwd = cwd
+          this.session.setSession(msg.session_id, cwd)
+        }
         // Claude Code dice in che modo è (all'inizio di ogni turno e quando cambia): la finestra si allinea
         if (msg.type === 'system' && (msg.subtype === 'init' || msg.subtype === 'status') && msg.permissionMode) this.setMode(msg.permissionMode, true)
         if (msg.type === 'system') {
@@ -340,21 +348,23 @@ class ClaudeBridge extends EventEmitter {
     })
   }
 
-  // Le sessioni di Claude Code nella cartella di lavoro, le più recenti prima: quelle dell'app desktop comprese
+  // Le sessioni di Claude Code di tutte le cartelle, le più recenti prima, come nella barra laterale dell'app
+  // desktop (le sue comprese, coi loro titoli); ognuna con la sua cartella, che serve per riprenderla
   async sessions() {
     const { listSessions } = await loadSdk()
-    const list = await listSessions({ dir: this.workdir, limit: 40 })
+    const list = await listSessions({ limit: 80 })
     return list.map((s) => ({
       id: s.sessionId,
       title: s.customTitle || s.summary || s.firstPrompt || '(senza titolo)',
       lastModified: s.lastModified,
+      cwd: s.cwd ? s.cwd.replace(/\\/g, '/') : null,
     }))
   }
 
   // I messaggi di una sessione, solo il testo: le domande della persona e le risposte di Claude
-  async history(sessionId) {
+  async history(sessionId, cwd) {
     const { getSessionMessages } = await loadSdk()
-    const messages = await getSessionMessages(sessionId, { dir: this.workdir })
+    const messages = await getSessionMessages(sessionId, cwd ? { dir: cwd } : {})
     return messages
       .filter((m) => (m.type === 'user' || m.type === 'assistant') && !m.parent_tool_use_id)
       .map((m) => ({ role: m.type, text: plainText(m.message) }))

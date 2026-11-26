@@ -63,7 +63,7 @@
     sessions: 'cronache',
     sessionsTitle: 'Le cronache',
     sessionsLoading: 'Sfoglio le cronache...',
-    sessionsEmpty: 'Nessuna cronaca in {dir}.',
+    sessionsEmpty: 'Nessuna cronaca: Claude Code non ha ancora conversazioni salvate su questo computer.',
     back: 'Torna',
     copying: 'Ricopio la cronaca...',
     continueHere: 'Da qui in poi si scrive nella stessa cronaca.',

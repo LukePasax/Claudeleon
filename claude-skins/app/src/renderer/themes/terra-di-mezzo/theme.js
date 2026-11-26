@@ -86,7 +86,7 @@
     sessions: 'annali',
     sessionsTitle: 'Gli annali',
     sessionsLoading: 'Sfoglio gli annali...',
-    sessionsEmpty: 'Nessun annale in {dir}.',
+    sessionsEmpty: 'Nessun annale: Claude Code non ha ancora conversazioni salvate su questo computer.',
     copying: 'Ricopio le pagine...',
     continueHere: 'Da qui in poi si scrive nello stesso annale.',
     notte: 'stelle',

@@ -175,6 +175,7 @@
     api.setMode(m)
   }
   api.onMode((m) => { mode = m; renderModes() })
+  api.onWorkdir((dir) => { workdir = dir })
 
   // ------------------------------------------------------------------ comandi con /
 
@@ -625,7 +626,10 @@
         row.dataset.id = s.id
         row.innerHTML = '<div class="title"></div><div class="when"></div>'
         row.querySelector('.title').textContent = s.title
-        row.querySelector('.when').textContent = formatWhen(s.lastModified)
+        // Quando e in che cartella: le cronache sono di tutte le cartelle, come nella barra dell'app desktop
+        const folder = s.cwd ? s.cwd.replace(/[\\/]+$/, '').split(/[\\/]/).pop() : ''
+        row.querySelector('.when').textContent = formatWhen(s.lastModified) + (folder ? ` · ${folder}` : '')
+        if (s.cwd) row.title = s.cwd
         row.addEventListener('click', () => openSession(s))
         list.appendChild(row)
       }
@@ -663,7 +667,7 @@
     markCurrentSession()
     const loading = labelled('footnote', 'copying')
     try {
-      const history = await api.openSession(s.id)
+      const history = await api.openSession(s.id, s.cwd || null)
       loading.remove()
       // Delle cronache lunghe bastano gli ultimi scambi
       for (const m of history.slice(-40)) {
@@ -849,10 +853,10 @@
       openLink: (url) => window.open(url, '_blank', 'noopener'),
       commands: async () => FAKE_COMMANDS,
       sessions: async () => [
-        { id: 's1', title: 'Temi per la Pergamena', lastModified: Date.now() - 3600000 },
-        { id: 's2', title: 'Il calcolo dei sentieri in RouteFinder', lastModified: Date.now() - day },
-        { id: 's3', title: 'Mod desktop Signore degli Anelli', lastModified: Date.now() - 4 * day },
-        { id: 's4', title: 'Profilo di Windows Terminal', lastModified: Date.now() - 9 * day },
+        { id: 's1', title: 'Temi per la Pergamena', lastModified: Date.now() - 3600000, cwd: 'C:/Workspace/Progetti/Claude-desktop-skins' },
+        { id: 's2', title: 'Il calcolo dei sentieri in RouteFinder', lastModified: Date.now() - day, cwd: 'C:/Workspace/MapEditor' },
+        { id: 's3', title: 'Mod desktop Signore degli Anelli', lastModified: Date.now() - 4 * day, cwd: 'C:/Workspace' },
+        { id: 's4', title: 'Profilo di Windows Terminal', lastModified: Date.now() - 9 * day, cwd: 'C:/Users/luca' },
       ],
       openSession: async () => [{ role: 'user', text: 'Ciao' }, { role: 'assistant', text: 'Salve, viandante.' }],
       onAsk: on('onAsk'), onAskClosed: on('onAskClosed'),
@@ -875,7 +879,7 @@
         fire('onDone', { durationMs: 2400 }, 900 + answer.length * 15 + 100)
         fire('onAsk', { id: 1, title: 'Claude vuole creare un file', description: '', detail: 'src/RouteFinder.h', change: FAKE_WRITE, canAlways: true }, 900 + answer.length * 15 + 200)
       },
-      onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'), onMode: on('onMode'), onCommands: on('onCommands'), onCommandsError: on('onCommandsError'), onCommandOutput: on('onCommandOutput'), onCompacted: on('onCompacted'), onStatus: on('onStatus'),
+      onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'), onMode: on('onMode'), onWorkdir: on('onWorkdir'), onCommands: on('onCommands'), onCommandsError: on('onCommandsError'), onCommandOutput: on('onCommandOutput'), onCompacted: on('onCompacted'), onStatus: on('onStatus'),
     }
   }
 })()

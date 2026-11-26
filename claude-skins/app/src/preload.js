@@ -21,7 +21,7 @@ contextBridge.exposeInMainWorld('skins', {
   answer: (id, allow, always) => ipcRenderer.send('perm:answer', { id, allow, always }),
   sessions: () => ipcRenderer.invoke('sessions:list'),
   commands: () => ipcRenderer.invoke('commands:get'),
-  openSession: (id) => ipcRenderer.invoke('session:open', id),
+  openSession: (id, cwd) => ipcRenderer.invoke('session:open', id, cwd),
   onAsk: listen('perm:ask'),
   onAskClosed: listen('perm:closed'),
 
@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('skins', {
   onReset: listen('chat:reset'),
   onTheme: listen('theme:apply'),
   onMode: listen('mode:changed'),
+  onWorkdir: listen('workdir:changed'),
   onCommands: listen('commands:list'),
   onCommandsError: listen('commands:error'),
   onCommandOutput: listen('claude:commandOutput'),

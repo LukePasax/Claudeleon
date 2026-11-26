@@ -1,6 +1,6 @@
 // La finestra: trasparente, senza bordi, sempre in primo piano. La sua forma la decide il tema in uso; dove il tema
 // non disegna nulla i clic passano alle finestre sotto, e si trascina dalla parte che il tema indica (data-drag).
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, globalShortcut, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, globalShortcut, shell, dialog } = require('electron')
 const fs = require('fs')
 const path = require('path')
 const { ClaudeBridge } = require('./claude-bridge')
@@ -33,7 +33,15 @@ function loadConfig() {
   try {
     Object.assign(config, JSON.parse(fs.readFileSync(configFile, 'utf8')))
   } catch {
-    // Primo avvio o file non valido: restano i valori di partenza
+    // Primo avvio o file non valido: si riprende la configurazione di quando l'app si chiamava Pergamena, se c'è
+    // (cartella di lavoro, scena, tema, capitolo, conversazione, modo); posizione e misura no, sono cambiate
+    try {
+      const old = JSON.parse(fs.readFileSync(path.join(app.getPath('appData'), 'pergamena-app', 'config.json'), 'utf8'))
+      for (const k of ['workdir', 'scene', 'theme', 'chapter', 'sessionId', 'sessionCwd', 'permissionMode', 'onTop']) if (old[k] !== undefined) config[k] = old[k]
+      saveConfig()
+    } catch {
+      // Nemmeno quella: restano i valori di partenza
+    }
   }
   // La misura unica delle versioni precedenti (460×720) non vale più: ogni tema ha la sua, più grande
   delete config.size
@@ -197,6 +205,7 @@ function trayMenu() {
     { label: win && win.isVisible() ? 'Nascondi' : 'Mostra', click: toggleVisible },
     { label: 'Nuovo capitolo', click: () => send('chat:reset') },
     { label: 'Tema', submenu: themes.map((t) => ({ label: t.name, type: 'radio', checked: t.id === currentTheme().id, click: () => setTheme(t.id) })) },
+    { label: 'Cartella di lavoro…', click: chooseWorkdir },
     { label: 'Sempre in primo piano', type: 'checkbox', checked: config.onTop !== false, click: (item) => setOnTop(item.checked) },
     { label: 'Riporta al centro', click: () => { const p = defaultPosition(); const [w, h] = win.getSize(); win.setBounds({ x: p.x, y: p.y, width: w, height: h }); config.position = p; saveConfig() } },
     { label: 'Dimensione iniziale', click: () => {
@@ -210,6 +219,16 @@ function trayMenu() {
     { type: 'separator' },
     { label: 'Esci', click: () => app.quit() },
   ])
+}
+
+// La cartella in cui nascono le conversazioni nuove (quelle riprese restano nella loro)
+async function chooseWorkdir() {
+  const r = await dialog.showOpenDialog(win, { title: 'Cartella di lavoro di Claude', defaultPath: bridge.workdir, properties: ['openDirectory'] })
+  if (r.canceled || !r.filePaths[0]) return
+  config.workdir = r.filePaths[0]
+  bridge.workdir = r.filePaths[0].replace(/\\/g, '/')
+  saveConfig()
+  send('workdir:changed', bridge.workdir)
 }
 
 // Con una finestra grande come l'app desktop, stare sempre sopra le altre può dare fastidio: si sceglie dal vassoio
@@ -252,6 +271,8 @@ function registerIpc() {
     bridge.cancel()
     config.chapter += 1
     config.sessionId = null
+    config.sessionCwd = null
+    bridge.sessionCwd = null
     saveConfig()
     return config.chapter
   })
@@ -263,12 +284,14 @@ function registerIpc() {
     if (bridge.commandList.length) return bridge.commandList
     try { return JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'commands.json'), 'utf8')) } catch { return [] }
   })
-  // Apre una sessione di Claude Code, anche dell'app desktop: i messaggi dopo continuano quella
-  ipcMain.handle('session:open', async (_e, id) => {
+  // Apre una sessione di Claude Code, anche dell'app desktop: i messaggi dopo continuano quella, nella sua cartella
+  ipcMain.handle('session:open', async (_e, id, cwd) => {
     bridge.cancel()
     config.sessionId = id
+    config.sessionCwd = cwd || null
+    bridge.sessionCwd = config.sessionCwd
     saveConfig()
-    return bridge.history(id)
+    return bridge.history(id, config.sessionCwd)
   })
   ipcMain.on('tray:icon', (_e, dataUrl) => {
     const img = nativeImage.createFromDataURL(dataUrl)
@@ -365,8 +388,9 @@ app.whenReady().then(() => {
   if (!config.chapter) { config.chapter = 1; saveConfig() }
   bridge = new ClaudeBridge({
     getSession: () => config.sessionId,
-    setSession: (id) => { config.sessionId = id; saveConfig() },
+    setSession: (id, cwd) => { config.sessionId = id; config.sessionCwd = cwd || null; saveConfig() },
   }, config.workdir, currentTheme().persona, config.permissionMode)
+  bridge.sessionCwd = config.sessionCwd || null
   if (capture) bridge.send = () => {}
   registerIpc()
   createWindow()

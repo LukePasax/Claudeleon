@@ -116,6 +116,12 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
 - **npm 11** non esegue lo script di installazione di Electron: `node node_modules/electron/install.js`.
 - **`listSessions({ dir })`** vuole il percorso come Claude Code lo registra (`C:/cartella`); scritto in altro modo
   torna un elenco vuoto senza errore.
+- **Le cronache sono di tutte le cartelle:** `listSessions({ limit })` senza `dir` le elenca tutte, ognuna con la
+  sua `cwd`. Una sessione si riprende solo nella cartella in cui è nata: aprendone una, `session:open` passa la sua
+  `cwd`, che diventa `bridge.sessionCwd` (e `config.sessionCwd`); un capitolo nuovo nasce in `workdir`. Prima le
+  cronache erano solo di `workdir`, e dopo il cambio di nome dell'app (configurazione nuova, `workdir` vuota = la
+  cartella utente) le sessioni dell'app desktop sparivano: ora la configurazione di `pergamena-app` si recupera al
+  primo avvio, e la cartella di lavoro si sceglie dal vassoio.
 - **Permessi in modo `auto`:** il classificatore approva da solo le azioni chiare, quindi la domanda nella finestra
   compare di rado. Per provarla, il modo "chiedi sempre" dal selettore sopra la penna.
 - **Comandi con `/`:** si eseguono spedendo il testo `/nome argomenti` come prompt. L'elenco viene da

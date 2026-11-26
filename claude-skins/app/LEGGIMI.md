@@ -56,10 +56,13 @@ npm 11 altrimenti non arriva.
     piano" (Claude procede, nel modo di prima) e "Continua a pianificare".
 
   Le domande compaiono nella conversazione con Permetti, Sempre e Nega, e con le differenze se riguardano un file.
-- **Cronache (annali):** l'elenco delle sessioni di Claude Code nella cartella di lavoro, comprese quelle dell'app
-  desktop coi loro titoli. Nel Libro Rosso sono sempre visibili sulla pagina sinistra; nel rotolo si aprono col
-  pulsante "cronache". Aprendone una si vedono gli ultimi scambi e i messaggi dopo continuano quella. Non aprire qui
-  una sessione che è aperta anche nell'app desktop.
+- **Cronache (annali):** le sessioni di Claude Code di tutte le cartelle, le più recenti prima, come nella barra
+  laterale dell'app desktop (le sue comprese, coi loro titoli); accanto alla data c'è la cartella. Nel Libro Rosso
+  sono sempre visibili sulla pagina sinistra; nel rotolo si aprono col pulsante "cronache". Aprendone una si vedono
+  gli ultimi scambi, e i messaggi dopo la continuano nella sua cartella. Non aprire qui una sessione che è aperta
+  anche nell'app desktop.
+- **Cartella di lavoro:** dal vassoio, "Cartella di lavoro…": è dove nascono le conversazioni nuove (quelle riprese
+  restano nella loro cartella).
 - **Configurazione:** `%APPDATA%\Claude Skins\config.json`: `workdir` (la cartella in cui lavora Claude e di cui si
   elencano le cronache; vuota, la cartella utente), posizione, dimensione per tema, scena, capitolo, sessione, tema,
   sempre in primo piano.
