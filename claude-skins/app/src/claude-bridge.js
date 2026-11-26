@@ -29,6 +29,21 @@ function summary(input) {
   return input.file_path && text.split(/[\\/]/).length > 3 ? text.split(/[\\/]/).slice(-2).join('/') : text
 }
 
+// I modi dei permessi che la finestra offre. Fuori: 'bypassPermissions' (nessun controllo) e 'dontAsk' (nega tutto
+// quello che non è già permesso, inutile con una finestra che può chiedere)
+const MODES = ['auto', 'default', 'acceptEdits', 'plan']
+
+// Il testo del piano proposto con ExitPlanMode: nel campo plan, o in un file indicato dallo strumento
+function planText(input) {
+  if (!input || typeof input !== 'object') return ''
+  if (typeof input.plan === 'string') return input.plan
+  const file = input.planFilePath || input.plan_file_path
+  if (typeof file === 'string') {
+    try { return fs.readFileSync(file, 'utf8') } catch { return '' }
+  }
+  return ''
+}
+
 // Oltre questa misura (prima o dopo) una modifica non si mostra riga per riga: basterebbe a bloccare la finestra
 const MAX_CHANGE = 400 * 1024
 
@@ -58,8 +73,8 @@ function plainText(message) {
 
 class ClaudeBridge extends EventEmitter {
   // session: getSession/setSession della conversazione corrente; workdir: la cartella in cui lavora Claude Code;
-  // persona: il tono del tema in uso, si può cambiare fra un messaggio e l'altro
-  constructor(session, workdir, persona) {
+  // persona: il tono del tema in uso, si può cambiare fra un messaggio e l'altro; mode: il modo dei permessi
+  constructor(session, workdir, persona, mode) {
     super()
     this.persona = persona
     this.session = session
@@ -67,8 +82,23 @@ class ClaudeBridge extends EventEmitter {
     this.query = null
     this.pending = new Map()
     this.nextAsk = 1
-    // 'auto': un classificatore decide e chiede solo quando non sa; 'default': chiede per ogni azione a rischio
-    this.mode = 'auto'
+    // auto: un classificatore decide e chiede solo quando non sa; default: chiede per ogni azione a rischio;
+    // acceptEdits: le modifiche ai file passano, il resto si chiede; plan: Claude legge e propone un piano, senza
+    // toccare nulla finché il piano non è approvato
+    this.mode = MODES.includes(mode) ? mode : 'auto'
+    // Il modo da riprendere quando si approva un piano
+    this.beforePlan = null
+    // Le domande che sono piani da approvare: id → input di ExitPlanMode
+    this.plans = new Map()
+  }
+
+  // Cambia modo, anche mentre Claude lavora: vale da subito per la conversazione in corso
+  setMode(mode, fromClaude) {
+    if (!MODES.includes(mode) || mode === this.mode) return
+    if (mode === 'plan') this.beforePlan = this.mode
+    this.mode = mode
+    if (this.query && !fromClaude) this.query.setPermissionMode(mode).catch(() => {})
+    this.emit('mode', mode)
   }
 
   // La modifica che uno strumento fa a un file, da mostrare riga per riga: { file, created?, whole?, tooBig?,
@@ -116,6 +146,7 @@ class ClaudeBridge extends EventEmitter {
   cancel() {
     for (const resolve of this.pending.values()) resolve({ behavior: 'deny', message: 'La persona ha fermato il messaggero.', interrupt: true })
     this.pending.clear()
+    this.plans.clear()
     if (this.query) {
       const q = this.query
       this.query = null
@@ -128,6 +159,18 @@ class ClaudeBridge extends EventEmitter {
     const resolve = this.pending.get(id)
     if (!resolve) return
     this.pending.delete(id)
+    const plan = this.plans.get(id)
+    this.plans.delete(id)
+    if (plan) {
+      // Un piano approvato: Claude esce dal modo piano e torna a quello di prima (se era già piano, chiedi sempre)
+      if (!allow) return resolve({ behavior: 'deny', message: 'La persona non approva ancora il piano: continua a pianificare e chiedile che cosa vuole cambiare.' })
+      const back = this.beforePlan && this.beforePlan !== 'plan' ? this.beforePlan : 'default'
+      resolve({ behavior: 'allow', updatedInput: plan, updatedPermissions: [{ type: 'setMode', mode: back, destination: 'session' }] })
+      this.beforePlan = null
+      this.mode = back
+      this.emit('mode', back)
+      return
+    }
     resolve(allow ? { behavior: 'allow', updatedPermissions: always ? this.suggestions.get(id) : undefined } : { behavior: 'deny', message: 'La persona ha negato il permesso.' })
   }
 
@@ -159,6 +202,8 @@ class ClaudeBridge extends EventEmitter {
       for await (const msg of current) {
         if (this.query !== current) break
         if (msg.session_id) this.session.setSession(msg.session_id)
+        // Claude Code dice in che modo è (all'inizio di ogni turno e quando cambia): la finestra si allinea
+        if (msg.type === 'system' && (msg.subtype === 'init' || msg.subtype === 'status') && msg.permissionMode) this.setMode(msg.permissionMode, true)
         if (msg.type === 'stream_event') {
           const ev = msg.event || {}
           if (ev.type === 'content_block_start' && ev.content_block?.type === 'text' && wroteText) {
@@ -197,6 +242,7 @@ class ClaudeBridge extends EventEmitter {
   ask(toolName, input, options) {
     const id = this.nextAsk++
     this.suggestions.set(id, options.suggestions)
+    if (toolName === 'ExitPlanMode') return this.askPlan(id, input, options)
     return new Promise((resolve) => {
       this.pending.set(id, resolve)
       options.signal?.addEventListener('abort', () => {
@@ -211,6 +257,20 @@ class ClaudeBridge extends EventEmitter {
         change: this.change(toolName, input),
         canAlways: Array.isArray(options.suggestions) && options.suggestions.length > 0,
       })
+    })
+  }
+
+  // La fine del modo piano: la finestra mostra il piano proposto, con Approva o Continua a pianificare
+  askPlan(id, input, options) {
+    this.plans.set(id, input)
+    return new Promise((resolve) => {
+      this.pending.set(id, resolve)
+      options.signal?.addEventListener('abort', () => {
+        this.plans.delete(id)
+        if (this.pending.delete(id)) resolve({ behavior: 'deny', message: 'Richiesta annullata.' })
+        this.emit('askClosed', { id })
+      })
+      this.emit('ask', { id, kind: 'plan', plan: planText(input) })
     })
   }
 
@@ -236,4 +296,4 @@ class ClaudeBridge extends EventEmitter {
   }
 }
 
-module.exports = { ClaudeBridge }
+module.exports = { ClaudeBridge, MODES }

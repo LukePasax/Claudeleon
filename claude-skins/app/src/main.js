@@ -22,7 +22,8 @@ let configFile = null
 // workdir: la cartella in cui lavora Claude Code e di cui si elencano le cronache; vuota, la cartella utente
 // theme: l'id del tema in uso (una cartella di src/renderer/themes); sizes: la misura scelta per ogni tema, perché un
 // rotolo e un libro aperto non stanno bene alla stessa misura
-let config = { workdir: '', position: null, sizes: {}, sessionId: null, scene: 'notte', chapter: 0, theme: DEFAULT_THEME }
+// permissionMode: il modo dei permessi (auto, default, acceptEdits, plan)
+let config = { workdir: '', position: null, sizes: {}, sessionId: null, scene: 'notte', chapter: 0, theme: DEFAULT_THEME, permissionMode: 'auto' }
 let themes = []
 // Il trascinamento o il ridimensionamento in corso: il processo principale segue il cursore
 let gesture = null
@@ -235,8 +236,11 @@ function registerIpc() {
     theme: currentTheme().id,
     themes: themes.map((t) => t.id),
     workdir: bridge.workdir,
+    mode: bridge.mode,
   }))
   ipcMain.on('theme:set', (_e, id) => setTheme(String(id)))
+  // Il modo dei permessi, scelto dalla finestra; il messaggero lo applica anche alla risposta in corso
+  ipcMain.on('mode:set', (_e, mode) => bridge.setMode(String(mode)))
   ipcMain.on('scene:set', (_e, scene) => { config.scene = scene === 'giorno' ? 'giorno' : 'notte'; saveConfig() })
   // Un capitolo per conversazione: il numero cresce, la sessione di Claude Code ricomincia
   ipcMain.handle('chapter:new', () => {
@@ -273,6 +277,8 @@ function registerIpc() {
   bridge.on('error', (m) => send('claude:error', m))
   bridge.on('ask', (q) => { if (!win.isVisible()) win.show(); send('perm:ask', q) })
   bridge.on('askClosed', (q) => send('perm:closed', q))
+  // Il modo cambia dalla finestra, dall'approvazione di un piano o da Claude Code stesso: si ricorda e si mostra
+  bridge.on('mode', (mode) => { config.permissionMode = mode; saveConfig(); send('mode:changed', mode) })
 }
 
 app.on('second-instance', () => {
@@ -334,7 +340,7 @@ app.whenReady().then(() => {
   if (capture) {
     // Le prove non toccano la configurazione vera
     configFile = path.join(app.getPath('temp'), 'claude-skins-prova.json')
-    config = { workdir: config.workdir, position: { x: 20, y: 20 }, sizes: {}, sessionId: null, scene: capture.scene, chapter: 3, theme: capture.theme || config.theme }
+    config = { workdir: config.workdir, position: { x: 20, y: 20 }, sizes: {}, sessionId: null, scene: capture.scene, chapter: 3, theme: capture.theme || config.theme, permissionMode: 'auto' }
   }
   themes = listThemes()
   if (capture && capture.size) config.sizes[currentTheme().id] = capture.size
@@ -342,7 +348,7 @@ app.whenReady().then(() => {
   bridge = new ClaudeBridge({
     getSession: () => config.sessionId,
     setSession: (id) => { config.sessionId = id; saveConfig() },
-  }, config.workdir, currentTheme().persona)
+  }, config.workdir, currentTheme().persona, config.permissionMode)
   if (capture) bridge.send = () => {}
   registerIpc()
   createWindow()

@@ -122,6 +122,16 @@ button { font-family: inherit; }
 .diff-more:hover { color: var(--strong); }
 .ask .diff { margin-bottom: 10px; }
 
+/* Il modo dei permessi: l'etichetta e un pulsante per modo, quello attivo d'oro */
+.modes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-bottom: 8px; }
+.modes-label { color: var(--ink-soft); margin-right: 2px; }
+.mode { border: none; background: none; cursor: pointer; font-size: 12px; padding: 2px 7px; color: var(--ink-soft); box-shadow: inset 0 0 0 2px var(--edge-light); }
+.mode:hover { color: var(--ink); }
+.mode.active { background: var(--btn-bg); color: var(--btn-ink); box-shadow: inset -2px -2px 0 var(--btn-dark), inset 2px 2px 0 var(--btn-light); }
+
+/* Il piano proposto: il testo in un foglio a parte dentro la domanda */
+.ask.plan .plan-body { background: var(--field); padding: 8px 12px; margin: 6px 0 10px; max-height: 420px; overflow-y: auto; line-height: 1.45; }
+
 /* La domanda di permesso: un riquadro a gradino con i tre pulsanti */
 .ask { margin: 6px 0 16px; padding: 10px 12px; background: var(--code); box-shadow: inset 3px 3px 0 var(--gold), inset -3px -3px 0 var(--edge); }
 .ask .ask-title { color: var(--strong); margin-bottom: 4px; }

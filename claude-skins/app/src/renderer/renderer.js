@@ -19,6 +19,9 @@
   let workdir = ''
   // La cronaca aperta, se c'è: { id, title, lastModified }
   let currentSession = null
+  // Il modo dei permessi
+  let mode = 'auto'
+  const MODES = [['auto', 'modeAuto'], ['default', 'modeDefault'], ['acceptEdits', 'modeAcceptEdits'], ['plan', 'modePlan']]
   const tools = new Map()
 
   function craftOf(tool) {
@@ -168,6 +171,36 @@
     for (const el of all('canvas[data-art][data-art-anim]')) drawArt(el)
   }, 180)
 
+  // ------------------------------------------------------------------ il modo dei permessi
+
+  // data-part="modes": il motore ci mette l'etichetta e un pulsante per modo (data-perm-mode), quello attivo con la
+  // classe active. body[data-perm-mode] dice il modo anche al CSS del tema
+  function renderModes() {
+    for (const box of all('[data-part="modes"]')) {
+      if (!box.querySelector('[data-perm-mode]')) {
+        box.appendChild(label(Object.assign(document.createElement('span'), { className: 'modes-label' }), 'modesLabel'))
+        for (const [m, key] of MODES) {
+          const b = document.createElement('button')
+          b.className = 'mode'
+          b.dataset.permMode = m
+          b.dataset.sTitle = `${key}Tip`
+          b.title = t(`${key}Tip`)
+          box.appendChild(label(b, key))
+        }
+      }
+      for (const b of box.querySelectorAll('[data-perm-mode]')) b.classList.toggle('active', b.dataset.permMode === mode)
+    }
+    document.body.dataset.permMode = mode
+  }
+
+  function chooseMode(m) {
+    if (m === mode) return
+    mode = m
+    renderModes()
+    api.setMode(m)
+  }
+  api.onMode((m) => { mode = m; renderModes() })
+
   // ------------------------------------------------------------------ il layout del tema
 
   // Monta il tema: il suo HTML prende il posto del precedente, la conversazione, la bozza e lo stato passano al nuovo
@@ -180,6 +213,7 @@
     if (log) for (const it of items) log.appendChild(it)
     if (part('input')) part('input').value = draft
     setBusy(busy)
+    renderModes()
     renderChapterHead()
     paint()
     scrollDown()
@@ -383,9 +417,11 @@
 
   const asks = new Map()
 
-  api.onAsk(({ id, title, description, detail, change, canAlways }) => {
+  api.onAsk((q) => {
     renderReply()
     reply = null
+    if (q.kind === 'plan') return askPlan(q)
+    const { id, title, description, detail, change, canAlways } = q
     const card = add('ask', '<div class="ask-title"></div><div class="ask-desc"></div><div class="ask-detail"></div><div class="ask-buttons"></div>')
     card.querySelector('.ask-title').textContent = title
     card.querySelector('.ask-desc').textContent = description
@@ -412,6 +448,30 @@
     choice('deny', 'deny', false, false, 'denied')
     asks.set(id, card)
   })
+
+  // La fine del modo piano: il piano proposto, da approvare (Claude procede, nel modo di prima) o no (continua a
+  // pianificare)
+  function askPlan({ id, plan }) {
+    const card = add('ask plan', '<div class="ask-title"></div><div class="text plan-body"></div><div class="ask-buttons"></div>')
+    label(card.querySelector('.ask-title'), 'planTitle')
+    const body = card.querySelector('.plan-body')
+    if (plan && plan.trim()) body.innerHTML = markdown(plan)
+    else label(body, 'planEmpty')
+    const buttons = card.querySelector('.ask-buttons')
+    for (const [key, cls, allow, outcome] of [['planApprove', '', true, 'planApproved'], ['planKeep', 'deny', false, 'planKept']]) {
+      const b = document.createElement('button')
+      label(b, key)
+      b.className = `pix small ${cls}`
+      b.addEventListener('click', () => {
+        api.answer(id, allow, false)
+        closeAsk(buttons, outcome)
+        asks.delete(id)
+      })
+      buttons.appendChild(b)
+    }
+    asks.set(id, card)
+    scrollDown()
+  }
 
   // Al posto dei pulsanti resta l'esito
   function closeAsk(buttons, outcome) {
@@ -530,6 +590,8 @@
     scene: () => { scene = scene === 'notte' ? 'giorno' : 'notte'; api.setScene(scene); paint() },
   }
   document.addEventListener('click', (e) => {
+    const m = e.target.closest('[data-perm-mode]')
+    if (m && app.contains(m)) return chooseMode(m.dataset.permMode)
     const b = e.target.closest('[data-action]')
     if (b && app.contains(b) && actions[b.dataset.action]) actions[b.dataset.action](e)
   })
@@ -585,6 +647,7 @@
     scene = info.scene === 'giorno' ? 'giorno' : 'notte'
     workdir = info.workdir || ''
     chapter = info.chapter || 1
+    mode = info.mode || 'auto'
     await Theming.load(info.themes || [])
     await mount(info.theme)
     if (part('input')) part('input').focus()
@@ -612,9 +675,10 @@
     const on = (name) => (cb) => { handlers[name] = cb }
     const fire = (name, v, ms) => setTimeout(() => handlers[name] && handlers[name](v), ms)
     let n = 1
-    // Dalla console dell'anteprima: anteprima.tema('pergamena'), anteprima.permesso()
+    // Dalla console dell'anteprima: anteprima.tema('pergamena'), anteprima.permesso(), anteprima.piano()
     window.anteprima = {
       tema: (id) => fire('onTheme', id, 0),
+      piano: () => fire('onAsk', { id: Date.now(), kind: 'plan', plan: '## Fiumi sulla mappa\n\n1. Aggiungere `DrawRivers()` in **MapView.cpp**, prima delle strade\n2. Leggere i fiumi dal file della mappa in `MapLoader`\n3. Un interruttore `m_showRivers` nel menu Vista\n\nNessun file cambia finché non approvi.' }, 0),
       permesso: () => fire('onAsk', { id: Date.now(), title: 'Claude vuole modificare un file', description: '', detail: 'src/MapView.cpp', canAlways: true }, 0),
     }
     const day = 86400000
@@ -622,9 +686,10 @@
       // ?tema=<id>&scena=giorno nell'indirizzo per guardare un tema
       info: async () => {
         const q = new URLSearchParams(location.search)
-        return { scene: q.get('scena') || 'notte', chapter: n, theme: q.get('tema') || 'terra-di-mezzo', themes: ['terra-di-mezzo', 'pergamena'], workdir: 'C:/Workspace' }
+        return { scene: q.get('scena') || 'notte', chapter: n, theme: q.get('tema') || 'terra-di-mezzo', themes: ['terra-di-mezzo', 'pergamena'], workdir: 'C:/Workspace', mode: q.get('modo') || 'auto' }
       },
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
+      setMode: (m) => fire('onMode', m, 0),
       sessions: async () => [
         { id: 's1', title: 'Temi per la Pergamena', lastModified: Date.now() - 3600000 },
         { id: 's2', title: 'Il calcolo dei sentieri in RouteFinder', lastModified: Date.now() - day },
@@ -644,7 +709,7 @@
         fire('onDone', { durationMs: 2400 }, 900 + answer.length * 15 + 100)
         fire('onAsk', { id: 1, title: 'Claude vuole creare un file', description: '', detail: 'src/RouteFinder.h', change: FAKE_WRITE, canAlways: true }, 900 + answer.length * 15 + 200)
       },
-      onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'),
+      onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'), onMode: on('onMode'),
     }
   }
 })()

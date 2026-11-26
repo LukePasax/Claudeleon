@@ -40,8 +40,15 @@ npm 11 altrimenti non arriva.
   nella riga il conto `+N −M`; un clic sulla riga lo chiude e lo riapre, oltre le 16 righe c'è "mostra altre N
   righe". La stessa vista compare nella domanda di permesso, così si vede cosa si sta approvando. Per un `Write` il
   "prima" si legge dal disco: se il file è già stato scritto si vede il contenuto intero.
-- **Permessi:** modo `auto` (un classificatore decide; quando non sa, la domanda compare nel rotolo con Permetti,
-  Sempre, Nega). In `src/claude-bridge.js`, `this.mode = 'default'` fa chiedere ogni azione a rischio.
+- **Permessi:** sopra la penna si sceglie il modo, che resta fra un avvio e l'altro e vale anche per la risposta in
+  corso:
+  - **automatico**: un classificatore approva le azioni chiare e chiede solo quando non sa;
+  - **chiedi sempre**: chiede prima di ogni azione a rischio (comandi, modifiche, rete);
+  - **accetta modifiche**: le modifiche ai file passano, comandi e rete si chiedono;
+  - **piano**: Claude legge e propone un piano senza toccare nulla. Il piano compare in una scheda con "Approva il
+    piano" (Claude procede, nel modo di prima) e "Continua a pianificare".
+
+  Le domande compaiono nella conversazione con Permetti, Sempre e Nega, e con le differenze se riguardano un file.
 - **Cronache (annali):** l'elenco delle sessioni di Claude Code nella cartella di lavoro, comprese quelle dell'app
   desktop coi loro titoli. Nel Libro Rosso sono sempre visibili sulla pagina sinistra; nel rotolo si aprono col
   pulsante "cronache". Aprendone una si vedono gli ultimi scambi e i messaggi dopo continuano quella. Non aprire qui

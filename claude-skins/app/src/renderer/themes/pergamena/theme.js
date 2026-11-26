@@ -42,6 +42,7 @@
       </div>
     </div>
     <div class="quill">
+      <div class="modes" data-part="modes"></div>
       <textarea data-part="input" data-s-placeholder="placeholder" spellcheck="false"></textarea>
       <div class="quill-row">
         <canvas class="lamp" data-art="lamp" data-art-anim data-art-fit="natural"></canvas>

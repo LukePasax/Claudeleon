@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('skins', {
   quit: () => ipcRenderer.send('app:quit'),
   setScene: (scene) => ipcRenderer.send('scene:set', scene),
   setTheme: (id) => ipcRenderer.send('theme:set', id),
+  setMode: (mode) => ipcRenderer.send('mode:set', mode),
   newChapter: () => ipcRenderer.invoke('chapter:new'),
   send: (text) => ipcRenderer.send('chat:send', text),
   stop: () => ipcRenderer.send('chat:stop'),
@@ -29,4 +30,5 @@ contextBridge.exposeInMainWorld('skins', {
   onError: listen('claude:error'),
   onReset: listen('chat:reset'),
   onTheme: listen('theme:apply'),
+  onMode: listen('mode:changed'),
 })

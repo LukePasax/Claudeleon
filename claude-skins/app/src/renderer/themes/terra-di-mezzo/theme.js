@@ -46,6 +46,7 @@
     <section class="page right" data-art-bg="paper">
       <div class="log" data-part="log"></div>
       <div class="quill">
+        <div class="modes" data-part="modes"></div>
         <textarea data-part="input" data-s-placeholder="placeholder" spellcheck="false"></textarea>
         <div class="quill-row">
           <canvas class="lamp" data-art="lamp" data-art-anim data-art-fit="natural"></canvas>
@@ -91,6 +92,11 @@
     notte: 'stelle',
     giorno: 'Contea',
     newChapter: 'Nuovo capitolo',
+    planTitle: 'Lo scriba traccia la via',
+    planApprove: 'Approva la via',
+    planKeep: 'Continua a tracciarla',
+    planApproved: 'La via è approvata: lo scriba si mette in cammino.',
+    planKept: 'Lo scriba continua a studiare le mappe.',
     diffMore: 'Sfoglia altre {n} righe',
     diffLess: 'Richiudi',
     diffNew: 'Pagina nuova.',

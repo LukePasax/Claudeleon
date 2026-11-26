@@ -75,6 +75,7 @@ c'è.
 | `data-part="input"` | La `textarea` dove si scrive. Invio spedisce, Maiusc+Invio va a capo |
 | `data-part="hint"` | Il suggerimento sotto la penna, che cambia mentre Claude lavora |
 | `data-part="chapter-title"`, `data-part="chapter-date"` | Il titolo del capitolo, o della cronaca aperta, e la sua data |
+| `data-part="modes"` | Il selettore del modo dei permessi: il motore ci mette l'etichetta e un pulsante `.mode` per modo (`data-perm-mode`), quello attivo con `.active`. Anche `body[data-perm-mode]` dice il modo, per il CSS del tema |
 | `data-part="sessions"` | Il pannello delle cronache. Con `hidden` è in sovrimpressione: lo apre `data-action="sessions"`. Con `data-mode="always"` è sempre visibile, come la barra laterale dell'app desktop, e si aggiorna da solo |
 | `data-part="sessions-list"` | Dentro il pannello: l'elenco delle cronache |
 

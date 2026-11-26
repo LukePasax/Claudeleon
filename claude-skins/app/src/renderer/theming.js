@@ -26,6 +26,23 @@
     grantedAlways: 'Permesso concesso, anche per le prossime volte.',
     denied: 'Permesso negato.',
     cancelled: 'Richiesta annullata.',
+    // Il modo dei permessi
+    modesLabel: 'Permessi:',
+    modeAuto: 'automatico',
+    modeAutoTip: 'Un classificatore approva le azioni chiare e chiede solo quando non sa',
+    modeDefault: 'chiedi sempre',
+    modeDefaultTip: 'Chiede prima di ogni azione a rischio: comandi, modifiche ai file, rete',
+    modeAcceptEdits: 'accetta modifiche',
+    modeAcceptEditsTip: 'Le modifiche ai file passano senza chiedere; comandi e rete si chiedono',
+    modePlan: 'piano',
+    modePlanTip: 'Claude legge e propone un piano, senza toccare nulla finché non lo approvi',
+    // Il piano proposto alla fine del modo piano
+    planTitle: 'Claude propone un piano',
+    planEmpty: 'Il piano è nella risposta qui sopra.',
+    planApprove: 'Approva il piano',
+    planKeep: 'Continua a pianificare',
+    planApproved: 'Piano approvato: Claude procede.',
+    planKept: 'Claude continua a pianificare.',
     // Le modifiche ai file
     diffMore: 'Mostra altre {n} righe',
     diffLess: 'Mostra meno',

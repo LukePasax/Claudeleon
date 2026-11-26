@@ -111,7 +111,12 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
 - **`listSessions({ dir })`** vuole il percorso come Claude Code lo registra (`C:/cartella`); scritto in altro modo
   torna un elenco vuoto senza errore.
 - **Permessi in modo `auto`:** il classificatore approva da solo le azioni chiare, quindi la domanda nella finestra
-  compare di rado. Per provarla, `this.mode = 'default'`.
+  compare di rado. Per provarla, il modo "chiedi sempre" dal selettore sopra la penna.
+- **Modi dei permessi:** `setPermissionMode()` sulla `Query` li cambia a risposta in corso; i messaggi `system`
+  `init` e `status` portano `permissionMode`, e il messaggero ci si allinea (`setMode(mode, true)`). Il modo piano
+  finisce con lo strumento `ExitPlanMode`, che passa da `canUseTool`: il piano è in `input.plan` (o in un file,
+  `planFilePath`); approvarlo risponde `allow` con `updatedPermissions: [{ type: 'setMode', mode: <quello di
+  prima>, destination: 'session' }]`. Non si offrono `bypassPermissions` né `dontAsk`.
 - **Screenshot dell'app:** `webContents.capturePage()` a volte fallisce con `UnknownVizError` (GPU): si riprova.
 - **Non aprire la stessa sessione** nel rotolo e nell'app desktop insieme: si pestano i piedi. Il desktop vede i
   messaggi nuovi solo riaprendo la sessione.
@@ -137,7 +142,8 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
 2. ~~**Modifiche ai file**~~: fatto (riquadro delle differenze nella conversazione e nei permessi). Restano: le
    modifiche anche nelle cronache riaperte (oggi si ricopia solo il testo), e un riepilogo dei file toccati nel
    capitolo.
-3. **Interruzione più fine e scelta del modo dei permessi** dalla finestra (auto / chiedi sempre / piano).
+3. ~~**Scelta del modo dei permessi**~~: fatto (selettore sopra la penna, scheda del piano). Resta l'interruzione
+   più fine (fermare un solo strumento, non tutta la risposta).
 4. **Comandi con `/`, skill e plugin**: il motore li carica già; servono un modo di scriverli e di mostrarne l'esito.
 5. **Un personaggio** in pixel art accanto al rotolo (lo sprite si disegna come le icone, a griglia), che reagisce
    al mouse e a cosa sta facendo Claude. Per la Terra di Mezzo, uno stregone grigio o un hobbit con lo zaino.
