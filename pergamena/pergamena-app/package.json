@@ -1,11 +1,12 @@
 {
   "name": "pergamena-app",
   "version": "0.1.0",
-  "description": "Claude in una finestra a rotolo di pergamena, in pixel art, sempre in primo piano",
+  "description": "Claude in una finestra in pixel art, a temi",
   "main": "src/main.js",
   "private": true,
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "postinstall": "node node_modules/electron/install.js"
   },
   "devDependencies": {
     "electron": "^45.5.0"
