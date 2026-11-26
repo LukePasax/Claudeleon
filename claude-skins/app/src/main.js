@@ -21,7 +21,7 @@ let bridge = null
 let configFile = null
 // workdir: la cartella in cui lavora Claude Code e di cui si elencano le cronache; vuota, la cartella utente
 // theme: l'id del tema in uso (una cartella di src/renderer/themes); sizes: la misura scelta per ogni tema, perché un
-// rotolo e un libro aperto non stanno bene alla stessa misura
+// libro aperto e una finestra semplice non stanno bene alla stessa misura
 // permissionMode: il modo dei permessi (auto, default, acceptEdits, plan)
 let config = { workdir: '', position: null, sizes: {}, sessionId: null, scene: 'notte', chapter: 0, theme: DEFAULT_THEME, permissionMode: 'auto' }
 let themes = []

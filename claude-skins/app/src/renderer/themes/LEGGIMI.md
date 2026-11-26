@@ -19,7 +19,6 @@ il tono dal messaggio successivo.
 
 ```
 themes/
-  pergamena/        pixel art: il rotolo, due capi arrotolati, foglio in mezzo, cronache in sovrimpressione
   terra-di-mezzo/   pixel art: il Libro Rosso aperto, annali a sinistra, conversazione a destra
   moderno/          niente pixel: un riquadro pulito con l'ombra, barra laterale, icone SVG, agganci
 kits/

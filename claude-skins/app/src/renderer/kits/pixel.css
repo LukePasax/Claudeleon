@@ -1,4 +1,4 @@
-/* Kit "pixel": la pixel art dei temi Pergamena e Terra di Mezzo. Un tema lo include con kits: ['pixel'] nel suo
+/* Kit "pixel": la pixel art dei temi pixel (oggi Terra di Mezzo; c'era anche Pergamena, il rotolo, tolto). Un tema lo include con kits: ['pixel'] nel suo
    theme.js; si carica dopo style.css e prima del theme.css del tema. Porta i caratteri a pixel, la palette di
    pergamena di partenza (notte e giorno), angoli vivi, bordi e pulsanti a gradino fatti con box-shadow, barre di
    scorrimento a pixel, il capolettera e i disegni ingranditi senza sfumature. */

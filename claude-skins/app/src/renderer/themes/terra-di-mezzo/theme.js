@@ -15,7 +15,7 @@
   // La finestra: grande come l'app desktop; sotto i 760 px le due pagine non ci stanno
   window: { width: 1180, height: 780, minWidth: 760, minHeight: 520 },
 
-  // Lo stile pixel (caratteri, bordi a gradino, palette di pergamena di partenza) viene dal kit, poi theme.css
+  // Lo stile pixel (bordi a gradino, palette di partenza color pergamena) viene dal kit, poi theme.css
   kits: ['pixel'],
   // Pixel ×2: più fini di quelli di partenza (×3), con più dettaglio nei disegni
   artScale: 2,

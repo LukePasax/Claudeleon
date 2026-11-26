@@ -50,6 +50,11 @@ laterale dell'app desktop), conversazione a destra.
 
 ## Com'è fatta
 
+**Pergamena tolto (novembre 2026).** Il tema del rotolo generico era un residuo del Libro Rosso e tenerlo aggiornato
+costava: l'utente l'ha fatto togliere. Resta nella storia del repo (commit precedenti a quello che lo toglie); il kit
+pixel e `Pixel.lib` (carta, capo del rotolo, candela, rotolino del vassoio, sfere, rumore) restano, perché il Libro
+Rosso e i valori di partenza li usano. Una configurazione con `theme: 'pergamena'` ripiega sul tema predefinito.
+
 **Temi non solo pixel (novembre 2026).** Lo stile pixel non è più del motore: `style.css` è neutro (caratteri di
 sistema, bordi sottili, `--radius`) e la pixel art sta nel kit `kits/pixel.css`, che Pergamena e Terra di Mezzo
 includono (`kits: ['pixel']`). Un tema può dare icone SVG o immagini, disegni a qualunque scala (`artScale`,

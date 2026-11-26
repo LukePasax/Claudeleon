@@ -2,7 +2,7 @@
 
 Claude in una finestra in pixel art, grande come l'app desktop e (se si vuole) sempre in primo piano. Forma e
 aspetto vengono dal tema. Quello di partenza è **Terra di Mezzo**: il Libro Rosso aperto, con gli annali a sinistra
-e la conversazione a destra. C'è anche **Pergamena**, il rotolo fantasy senza un mondo preciso, e **Moderno**,
+e la conversazione a destra. C'è anche **Moderno**,
 pulito come un'app di oggi, senza pixel art. Altri temi si
 aggiungono come cartelle in `src/renderer/themes/`, ognuno con il proprio scheletro (guida:
 [`src/renderer/themes/LEGGIMI.md`](src/renderer/themes/LEGGIMI.md)).
@@ -21,8 +21,8 @@ npm 11 altrimenti non arriva.
 ## Uso
 
 - **Avvio:** doppio clic su `avvia.cmd`. La finestra compare al centro dello schermo, grande come l'app desktop
-  (Terra di Mezzo 1180×780, Pergamena 1080×760, mai oltre il 92% dello schermo).
-- **Spostare e allargare:** si trascina dalla testata (il capo alto del rotolo, la copertina del libro); la
+  (Terra di Mezzo 1180×780, Moderno 1100×760, mai oltre il 92% dello schermo).
+- **Spostare e allargare:** si trascina dalla testata (la copertina del libro, la barra in alto di Moderno); la
   maniglia a gradini in basso a destra allarga e allunga. Posizione e dimensione restano, e la dimensione è
   ricordata per tema. Dal vassoio: "Riporta al centro" e "Dimensione iniziale".
 - **Bordi e ingrandimento:** la finestra si ridimensiona da tutti i lati e gli angoli, come una finestra normale. Il
@@ -30,7 +30,7 @@ npm 11 altrimenti non arriva.
   tutto schermo; di nuovo, si ripristina. Spostarla da ingrandita la riporta alla sua misura.
 - **Sempre in primo piano:** dal vassoio si può spegnere, ora che la finestra è grande.
 - **Scorciatoia:** `Ctrl+Alt+P` mostra o nasconde la finestra da qualunque programma; c'è anche l'icona nel vassoio.
-- **Tema:** dalla finestra ("temi" sotto il rotolo, "altri libri" in fondo alla pagina sinistra del Libro Rosso,
+- **Tema:** dalla finestra ("altri libri" in fondo alla pagina sinistra del Libro Rosso,
   "Temi" in fondo alla barra laterale di Moderno), con
   un'anteprima di ogni tema, oppure dal vassoio, **Tema**. Cambia sul posto (forma della finestra compresa) senza perdere la conversazione;
   Claude prende il tono del nuovo tema dal messaggio successivo. Il pulsante "stelle"/"Contea" (o "notte"/"giorno")
@@ -39,7 +39,7 @@ npm 11 altrimenti non arriva.
   corrente prosegue fra un avvio e l'altro.
 - **Claude Code:** comandato con l'Agent SDK (`@anthropic-ai/claude-agent-sdk`) sopra
   `%USERPROFILE%\.local\bin\claude.exe`, con il prompt di sistema di Claude Code più la "personalità" del tema (lo
-  scriba di Gran Burrone per Terra di Mezzo, il cronista per Pergamena). Gli hook dell'utente sono spenti per queste
+  scriba di Gran Burrone per Terra di Mezzo, diretto e conciso per Moderno). Gli hook dell'utente sono spenti per queste
   conversazioni.
 - **Comandi con `/`:** scrivendo `/` all'inizio della penna si apre l'elenco dei comandi di Claude Code, comprese
   le tue skill, i plugin e i comandi del progetto (con la tacca verde). Si filtra scrivendo; frecce per scegliere,
@@ -64,7 +64,7 @@ npm 11 altrimenti non arriva.
   Le domande compaiono nella conversazione con Permetti, Sempre e Nega, e con le differenze se riguardano un file.
 - **Cronache (annali):** le sessioni di Claude Code di tutte le cartelle, le più recenti prima, come nella barra
   laterale dell'app desktop (le sue comprese, coi loro titoli); accanto alla data c'è la cartella. Nel Libro Rosso
-  sono sempre visibili sulla pagina sinistra; nel rotolo si aprono col pulsante "cronache". Aprendone una si vedono
+  sono sempre visibili sulla pagina sinistra, in Moderno nella barra laterale. Aprendone una si vedono
   gli ultimi 40 messaggi con le azioni di Claude e il loro esito, le modifiche ai file (chiuse: si aprono con un
   clic sulla riga), i comandi con `/` e la loro uscita; i messaggi dopo la continuano nella sua cartella. Non aprire qui una sessione che è aperta
   anche nell'app desktop.

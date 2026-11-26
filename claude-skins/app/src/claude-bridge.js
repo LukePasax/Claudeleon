@@ -10,7 +10,7 @@ const CLAUDE = path.join(os.homedir(), '.local', 'bin', process.platform === 'wi
 // La personalità che si aggiunge al prompt di sistema viene dal tema (campo persona del suo theme.js); questa vale per
 // un tema che non ne ha una
 const FALLBACK_PERSONA = [
-  'Le tue risposte compaiono in una piccola finestra a forma di rotolo di pergamena, in pixel art.',
+  'Le tue risposte compaiono in una finestra con un aspetto personalizzato.',
   'Resta preciso e conciso. Usa markdown leggero (grassetto, `codice`, blocchi di codice, elenchi).',
 ].join(' ')
 

@@ -6,7 +6,7 @@
 
   // Le scritte dell'interfaccia. {s}, {dir} ecc. si sostituiscono con i valori del momento
   const STRINGS = {
-    title: 'Pergamena',
+    title: 'Claude Skins',
     chapter: 'Capitolo',
     placeholder: 'Intingi la penna e scrivi...',
     hint: 'Invio spedisce, Maiusc+Invio va a capo, / per i comandi',
@@ -80,7 +80,7 @@
     maxTip: 'Ingrandisci (F11: schermo intero)',
     restoreTip: 'Ripristina',
     quitTip: 'Chiudi',
-    gripTip: 'Trascina per allargare o allungare il rotolo',
+    gripTip: 'Trascina per allargare o allungare la finestra',
   }
 
   // I colori della pixel art per scena. Un tema ridefinisce solo le chiavi che cambia; i colori dell'interfaccia

@@ -999,7 +999,7 @@
     const fire = (name, v, ms) => setTimeout(() => handlers[name] && handlers[name](v), ms)
     let n = 1
     let fakeWin = 'normal'
-    // Dalla console dell'anteprima: anteprima.tema('pergamena'), anteprima.permesso(), anteprima.piano(),
+    // Dalla console dell'anteprima: anteprima.tema('moderno'), anteprima.permesso(), anteprima.piano(),
     // anteprima.risposta('testo in markdown')
     window.anteprima = {
       tema: (id) => fire('onTheme', id, 0),
@@ -1013,7 +1013,7 @@
       // ?tema=<id>&scena=giorno nell'indirizzo per guardare un tema
       info: async () => {
         const q = new URLSearchParams(location.search)
-        return { scene: q.get('scena') || 'notte', chapter: n, theme: q.get('tema') || 'terra-di-mezzo', themes: ['terra-di-mezzo', 'moderno', 'pergamena'], workdir: 'C:/Workspace', mode: q.get('modo') || 'auto' }
+        return { scene: q.get('scena') || 'notte', chapter: n, theme: q.get('tema') || 'terra-di-mezzo', themes: ['terra-di-mezzo', 'moderno'], workdir: 'C:/Workspace', mode: q.get('modo') || 'auto' }
       },
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
       setMode: (m) => fire('onMode', m, 0),
@@ -1023,7 +1023,7 @@
       openLink: (url) => window.open(url, '_blank', 'noopener'),
       commands: async () => FAKE_COMMANDS,
       sessions: async () => [
-        { id: 's1', title: 'Temi per la Pergamena', lastModified: Date.now() - 3600000, cwd: 'C:/Workspace/Progetti/Claude-desktop-skins' },
+        { id: 's1', title: 'Temi per Claude Skins', lastModified: Date.now() - 3600000, cwd: 'C:/Workspace/Progetti/Claude-desktop-skins' },
         { id: 's2', title: 'Il calcolo dei sentieri in RouteFinder', lastModified: Date.now() - day, cwd: 'C:/Workspace/MapEditor' },
         { id: 's3', title: 'Mod desktop Signore degli Anelli', lastModified: Date.now() - 4 * day, cwd: 'C:/Workspace' },
         { id: 's4', title: 'Profilo di Windows Terminal', lastModified: Date.now() - 9 * day, cwd: 'C:/Users/luca' },
