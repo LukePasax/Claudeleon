@@ -54,6 +54,8 @@ canvas, [data-art-bg], .tool img { image-rendering: pixelated; }
 .who { font-size: 14px; margin-bottom: 2px; }
 .entry.you .text { color: var(--ink-soft); padding: 0 0 0 10px; background: none; border-radius: 0; box-shadow: inset 3px 0 0 var(--edge-light); }
 .entry.claude .text p { margin: 0 0 8px; }
+/* Il testo contiene il suo capolettera: con una risposta di una riga sola, quello che segue non gli gira intorno */
+.entry.claude .text { display: flow-root; }
 /* Il capolettera: una maiuscola a pixel in grassetto, in un riquadro d'oro a gradino; il testo le gira intorno */
 .entry.claude .text > p:first-child::first-letter {
   float: left; font-weight: 700; font-size: 32px; line-height: 1; padding: 6px 8px 4px; margin: 4px 8px 0 0;
@@ -87,8 +89,8 @@ canvas, [data-art-bg], .tool img { image-rendering: pixelated; }
 .text .link-off { text-decoration: none; box-shadow: inset 0 -2px 0 var(--edge-light); }
 
 .tool { font-size: 14px; margin: 2px 0; }
-/* Le icone a pixel 8×8, a ×2 come i disegni dei temi */
-.tool img { width: 16px; height: 16px; }
+/* Le icone a pixel 12×12, a ×2 come i disegni dei temi */
+.tool img { width: 24px; height: 24px; }
 .tool .what { font-family: inherit; font-size: inherit; }
 .footnote { font-size: 13px; }
 

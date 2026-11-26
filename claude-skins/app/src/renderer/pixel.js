@@ -222,21 +222,130 @@
     }
   }
 
-  // Le icone dei mestieri, 8×8. Colori: o inchiostro tenue, p carta chiara, g oro, y oro chiaro, r rosso; un tema
-  // può aggiungere lettere sue con palette.iconColors
+  // Le icone dei mestieri, 12×12 (a ×2 fanno 24 px). Colori: o inchiostro tenue, p carta, w carta chiara, s ombra
+  // della carta, g oro, y oro chiaro, d oro scuro, r rosso, k bordo scuro; un tema può aggiungere lettere sue o
+  // cambiarle con palette.iconColors. Si generano con un piccolo script di forme (linee, cerchi, rettangoli): le
+  // righe qui sotto sono il risultato
   const ICONS = {
-    leggere: ['........', '.oooooo.', 'opppppo.', '.opppppo', '.opoopo.', '.opppppo', 'opppppo.', '.oooooo.'],
-    scrivere: ['......go', '.....ggo', '....ggo.', '...ggo..', '..ggo...', '..go....', '.o......', 'o.......'],
-    forgiare: ['........', 'ooooooo.', 'ogggggoo', '.oogggo.', '...gg...', '..oggo..', '.oooooo.', '........'],
-    cercare: ['...oo...', '..o..o..', '.oooooo.', '.oyyyyo.', '.oyrryo.', '.oyyyyo.', '.oooooo.', '........'],
-    messaggi: ['..rrrr..', '.rrrrrr.', 'rrrggrrr', 'rrggggrr', 'rrrggrrr', '.rrrrrr.', '..rrrr..', '........'],
-    compagnia: ['o.......', 'ogggggg.', 'oggggg..', 'ogggggg.', 'o.......', 'o.......', 'o.......', 'o.......'],
-    mappa: ['...g....', '...g....', '..ggg...', 'ggggggg.', '..ggg...', '...g....', '...g....', '........'],
-    altro: ['...o....', '..ogo...', '.oggo...', 'oggggo..', '.oggo...', '..ogo...', '...o....', '........'],
+    leggere: [
+      '............',
+      '.ooooodoooo.',
+      'owwwwodwwwwo',
+      'owsswodwsswo',
+      'owwwwodwwwwo',
+      'owsswodwsswo',
+      'owwwwodwwwwo',
+      'owsswodwsswo',
+      'owwwwodwwwwo',
+      'owwwwodwwwwo',
+      '.oooooooroo.',
+      '........r...',
+    ],
+    scrivere: [
+      '..........yy',
+      '.........yyy',
+      '........yyy.',
+      '.......yyy..',
+      '......yyy...',
+      '.....ygy....',
+      '....ygy.....',
+      '...dgy......',
+      '...d........',
+      '..o.........',
+      '.o..........',
+      'o...........',
+    ],
+    forgiare: [
+      '......y.....',
+      '....r...r...',
+      '.....ry.....',
+      '............',
+      'oyyyyyyyyyyo',
+      'oggggggggggo',
+      '..dddddddd..',
+      '....gddd....',
+      '....dddd....',
+      '..dggggggd..',
+      '..dddddddd..',
+      '............',
+    ],
+    cercare: [
+      '...ooo......',
+      '..opppo.....',
+      '.opwpppo....',
+      'opwyppppo...',
+      'opppppppo...',
+      'opppppppo...',
+      '.opppppo....',
+      '..opppodg...',
+      '...ooo..dg..',
+      '.........dg.',
+      '..........dg',
+      '............',
+    ],
+    messaggi: [
+      '............',
+      '............',
+      'oooooooooooo',
+      'oswwwwwwwwso',
+      'owswwwwwwswo',
+      'owwsrrrrswwo',
+      'owwwryrrwwwo',
+      'owwwrrrrwwwo',
+      'owwwrrrrwwwo',
+      'owwwwwwwwwwo',
+      'oooooooooooo',
+      '............',
+    ],
+    compagnia: [
+      '.yy.........',
+      '.dggggggggg.',
+      '.drrryyrrrr.',
+      '.drryyyyrr..',
+      '.drryyyyr...',
+      '.drrryyrrr..',
+      '.drrrrrrrrr.',
+      '.d..........',
+      '.d..........',
+      '.d..........',
+      '.d..........',
+      '.d..........',
+    ],
+    mappa: [
+      '.....sg.....',
+      '...ss.yss...',
+      '..s..yyg.s..',
+      '.s...gyg..s.',
+      '.s...gyg..s.',
+      's.ggggyggg.s',
+      'ggggggrggggg',
+      '.sggggggggs.',
+      '.s...ggg..s.',
+      '..s..ggg.s..',
+      '...ss.gss...',
+      '.....sg.....',
+    ],
+    altro: [
+      '......g.....',
+      '.y....y.....',
+      '......y...y.',
+      '.....ggg....',
+      '....dgggd...',
+      '...ggyyygg..',
+      'gyyggyyygggg',
+      '...ggyyygg..',
+      '....dgggd...',
+      '.....ggg....',
+      '..y...g.....',
+      '......g.....',
+    ],
   }
 
   function iconColors(pal) {
-    return Object.assign({ o: pal.inkSoft, p: pal.paper[3], g: pal.gold, y: pal.goldLight, r: pal.red }, pal.iconColors || {})
+    return Object.assign({
+      o: pal.inkSoft, p: pal.paper[3], g: pal.gold, y: pal.goldLight, r: pal.red,
+      d: pal.iconDark || (pal.knob ? pal.knob[1] : pal.gold), w: pal.wax, s: pal.waxShade, k: pal.paperEdge,
+    }, pal.iconColors || {})
   }
 
   function icon(craft, pal, icons) {

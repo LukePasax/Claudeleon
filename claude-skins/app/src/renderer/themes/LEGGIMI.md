@@ -156,8 +156,9 @@ I nomi dei disegni sono liberi: sono quelli che il layout usa. Tre nomi sono spe
 - **`icons`** non è una funzione ma un oggetto `{ mestiere: icona }`. I mestieri sono `leggere`, `scrivere`,
   `forgiare`, `cercare`, `messaggi`, `compagnia`, `mappa` e `altro`; `craftOf` in `renderer.js` decide quale
   strumento va con quale. Un'icona può essere:
-  - le righe di una bitmap a pixel (lettere di colore: `o` inchiostro tenue, `p` carta chiara, `g` oro, `y` oro
-    chiaro, `r` rosso, più quelle di `palette.iconColors`);
+  - le righe di una bitmap a pixel, 12×12 come quelle di partenza (lettere di colore: `o` inchiostro tenue, `p`
+    carta, `w` carta chiara, `s` ombra della carta, `g` oro, `y` oro chiaro, `d` oro scuro, `r` rosso, `k` bordo
+    scuro, più quelle di `palette.iconColors`);
   - un SVG scritto nel codice (`'<svg ...>'`);
   - un file della cartella del tema (`'icone/leggere.svg'`, PNG compresi);
   - un canvas;

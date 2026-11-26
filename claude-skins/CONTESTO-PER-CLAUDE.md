@@ -63,7 +63,7 @@ quasi tutti procedurali: carta a macchie morbide senza giunture (rumore a valori
 le macchie che decidono solo la probabilità dei pixel chiari e scuri: le soglie nette facevano forme che si
 ripetevano), capi del rotolo a 18 fasce con pomelli sferici (`Pixel.sphere`), candela a goccia, grana del cuoio,
 spilla a foglia come lente inclinata, rune tracciate a linee (`Pixel.line`) con ombra, Anello 19×19, segnalibro in
-seta. Le icone degli strumenti restano 8×8, a ×2 (16 px).
+seta. Le icone degli strumenti sono 12×12 a ×2 (24 px), generate con un piccolo script di forme.
 
 L'app è divisa in un **motore** comune (finestra, conversazione, permessi, cronache, gli attrezzi del disegno a
 pixel) e in **temi** che decidono tutto quello che si vede: forma della finestra (HTML e CSS), misura, scritte,
@@ -104,7 +104,7 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
   - `diff.js` calcola le differenze riga per riga (sottosequenza comune più lunga, dopo aver tolto le righe uguali
     in testa e in coda; oltre 4 milioni di celle mostra blocco tolto e blocco aggiunto) e le raggruppa con 3 righe
     di contesto. Funzioni pure, si provano con node.
-  - `pixel.js` contiene gli attrezzi del disegno (`bitmap`, `mirror`, `seeded`, `upscale`), le icone 8×8 dei
+  - `pixel.js` contiene gli attrezzi del disegno (`bitmap`, `mirror`, `seeded`, `upscale`), le icone 12×12 dei
     "mestieri" di partenza e una libreria di disegni pronti (`Pixel.lib`: carta, capo del rotolo, tratteggio,
     candela, rotolino del vassoio). Si disegna dal codice a bassa risoluzione e si ingrandisce senza sfumature.
   - `theming.js` carica i temi e risponde con quello in uso: layout, scritte (`t(chiave)`, partenza in `STRINGS`),
