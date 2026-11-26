@@ -70,6 +70,14 @@ del tema, licenza OFL. Il capolettera è una grande iniziale onciale rossa senza
 solo su un primo paragrafo lungo (classe `long-start`, da 160 caratteri): su una frase breve staccava la prima
 lettera ("cco quanto mi chiedi"). Cuoio della copertina appena granulato.
 
+**Più Terra di Mezzo (novembre 2026).** L'utente trovava il Libro Rosso poco riconoscibile. Aggiunti: la mappa del
+viaggio sulla pagina sinistra (pixel art procedurale nello stile delle mappe dei libri, non copiata: mare, Contea,
+Vecchia Foresta, Montagne Nebbiose, Bosco Atro, Lothlórien, Anduin, Mordor e il Monte Fato che arde), con il
+viandante che avanza di una tappa a ogni messaggio del capitolo (Hobbiville, Brea, Colle Vento, Gran Burrone,
+Moria, Lothlórien, Amon Hen, Paludi Morte, Ithilien, Cirith Ungol, Monte Fato) e la tappa scritta sotto; frasi di
+cammino a caso al posto di "Lo scriba è in cammino" mentre Claude lavora. Solo nomi di luoghi e cose, nessuna
+citazione. Il motore ha guadagnato l'aggancio `chapter` e `redraw()` nel contesto degli agganci.
+
 **Pixel art più fine.** Pergamena e Terra di Mezzo disegnano a ×2 invece che a ×3 (`artScale: 2`), e i disegni sono
 quasi tutti procedurali: carta a macchie morbide senza giunture (rumore a valori periodico, `Pixel.valueNoise`, con
 le macchie che decidono solo la probabilità dei pixel chiari e scuri: le soglie nette facevano forme che si
@@ -194,6 +202,9 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
 ## Prossimi passi possibili
 
 0. **Temi.**
+   - Terra di Mezzo, altre idee di riferimenti non ancora fatte: un hobbit a pixel che fuma la pipa accanto alla
+     mappa e fa anelli di fumo mentre Claude lavora; un'iscrizione in segni "elfici" inventati che compare
+     sull'Anello; suoni leggeri (penna, pagina che si gira).
    - Caratteri propri per tema, già possibili con `@font-face` nel `theme.css`: per la Terra di Mezzo, un carattere
      a pixel in stile onciale o runico con licenza libera.
    - Suoni e personaggio per tema.

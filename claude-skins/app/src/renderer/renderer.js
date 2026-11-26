@@ -170,7 +170,11 @@
 
   // Gli agganci del tema ricevono questo: la radice del layout, i suoi pezzi, lo stato, i file del tema
   function hookContext() {
-    return { root: app, part, all, scene, busy, theme: Theming.current, asset: (p) => Theming.asset(p), t, Pixel }
+    return {
+      root: app, part, all, scene, busy, theme: Theming.current, asset: (p) => Theming.asset(p), t, Pixel,
+      // Ridisegna i disegni del tema (dopo che un aggancio ha cambiato qualcosa che usano, per esempio un data-*)
+      redraw: () => { for (const el of all('canvas[data-art]')) drawArt(el) },
+    }
   }
   function hook(name, ...args) {
     Theming.hook(name, hookContext(), ...args)
@@ -534,11 +538,12 @@
   function setBusy(on) {
     const changed = busy !== on
     busy = on
-    if (changed) hook('busy', on)
     for (const el of all('[data-action="send"]')) el.hidden = on
     for (const el of all('[data-action="stop"]')) el.hidden = !on
     for (const el of all('[data-part="hint"]')) el.textContent = t(on ? 'busyHint' : 'hint')
     document.body.classList.toggle('busy', on)
+    // Dopo, così l'aggancio può cambiare anche il suggerimento
+    if (changed) hook('busy', on)
   }
 
   function sendMessage() {
@@ -627,6 +632,7 @@
     setBusy(false)
     setChapter(n)
     markCurrentSession()
+    hook('chapter')
     if (part('input')) part('input').focus()
   }
 
@@ -826,6 +832,7 @@
       }
       // Le differenze delle cronache restano chiuse: si aprono con un clic sulla riga dell'azione
       for (const el of all('[data-part="log"] > .item.change')) el.hidden = true
+      hook('chapter')
       labelled('footnote', 'continueHere')
     } catch (err) {
       loading.remove()

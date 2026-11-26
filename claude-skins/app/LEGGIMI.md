@@ -22,6 +22,8 @@ npm 11 altrimenti non arriva.
 
 - **Avvio:** doppio clic su `avvia.cmd`. La finestra compare al centro dello schermo, grande come l'app desktop
   (Terra di Mezzo 1180×780, Moderno 1100×760, mai oltre il 92% dello schermo).
+- **Il viaggio (Terra di Mezzo):** sulla pagina sinistra una mappa della Terra di Mezzo; a ogni tuo messaggio il
+  viandante avanza di una tappa, dalla Contea al Monte Fato, e un nuovo capitolo lo riporta a Hobbiville.
 - **Spostare e allargare:** si trascina dalla testata (la copertina del libro, la barra in alto di Moderno); la
   maniglia a gradini in basso a destra allarga e allunga. Posizione e dimensione restano, e la dimensione è
   ricordata per tema. Dal vassoio: "Riporta al centro" e "Dimensione iniziale".

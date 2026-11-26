@@ -179,7 +179,8 @@ I nomi dei disegni sono liberi: sono quelli che il layout usa. Tre nomi sono spe
 ## Gli agganci: `hooks`
 
 Funzioni che il motore chiama quando succede qualcosa, per animazioni, suoni o un personaggio. Ricevono per primo
-un contesto `{ root, part(nome), all(selettore), scene, busy, theme, asset(percorso), t(chiave), Pixel }`. `asset`
+un contesto `{ root, part(nome), all(selettore), scene, busy, theme, asset(percorso), t(chiave), Pixel, redraw() }`
+(`redraw` ridisegna i disegni del tema, per esempio dopo aver cambiato un `data-*` che usano). `asset`
 dà l'indirizzo di un file della cartella del tema, per esempio `new Audio(ctx.asset('penna.ogg')).play()`. Poi:
 
 | Aggancio | Quando | Dopo il contesto |
@@ -192,6 +193,7 @@ dà l'indirizzo di un file della cartella del tema, per esempio `new Audio(ctx.a
 | `ask` | Arriva una domanda di permesso o un piano | la domanda |
 | `done`, `error` | La risposta è finita; si è fermata con un errore | `{ durationMs }`; il messaggio |
 | `scene` | Notte ↔ giorno | `'notte'` o `'giorno'` |
+| `chapter` | Comincia un capitolo nuovo o si apre una cronaca (la conversazione nel log è cambiata) | — |
 
 Il testo di una risposta ha la classe `long-start` quando il suo primo paragrafo è lungo: i temi che hanno un
 capolettera lo mettono solo lì (`.entry.claude .text.long-start > p:first-child::first-letter`).
