@@ -120,12 +120,18 @@ function startGesture(kind) {
   const start = screen.getCursorScreenPoint()
   const [x, y] = win.getPosition()
   const [w, h] = win.getSize()
+  // Su Windows con lo schermo ridimensionato (125%, 150%...) ogni setPosition su una finestra trasparente senza bordi
+  // può allargarla di un pixel per l'arrotondamento fra pixel logici e fisici: chiamata 60 volte al secondo, la
+  // finestra cresce da sola. Per questo si passa sempre la dimensione di partenza, e solo quando il cursore si muove
+  let last = null
   const timer = setInterval(() => {
     const c = screen.getCursorScreenPoint()
+    if (last && c.x === last.x && c.y === last.y) return
+    last = c
     const dx = c.x - start.x
     const dy = c.y - start.y
     if (kind === 'move') {
-      win.setPosition(x + dx, y + dy)
+      win.setBounds({ x: x + dx, y: y + dy, width: w, height: h })
     } else {
       const wa = screen.getDisplayNearestPoint(c).workArea
       const nw = Math.max(MIN_W, Math.min(w + dx, wa.x + wa.width - x))
@@ -161,7 +167,7 @@ function trayMenu() {
     { label: win && win.isVisible() ? 'Nascondi il rotolo' : 'Mostra il rotolo', click: toggleVisible },
     { label: 'Nuovo capitolo', click: () => send('chat:reset') },
     { label: 'Tema', submenu: themes.map((t) => ({ label: t.name, type: 'radio', checked: t.id === currentTheme().id, click: () => setTheme(t.id) })) },
-    { label: 'Riporta in basso a destra', click: () => { const p = defaultPosition(); win.setPosition(p.x, p.y); config.position = p; saveConfig() } },
+    { label: 'Riporta in basso a destra', click: () => { const p = defaultPosition(); const [w, h] = win.getSize(); win.setBounds({ x: p.x, y: p.y, width: w, height: h }); config.position = p; saveConfig() } },
     { label: 'Dimensione iniziale', click: () => { win.setSize(WIN_W, WIN_H); config.size = null; saveConfig() } },
     { type: 'separator' },
     { label: 'Esci', click: () => app.quit() },
