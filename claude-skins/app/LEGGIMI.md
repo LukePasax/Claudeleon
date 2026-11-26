@@ -63,9 +63,9 @@ npm 11 altrimenti non arriva.
   anche nell'app desktop.
 - **Cartella di lavoro:** dal vassoio, "Cartella di lavoro…": è dove nascono le conversazioni nuove (quelle riprese
   restano nella loro cartella).
-- **Configurazione:** `%APPDATA%\Claude Skins\config.json`: `workdir` (la cartella in cui lavora Claude e di cui si
-  elencano le cronache; vuota, la cartella utente), posizione, dimensione per tema, scena, capitolo, sessione, tema,
-  sempre in primo piano.
+- **Configurazione:** `%APPDATA%\Claude Skins\config.json`: `workdir` (la cartella in cui nascono le
+  conversazioni nuove; vuota, la cartella utente), posizione, dimensione per tema, scena, capitolo, sessione e sua
+  cartella, tema, modo dei permessi, sempre in primo piano. Al primo avvio riprende quella di `pergamena-app`.
 - **Prove:** `node_modules\electron\dist\electron.exe . --cattura <file.png> [notte|giorno] [chat|cronache]
   [LxA] [--tema <id>]` (senza LxA, la misura del tema) disegna una conversazione finta (con una domanda di permesso) o l'elenco delle cronache, salva
   uno screenshot della finestra ed esce, senza chiamare Claude. Per guardare un tema senza Electron basta aprire
