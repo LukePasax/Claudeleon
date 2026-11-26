@@ -44,33 +44,8 @@
 
   function esc(s) { return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])) }
 
-  // Markdown minimo: blocchi di codice, titoli, elenchi, paragrafi; nelle righe codice, grassetto, corsivo
-  function inline(s) {
-    return esc(s)
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
-      .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<i>$2</i>')
-  }
-  function markdown(src) {
-    const out = []
-    src.replace(/\r/g, '').split(/\n?```/).forEach((chunk, i) => {
-      if (i % 2 === 1) {
-        const nl = chunk.indexOf('\n')
-        out.push('<pre><code>' + esc(nl >= 0 ? chunk.slice(nl + 1) : chunk) + '</code></pre>')
-        return
-      }
-      for (const para of chunk.split(/\n{2,}/)) {
-        const lines = para.split('\n').filter((l) => l.trim() !== '')
-        if (!lines.length) continue
-        if (/^#{1,6} /.test(lines[0])) { out.push('<h3>' + inline(lines.shift().replace(/^#+ /, '')) + '</h3>') }
-        if (!lines.length) continue
-        if (lines.every((l) => /^\s*[-*] /.test(l))) out.push('<ul>' + lines.map((l) => '<li>' + inline(l.replace(/^\s*[-*] /, '')) + '</li>').join('') + '</ul>')
-        else if (lines.every((l) => /^\s*\d+\. /.test(l))) out.push('<ol>' + lines.map((l) => '<li>' + inline(l.replace(/^\s*\d+\. /, '')) + '</li>').join('') + '</ol>')
-        else out.push('<p>' + lines.map(inline).join('<br>') + '</p>')
-      }
-    })
-    return out.join('')
-  }
+  // Il markdown delle risposte è in markdown.js
+  const markdown = (src) => Markdown.render(src)
 
   // ------------------------------------------------------------------ la conversazione nel log
 
@@ -590,6 +565,9 @@
     scene: () => { scene = scene === 'notte' ? 'giorno' : 'notte'; api.setScene(scene); paint() },
   }
   document.addEventListener('click', (e) => {
+    // I link delle risposte si aprono nel browser di sistema
+    const a = e.target.closest('a[data-href]')
+    if (a) { e.preventDefault(); api.openLink(a.dataset.href); return }
     const m = e.target.closest('[data-perm-mode]')
     if (m && app.contains(m)) return chooseMode(m.dataset.permMode)
     const b = e.target.closest('[data-action]')
@@ -670,6 +648,38 @@
     hunks: [{ line: 1, before: '', after: ['#pragma once', '', '#include <vector>', '', 'class RouteFinder', '{', 'public:', '    explicit RouteFinder(const Map& map);', '', '    // Il sentiero più breve fra due punti, o vuoto', '    std::vector<Point> FindPath(Point start, Point goal) const;', '', 'private:', '    const Map& m_map;', '    float Cost(Point a, Point b) const;', '    float Heuristic(Point a, Point b) const;', '    bool Walkable(Point p) const;', '};', ''].join('\n') }],
   }
 
+  // Una risposta finta che usa tutto il markdown
+  const FAKE_ANSWER = [
+    'Ecco quanto mi chiedi: "{text}". La risposta arriva a pezzi, con **grassetto**, *corsivo*, ~~barrato~~ e `codice`.',
+    '## Il piano',
+    '1. Leggere `MapView.cpp`',
+    '2. Aggiungere i fiumi:',
+    '   - `DrawRivers()` prima delle strade',
+    '   - un interruttore nel menu **Vista**',
+    '3. Provare con la [guida di Qt](https://doc.qt.io/qt-6/qpainter.html)',
+    '',
+    '### File toccati',
+    '| File | Righe | Stato |',
+    '|:-----|------:|:-----:|',
+    '| `MapView.cpp` | +12 −3 | fatto |',
+    '| `MapLoader.cpp` | +40 | da fare |',
+    '',
+    '> Nota: i fiumi vanno disegnati **sotto** le strade, o le coprono.',
+    '',
+    '- [x] lettura del codice',
+    '- [ ] modifica',
+    '',
+    '---',
+    '',
+    '```cpp',
+    'void MapView::Draw()',
+    '{',
+    '    DrawRivers(); // prima',
+    '    DrawRoads();',
+    '}',
+    '```',
+  ].join('\n')
+
   function fakeApi() {
     const handlers = {}
     const on = (name) => (cb) => { handlers[name] = cb }
@@ -690,6 +700,7 @@
       },
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
       setMode: (m) => fire('onMode', m, 0),
+      openLink: (url) => window.open(url, '_blank', 'noopener'),
       sessions: async () => [
         { id: 's1', title: 'Temi per la Pergamena', lastModified: Date.now() - 3600000 },
         { id: 's2', title: 'Il calcolo dei sentieri in RouteFinder', lastModified: Date.now() - day },
@@ -704,7 +715,7 @@
         fire('onToolDone', { id: 't1', error: false }, 500)
         fire('onTool', { id: 't2', name: 'Edit', summary: 'src/MapView.cpp', change: FAKE_EDIT }, 600)
         fire('onToolDone', { id: 't2', error: false }, 800)
-        const answer = `Ecco quanto mi chiedi: "${text}".\n\nLa risposta arriva a pezzi, come in una vera conversazione, con **grassetto** e \`codice\`.`
+        const answer = FAKE_ANSWER.replace('{text}', text)
         ;[...answer].forEach((ch, i) => fire('onDelta', ch, 900 + i * 15))
         fire('onDone', { durationMs: 2400 }, 900 + answer.length * 15 + 100)
         fire('onAsk', { id: 1, title: 'Claude vuole creare un file', description: '', detail: 'src/RouteFinder.h', change: FAKE_WRITE, canAlways: true }, 900 + answer.length * 15 + 200)

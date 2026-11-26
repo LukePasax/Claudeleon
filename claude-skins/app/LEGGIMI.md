@@ -35,6 +35,8 @@ npm 11 altrimenti non arriva.
   `%USERPROFILE%\.local\bin\claude.exe`, con il prompt di sistema di Claude Code più la "personalità" del tema (lo
   scriba di Gran Burrone per Terra di Mezzo, il cronista per Pergamena). Gli hook dell'utente sono spenti per queste
   conversazioni.
+- **Risposte:** markdown completo (titoli, elenchi annidati, tabelle, citazioni, caselle, codice). I link si aprono
+  nel browser di sistema, mai dentro la finestra; le immagini restano link.
 - **Modifiche ai file:** quando Claude usa `Edit`, `MultiEdit` o `Write`, sotto la riga dello strumento compare il
   riquadro delle differenze (righe tolte in rosso, aggiunte in verde, numeri di riga del file quando si trovano) e
   nella riga il conto `+N −M`; un clic sulla riga lo chiude e lo riapre, oltre le 16 righe c'è "mostra altre N

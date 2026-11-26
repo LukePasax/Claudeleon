@@ -80,6 +80,12 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
 - `src/preload.js` — il ponte tra pagina e processo principale (`contextBridge`), niente Node nella pagina.
 - `src/renderer/` — la pagina.
   - `index.html` è vuoto: solo `<div id="app">`, dove si monta il `layout` del tema.
+  - `markdown.js` rende il markdown delle risposte: un piccolo parser a blocchi (titoli, paragrafi, elenchi annidati
+    e con caselle, citazioni, tabelle con allineamento, codice con il linguaggio, linee) e in linea (codice, link,
+    indirizzi, grassetto, corsivo, barrato). Tutto il testo è sfuggito; solo http, https e mailto diventano link, e
+    si aprono nel browser di sistema (`link:open` → `shell.openExternal`, che ricontrolla il protocollo). `_` e `__`
+    chiudono solo prima di spazio o punteggiatura, così `__init__.py` e `my_var` restano come sono. Funzioni pure,
+    si provano con node.
   - `diff.js` calcola le differenze riga per riga (sottosequenza comune più lunga, dopo aver tolto le righe uguali
     in testa e in coda; oltre 4 milioni di celle mostra blocco tolto e blocco aggiunto) e le raggruppa con 3 righe
     di contesto. Funzioni pure, si provano con node.

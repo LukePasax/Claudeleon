@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('skins', {
   setScene: (scene) => ipcRenderer.send('scene:set', scene),
   setTheme: (id) => ipcRenderer.send('theme:set', id),
   setMode: (mode) => ipcRenderer.send('mode:set', mode),
+  openLink: (url) => ipcRenderer.send('link:open', url),
   newChapter: () => ipcRenderer.invoke('chapter:new'),
   send: (text) => ipcRenderer.send('chat:send', text),
   stop: () => ipcRenderer.send('chat:stop'),

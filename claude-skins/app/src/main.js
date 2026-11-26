@@ -1,6 +1,6 @@
 // La finestra: trasparente, senza bordi, sempre in primo piano. La sua forma la decide il tema in uso; dove il tema
 // non disegna nulla i clic passano alle finestre sotto, e si trascina dalla parte che il tema indica (data-drag).
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, globalShortcut } = require('electron')
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, globalShortcut, shell } = require('electron')
 const fs = require('fs')
 const path = require('path')
 const { ClaudeBridge } = require('./claude-bridge')
@@ -241,6 +241,11 @@ function registerIpc() {
   ipcMain.on('theme:set', (_e, id) => setTheme(String(id)))
   // Il modo dei permessi, scelto dalla finestra; il messaggero lo applica anche alla risposta in corso
   ipcMain.on('mode:set', (_e, mode) => bridge.setMode(String(mode)))
+  // Un link di una risposta: nel browser di sistema, e solo se è http, https o mailto
+  ipcMain.on('link:open', (_e, url) => {
+    const u = String(url || '')
+    if (/^(https?:\/\/|mailto:)/i.test(u)) shell.openExternal(u).catch(() => {})
+  })
   ipcMain.on('scene:set', (_e, scene) => { config.scene = scene === 'giorno' ? 'giorno' : 'notte'; saveConfig() })
   // Un capitolo per conversazione: il numero cresce, la sessione di Claude Code ricomincia
   ipcMain.handle('chapter:new', () => {
