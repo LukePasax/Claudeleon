@@ -25,6 +25,9 @@ npm 11 altrimenti non arriva.
 - **Spostare e allargare:** si trascina dalla testata (il capo alto del rotolo, la copertina del libro); la
   maniglia a gradini in basso a destra allarga e allunga. Posizione e dimensione restano, e la dimensione è
   ricordata per tema. Dal vassoio: "Riporta al centro" e "Dimensione iniziale".
+- **Bordi e ingrandimento:** la finestra si ridimensiona da tutti i lati e gli angoli, come una finestra normale. Il
+  pulsante accanto a "nascondi" (o il doppio clic sulla testata) la ingrandisce all'area di lavoro; F11 la porta a
+  tutto schermo; di nuovo, si ripristina. Spostarla da ingrandita la riporta alla sua misura.
 - **Sempre in primo piano:** dal vassoio si può spegnere, ora che la finestra è grande.
 - **Scorciatoia:** `Ctrl+Alt+P` mostra o nasconde la finestra da qualunque programma; c'è anche l'icona nel vassoio.
 - **Tema:** dalla finestra ("temi" sotto il rotolo, "altri libri" in fondo alla pagina sinistra del Libro Rosso,

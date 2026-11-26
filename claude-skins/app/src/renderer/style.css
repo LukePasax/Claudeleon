@@ -223,6 +223,23 @@ button { font-family: inherit; color: inherit; }
 .btn.small { font-size: 13px; padding: 4px 10px; }
 .btn.deny { background: var(--deny-bg); color: var(--deny-ink); }
 .btn.deny:hover { background: var(--deny-light); }
+/* Le maniglie dei bordi: invisibili, sottili, sopra tutto; spariscono con la finestra ingrandita */
+.edge { position: absolute; z-index: 40; }
+.edge-n, .edge-s { left: 12px; right: 12px; height: 5px; cursor: ns-resize; }
+.edge-e, .edge-w { top: 12px; bottom: 12px; width: 5px; cursor: ew-resize; }
+.edge-n { top: 0; } .edge-s { bottom: 0; } .edge-e { right: 0; } .edge-w { left: 0; }
+.edge-ne, .edge-nw, .edge-se, .edge-sw { width: 12px; height: 12px; }
+.edge-ne { top: 0; right: 0; cursor: nesw-resize; } .edge-sw { bottom: 0; left: 0; cursor: nesw-resize; }
+.edge-nw { top: 0; left: 0; cursor: nwse-resize; } .edge-se { bottom: 0; right: 0; cursor: nwse-resize; }
+body.maximized .edge, body.fullscreen .edge, body.maximized [data-grip], body.fullscreen [data-grip] { display: none; }
+
+/* Il pulsante per ingrandire: un quadratino disegnato col CSS (non tutti i caratteri hanno il simbolo); da
+   ingrandita, due quadratini sovrapposti */
+.ctl.max { position: relative; }
+.ctl.max::before { content: ''; position: absolute; left: 50%; top: 50%; width: 8px; height: 7px; transform: translate(-50%, -50%); border: 1.5px solid currentColor; border-top-width: 2.5px; }
+body.maximized .ctl.max::before, body.fullscreen .ctl.max::before { width: 6px; height: 5px; transform: translate(-30%, -30%); }
+body.maximized .ctl.max::after, body.fullscreen .ctl.max::after { content: ''; position: absolute; left: 50%; top: 50%; width: 6px; height: 5px; transform: translate(-80%, -80%); border-top: 2px solid currentColor; border-right: 1.5px solid currentColor; }
+
 /* I pulsanti della finestra (nascondi, chiudi) */
 .ctl {
   width: 28px; height: 24px; border: none; cursor: pointer; font-size: 14px; line-height: 20px; padding: 0;

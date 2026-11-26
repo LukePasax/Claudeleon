@@ -29,6 +29,7 @@
     <canvas class="brooch" data-art="leaf" data-art-arg="destra" data-art-fit="natural"></canvas>
     <div class="controls">
       <button class="ctl" data-action="hide" data-s-title="hideTip">_</button>
+      <button class="ctl max" data-action="maximize" data-s-title="maxTip"></button>
       <button class="ctl" data-action="quit" data-s-title="quitTip">x</button>
     </div>
   </header>

@@ -79,3 +79,6 @@ body.busy .dot { opacity: 1; animation: pulse 1.1s ease-in-out infinite; }
 @media (max-width: 780px) {
   .side { display: none; }
 }
+
+/* Ingrandita o a schermo intero: niente margine trasparente, niente angoli né ombra */
+body.maximized .frame, body.fullscreen .frame { inset: 0; border: none; border-radius: 0; box-shadow: none; }

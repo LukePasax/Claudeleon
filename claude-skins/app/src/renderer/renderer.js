@@ -124,8 +124,20 @@
     return { width, height, w: Math.floor(width / sc), h: Math.floor(height / sc), scale: sc, pal: Theming.palette(scene), scene, frame, busy, el, arg: el.dataset.artArg }
   }
 
+  // Al cambio di misura della finestra: solo i canvas la cui misura è cambiata davvero (capi, dorso, divisori). Gli
+  // sfondi ripetuti non dipendono dalla misura e non si ridisegnano: rifarli a ogni fotogramma rendeva il
+  // ridimensionamento lento (data-art-bg-resize su un elemento lo ridisegna anche qui)
+  function repaintSized() {
+    for (const el of all('canvas[data-art]')) {
+      if (el.dataset.artFit === 'natural') continue
+      if (el._size !== `${el.clientWidth}x${el.clientHeight}`) drawArt(el)
+    }
+    for (const el of all('[data-art-bg-resize]')) drawBackground(el)
+  }
+
   // <canvas data-art="nome">: il disegno del tema, nel canvas
   function drawArt(el) {
+    el._size = `${el.clientWidth}x${el.clientHeight}`
     const drawn = Theming.art(el.dataset.art, artOptions(el))
     if (!drawn) return
     blit(el, drawn, el.dataset.artFit === 'natural', scaleOf(el))
@@ -156,6 +168,7 @@
     Theming.hook(name, hookContext(), ...args)
   }
 
+  // Tutto: colori, sfondi, disegni, icone, scritte (al montaggio, al cambio di tema o di scena)
   function paint() {
     Theming.applyScene(scene)
     for (const el of all('[data-art-bg]')) drawBackground(el)
@@ -368,6 +381,35 @@
     for (const el of document.querySelectorAll('.theme-picker')) el.remove()
   }
 
+  // ------------------------------------------------------------------ la finestra: bordi, ingrandire
+
+  // Le maniglie invisibili sui lati e sugli angoli della forma del tema (il suo primo elemento data-solid), per
+  // ridimensionare come una finestra normale. Un tema può non volerle con edges: false
+  function addEdges() {
+    if (Theming.current.edges === false) return
+    const host = app.querySelector('[data-solid]')
+    if (!host) return
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+    for (const side of ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']) {
+      const h = document.createElement('div')
+      h.className = `edge edge-${side}`
+      h.dataset.resize = side
+      host.appendChild(h)
+    }
+  }
+
+  let winMode = 'normal'
+  function setWindowState(mode) {
+    winMode = mode
+    document.body.classList.toggle('maximized', mode === 'max')
+    document.body.classList.toggle('fullscreen', mode === 'full')
+    for (const el of all('[data-action="maximize"]')) {
+      el.dataset.sTitle = mode === 'normal' ? 'maxTip' : 'restoreTip'
+      el.title = t(el.dataset.sTitle)
+    }
+  }
+  api.onWindowState(setWindowState)
+
   // ------------------------------------------------------------------ il layout del tema
 
   // Monta il tema: il suo HTML prende il posto del precedente, la conversazione, la bozza e lo stato passano al nuovo
@@ -378,10 +420,12 @@
     if (app.children.length) hook('unmount')
     const theme = await Theming.use(id)
     app.innerHTML = theme.layout || '<div data-solid style="background:#000;color:#fff;padding:20px">Questo tema non ha un layout.</div>'
+    addEdges()
     const log = part('log')
     if (log) for (const it of items) log.appendChild(it)
     if (part('input')) part('input').value = draft
     setBusy(busy)
+    setWindowState(winMode)
     renderModes()
     renderChapterHead()
     paint()
@@ -793,6 +837,8 @@
     sessions: showSessions,
     'sessions-close': () => { if (part('sessions') && !sessionsPinned()) part('sessions').hidden = true },
     themes: openThemes,
+    maximize: () => api.windowMode('max'),
+    fullscreen: () => api.windowMode('full'),
     scene: () => { scene = scene === 'notte' ? 'giorno' : 'notte'; api.setScene(scene); paint(); hook('scene', scene) },
   }
   document.addEventListener('click', (e) => {
@@ -806,6 +852,8 @@
   })
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && document.querySelector('.theme-picker')) { closeThemes(); return }
+    // F11: schermo intero, e di nuovo per tornare
+    if (e.key === 'F11') { e.preventDefault(); api.windowMode('full'); return }
     if (!e.target.matches('[data-part="input"]')) return
     if (menuKey(e)) { e.preventDefault(); return }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
@@ -823,14 +871,18 @@
   let gesturing = null
   document.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return
+    const edge = e.target.closest('[data-resize]')
     const grip = e.target.closest('[data-grip]')
     const drag = e.target.closest('[data-drag]')
     let kind = null
-    if (grip) kind = 'resize'
+    if (edge) kind = `resize:${edge.dataset.resize}`
+    else if (grip) kind = 'resize:se'
     else if (drag && !e.target.closest('button, input, textarea, select, a, [data-action], [data-no-drag], .session-row')) kind = 'move'
     if (!kind) return
+    // Doppio clic sulla testata: ingrandisce o ripristina
+    if (kind === 'move' && e.detail === 2) { e.preventDefault(); api.windowMode('max'); return }
     e.preventDefault()
-    gesturing = grip || drag
+    gesturing = edge || grip || drag
     gesturing.classList.add('dragging')
     api.gestureStart(kind)
   })
@@ -848,7 +900,7 @@
   window.addEventListener('resize', () => {
     if (repaintQueued) return
     repaintQueued = true
-    requestAnimationFrame(() => { repaintQueued = false; paint() })
+    requestAnimationFrame(() => { repaintQueued = false; repaintSized() })
   })
 
   // I clic attraversano la finestra tranne sopra gli elementi data-solid del layout
@@ -864,6 +916,7 @@
     workdir = info.workdir || ''
     chapter = info.chapter || 1
     mode = info.mode || 'auto'
+    api.windowState().then(setWindowState).catch(() => {})
     // I comandi della cache; l'elenco aggiornato arriva poi da onCommands
     api.commands().then((list) => { if (!commands.length) commands = list || [] }).catch(() => {})
     await Theming.load(info.themes || [])
@@ -937,6 +990,7 @@
     const on = (name) => (cb) => { handlers[name] = cb }
     const fire = (name, v, ms) => setTimeout(() => handlers[name] && handlers[name](v), ms)
     let n = 1
+    let fakeWin = 'normal'
     // Dalla console dell'anteprima: anteprima.tema('pergamena'), anteprima.permesso(), anteprima.piano()
     window.anteprima = {
       tema: (id) => fire('onTheme', id, 0),
@@ -953,6 +1007,8 @@
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
       setMode: (m) => fire('onMode', m, 0),
       setTheme: (id) => fire('onTheme', id, 0),
+      windowMode: (m) => { fakeWin = fakeWin === m ? 'normal' : m; fire('onWindowState', fakeWin, 0) },
+      windowState: async () => fakeWin,
       openLink: (url) => window.open(url, '_blank', 'noopener'),
       commands: async () => FAKE_COMMANDS,
       sessions: async () => [
@@ -991,7 +1047,7 @@
         fire('onDone', { durationMs: 2400 }, 900 + answer.length * 15 + 100)
         fire('onAsk', { id: 1, title: 'Claude vuole creare un file', description: '', detail: 'src/RouteFinder.h', change: FAKE_WRITE, canAlways: true }, 900 + answer.length * 15 + 200)
       },
-      onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'), onMode: on('onMode'), onWorkdir: on('onWorkdir'), onCommands: on('onCommands'), onCommandsError: on('onCommandsError'), onCommandOutput: on('onCommandOutput'), onCompacted: on('onCompacted'), onStatus: on('onStatus'),
+      onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'), onMode: on('onMode'), onWindowState: on('onWindowState'), onWorkdir: on('onWorkdir'), onCommands: on('onCommands'), onCommandsError: on('onCommandsError'), onCommandOutput: on('onCommandOutput'), onCompacted: on('onCompacted'), onStatus: on('onStatus'),
     }
   }
 })()

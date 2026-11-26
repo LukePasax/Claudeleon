@@ -30,6 +30,7 @@
     <div class="title" data-s="title"></div>
     <div class="controls">
       <button class="ctl" data-action="hide" data-s-title="hideTip">_</button>
+      <button class="ctl max" data-action="maximize" data-s-title="maxTip"></button>
       <button class="ctl" data-action="quit" data-s-title="quitTip">x</button>
     </div>
   </div>

@@ -97,6 +97,7 @@ Su un qualunque elemento cliccabile (anche più di uno per azione):
 | `themes` | Apre il selettore dei temi: un pannello sopra il layout (dentro il primo elemento `data-solid`) con una scheda per tema, anteprima, nome e `description`. L'anteprima la disegna il motore coi disegni del tema: `paper`, poi `leather` o `roll` per la fascia in alto, e `trayIcon` |
 | `scene` | Notte ↔ giorno. Se l'elemento è vuoto, il motore ci scrive il nome dell'altra scena |
 | `hide`, `quit` | Nasconde la finestra; chiude l'app |
+| `maximize`, `fullscreen` | Ingrandisce all'area di lavoro, o a tutto schermo; di nuovo, ripristina. Su un `.ctl.max` vuoto il motore disegna l'icona (un quadrato, due da ingrandita). Anche F11 e il doppio clic sulla testata |
 
 ### La finestra: `data-solid`, `data-drag`, `data-grip`
 
@@ -105,6 +106,11 @@ Su un qualunque elemento cliccabile (anche più di uno per azione):
 - `data-drag`: tenendo premuto qui si sposta la finestra. Fanno eccezione i pulsanti, i campi, le righe delle
   cronache e gli elementi con `data-no-drag`.
 - `data-grip`: trascinando da qui si ridimensiona la finestra, dall'angolo in basso a destra.
+- I **bordi**: il motore aggiunge da sé maniglie invisibili (`.edge`, `data-resize`) sui lati e sugli angoli del
+  primo elemento `data-solid`, per ridimensionare come una finestra normale. Un tema che non le vuole mette
+  `edges: false` nel `theme.js`.
+- Da ingrandita o a schermo intero il corpo ha la classe `maximized` o `fullscreen`: il tema può togliere margini
+  trasparenti, angoli e ombre (Moderno lo fa). Le maniglie spariscono.
 
 ### Scritte
 
@@ -118,13 +124,13 @@ Al cambio di tema il motore riscrive tutto.
 
 | Attributo | Che cosa fa |
 | --- | --- |
-| `<canvas data-art="nome">` | Il disegno `art.nome` del tema. La misura a schermo la decide il CSS del canvas; il disegno riceve quella misura divisa per la scala |
+| `<canvas data-art="nome">` | Il disegno `art.nome` del tema. La misura a schermo la decide il CSS del canvas; il disegno riceve quella misura divisa per la scala. Mentre si ridimensiona la finestra si ridisegna solo se la sua misura è cambiata: conviene che sia veloce |
 | `data-art-fit="natural"` | La misura la decide invece il disegno (ogni pixel diventa scala×scala): per lumi, spille, segnalibri |
 | `data-art-scale="2"` | La scala di questo disegno, al posto di quella del tema. Con `1` il disegno è a piena risoluzione |
 | `data-art-smooth` | Ingrandito con le sfumature invece che a pixel pieni: per disegni non pixel (curve, sfumature) |
 | `data-art-anim` | Ridisegnato ogni 180 ms con un fotogramma nuovo: per la candela o l'Anello |
 | `data-art-arg="..."` | Un valore in più per il disegno, per esempio `destra` per specchiarlo |
-| `data-art-bg="nome"` | Su qualunque elemento: il disegno come sfondo ripetuto, ingrandito a pixel pieni. Si usa per carta e cuoio |
+| `data-art-bg="nome"` | Su qualunque elemento: il disegno come sfondo ripetuto, ingrandito a pixel pieni. Si usa per carta e cuoio. Si disegna al montaggio e al cambio di scena, non mentre si ridimensiona (un riquadro ripetuto non dipende dalla misura); `data-art-bg-resize` lo ridisegna anche allora |
 
 ## I disegni: `art`
 

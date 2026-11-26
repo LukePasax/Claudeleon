@@ -156,6 +156,16 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
   finisce con lo strumento `ExitPlanMode`, che passa da `canUseTool`: il piano è in `input.plan` (o in un file,
   `planFilePath`); approvarlo risponde `allow` con `updatedPermissions: [{ type: 'setMode', mode: <quello di
   prima>, destination: 'session' }]`. Non si offrono `bypassPermissions` né `dontAsk`.
+- **Finestra trasparente e ingrandimento:** `maximize()` di Electron non va con una finestra trasparente: lo fa il
+  processo principale (`setWinMode`: area di lavoro, schermo intero, misura di prima in `restoreBounds`). I bordi
+  sono maniglie (`.edge`) che il motore aggiunge al primo `data-solid`; il gesto `resize:<lati>` tiene fermo il lato
+  opposto.
+- **Ridimensionare senza scatti:** a ogni fotogramma si ridisegnano solo i canvas `data-art` la cui misura è
+  cambiata, mai gli sfondi ripetuti (carta, cuoio: procedurali, costosi, e indipendenti dalla misura). Capi del
+  rotolo a righe intere e sfere in cache: da 8-11 ms a 0,5-1 ms per fotogramma.
+- **Provare i gesti su Linux (Xvfb):** `setIgnoreMouseEvents(true, { forward: true })` non inoltra il movimento su
+  Linux, quindi la pagina non riceve nulla finché un movimento simulato (Playwright) non la sblocca; il cursore
+  "vero" per il processo principale si muove con `xdotool`. Su Windows l'inoltro funziona.
 - **Screenshot dell'app:** `webContents.capturePage()` a volte fallisce con `UnknownVizError` (GPU): si riprova.
 - **Non aprire la stessa sessione** nel rotolo e nell'app desktop insieme: si pestano i piedi. Il desktop vede i
   messaggi nuovi solo riaprendo la sessione.

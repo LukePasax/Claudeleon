@@ -89,6 +89,7 @@
         </div>
         <div class="controls">
           <button class="ctl" data-action="hide" data-s-title="hideTip">&#8211;</button>
+          <button class="ctl max" data-action="maximize" data-s-title="maxTip"></button>
           <button class="ctl" data-action="quit" data-s-title="quitTip">&#10005;</button>
         </div>
       </header>

@@ -77,6 +77,8 @@
     notte: 'notte',
     giorno: 'giorno',
     hideTip: 'Nascondi (si riapre col vassoio o con la scorciatoia)',
+    maxTip: 'Ingrandisci (F11: schermo intero)',
+    restoreTip: 'Ripristina',
     quitTip: 'Chiudi',
     gripTip: 'Trascina per allargare o allungare il rotolo',
   }

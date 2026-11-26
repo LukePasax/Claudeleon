@@ -102,8 +102,14 @@
 
   // Una sfera piccola (pomello, perla) di diametro d, con la luce da in alto a sinistra: tones va dallo scuro al
   // chiaro, l'ultimo è il riflesso
+  // Le sfere già disegnate, per non ricalcolarle a ogni fotogramma (il ridimensionamento ridisegna i capi spesso)
+  const sphereCache = new Map()
   function sphere(d, tones) {
+    const key = `${d}|${tones.join(',')}`
+    if (sphereCache.has(key)) return sphereCache.get(key)
+    if (sphereCache.size > 50) sphereCache.clear()
     const c = canvas(d, d)
+    sphereCache.set(key, c)
     const ctx = c.getContext('2d')
     const r = d / 2
     for (let y = 0; y < d; y++) {
@@ -133,12 +139,14 @@
     // Dall'alto: bordo scuro, la luce, il corpo, l'ombra di sotto
     const bands = [6, 5, 1, 2, 3, 3, 3, 2, 2, 1, 1, 0, 4, 4, 5, 5, 6, 6]
     for (let y = 0; y < h; y++) {
-      for (let x = 7; x < w - 7; x++) {
-        // Sul confine fra due fasce, un retino a scacchi le mescola
-        const next = bands[Math.min(h - 1, y + 1)]
-        // (solo nella metà alta, dove sfuma la luce: in basso sembrerebbe una cucitura)
-        const mix = y < 9 && next !== bands[y] && (x + y) % 2 === 0
-        px(ctx, x, y, pal.roll[mix ? next : bands[y]])
+      // Ogni fascia a riga intera (veloce); sul confine fra due fasce, nella metà alta dove sfuma la luce, un retino a
+      // scacchi le mescola (in basso sembrerebbe una cucitura)
+      ctx.fillStyle = pal.roll[bands[y]]
+      ctx.fillRect(7, y, w - 14, 1)
+      const next = bands[Math.min(h - 1, y + 1)]
+      if (y < 9 && next !== bands[y]) {
+        ctx.fillStyle = pal.roll[next]
+        for (let x = 7 + ((7 + y) % 2); x < w - 7; x += 2) ctx.fillRect(x, y, 1, 1)
       }
     }
     // Le pieghe: una riga scura con la luce accanto

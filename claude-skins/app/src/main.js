@@ -99,7 +99,17 @@ function setTheme(id) {
   config.theme = id
   saveConfig()
   bridge.persona = currentTheme().persona
-  // La finestra prende la misura del nuovo tema, attorno allo stesso centro e dentro lo schermo
+  // La finestra prende la misura del nuovo tema, attorno allo stesso centro e dentro lo schermo (se è ingrandita
+  // resta ingrandita: cambia la misura a cui tornerà)
+  if (winMode !== 'normal') {
+    const b = win.getBounds()
+    const { w, h } = windowSize()
+    restoreBounds = { x: Math.round(b.x + (b.width - w) / 2), y: Math.round(b.y + (b.height - h) / 2), width: w, height: h }
+    saveConfig()
+    send('theme:apply', id)
+    refreshTray()
+    return
+  }
   const [x, y] = win.getPosition()
   const [ow, oh] = win.getSize()
   const { w, h } = windowSize()
@@ -152,14 +162,47 @@ function createWindow() {
 
 // Spostare ('move') o ridimensionare ('resize'): dal clic sulla pagina si segue il cursore sullo schermo, così il
 // gesto non si perde quando il mouse esce dalla finestra in un movimento veloce
+// La finestra: 'normale', 'ingrandita' (l'area di lavoro, la barra di Windows resta) o 'schermo intero' (tutto lo
+// schermo). Una finestra trasparente non si ingrandisce coi comandi di Windows: si fa a mano, ricordando la misura
+// di prima per ripristinarla
+let winMode = 'normal'
+let restoreBounds = null
+
+function setWinMode(mode) {
+  if (!['normal', 'max', 'full'].includes(mode) || mode === winMode) return
+  if (winMode === 'normal') restoreBounds = win.getBounds()
+  if (mode === 'normal') {
+    win.setBounds(restoreBounds || Object.assign(defaultPosition(), { width: windowSize().w, height: windowSize().h }))
+  } else {
+    const d = screen.getDisplayMatching(win.getBounds())
+    win.setBounds(mode === 'full' ? d.bounds : d.workArea)
+  }
+  winMode = mode
+  send('window:state', winMode)
+}
+
+// Spostare ('move') o ridimensionare ('resize:<lati>', es. 'resize:se', 'resize:n'): dal clic sulla pagina si segue il
+// cursore sullo schermo, così il gesto non si perde quando il mouse esce dalla finestra in un movimento veloce
 function startGesture(kind) {
   stopGesture()
+  // Spostare una finestra ingrandita la riporta alla sua misura, sotto il cursore come fa Windows
+  if (kind === 'move' && winMode !== 'normal' && restoreBounds) {
+    const c = screen.getCursorScreenPoint()
+    const b = win.getBounds()
+    const ratio = (c.x - b.x) / b.width
+    const rb = restoreBounds
+    winMode = 'normal'
+    win.setBounds({ x: Math.round(c.x - rb.width * ratio), y: Math.max(b.y, c.y - 20), width: rb.width, height: rb.height })
+    send('window:state', winMode)
+  }
+  if (kind !== 'move' && winMode !== 'normal') return
+  const sides = kind.startsWith('resize') ? (kind.split(':')[1] || 'se') : ''
   const start = screen.getCursorScreenPoint()
   const [x, y] = win.getPosition()
   const [w, h] = win.getSize()
   // Su Windows con lo schermo ridimensionato (125%, 150%...) ogni setPosition su una finestra trasparente senza bordi
   // può allargarla di un pixel per l'arrotondamento fra pixel logici e fisici: chiamata 60 volte al secondo, la
-  // finestra cresce da sola. Per questo si passa sempre la dimensione di partenza, e solo quando il cursore si muove
+  // finestra cresce da sola. Per questo si passa sempre la dimensione, e solo quando il cursore si muove
   let last = null
   const timer = setInterval(() => {
     const c = screen.getCursorScreenPoint()
@@ -167,17 +210,24 @@ function startGesture(kind) {
     last = c
     const dx = c.x - start.x
     const dy = c.y - start.y
-    if (kind === 'move') {
+    if (!sides) {
       win.setBounds({ x: x + dx, y: y + dy, width: w, height: h })
-    } else {
-      const wa = screen.getDisplayNearestPoint(c).workArea
-      const { minWidth, minHeight } = themeWindow()
-      const nw = Math.max(minWidth, Math.min(w + dx, wa.x + wa.width - x))
-      const nh = Math.max(minHeight, Math.min(h + dy, wa.y + wa.height - y))
-      win.setBounds({ x, y, width: nw, height: nh })
+      return
     }
+    // Il lato opposto a quello trascinato resta fermo; mai sotto la misura minima del tema né fuori dall'area di lavoro
+    const wa = screen.getDisplayNearestPoint(c).workArea
+    const { minWidth, minHeight } = themeWindow()
+    let nx = x
+    let ny = y
+    let nw = w
+    let nh = h
+    if (sides.includes('e')) nw = Math.max(minWidth, Math.min(w + dx, wa.x + wa.width - x))
+    if (sides.includes('s')) nh = Math.max(minHeight, Math.min(h + dy, wa.y + wa.height - y))
+    if (sides.includes('w')) { nw = Math.max(minWidth, Math.min(w - dx, x + w - wa.x)); nx = x + w - nw }
+    if (sides.includes('n')) { nh = Math.max(minHeight, Math.min(h - dy, y + h - wa.y)); ny = y + h - nh }
+    win.setBounds({ x: nx, y: ny, width: nw, height: nh })
   }, 1000 / 60)
-  gesture = { kind, timer }
+  gesture = { kind: sides ? 'resize' : 'move', timer }
 }
 
 function stopGesture() {
@@ -185,6 +235,7 @@ function stopGesture() {
   clearInterval(gesture.timer)
   const kind = gesture.kind
   gesture = null
+  if (winMode !== 'normal') return
   const [x, y] = win.getPosition()
   config.position = { x, y }
   if (kind === 'resize') {
@@ -244,7 +295,14 @@ function refreshTray() {
 
 function registerIpc() {
   ipcMain.on('mouse:interactive', (_e, on) => { if (!gesture) win.setIgnoreMouseEvents(!on, { forward: true }) })
-  ipcMain.on('gesture:start', (_e, kind) => { win.setIgnoreMouseEvents(false); startGesture(kind === 'resize' ? 'resize' : 'move') })
+  ipcMain.on('gesture:start', (_e, kind) => {
+    win.setIgnoreMouseEvents(false)
+    const k = String(kind || '')
+    startGesture(/^resize(:[nsew]{1,2})?$/.test(k) ? k : 'move')
+  })
+  // Ingrandire, schermo intero, ripristinare: toggle torna normale se la finestra è già in quel modo
+  ipcMain.on('window:mode', (_e, mode) => setWinMode(mode === winMode ? 'normal' : String(mode)))
+  ipcMain.handle('window:state', () => winMode)
   ipcMain.on('gesture:end', stopGesture)
   ipcMain.on('window:hide', () => { win.hide(); refreshTray() })
   ipcMain.on('app:quit', () => app.quit())
