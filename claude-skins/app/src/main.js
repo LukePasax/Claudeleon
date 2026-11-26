@@ -311,6 +311,8 @@ function fakeConversation(capture) {
     ['claude:toolDone', { id: 't1', error: false }],
     ['claude:tool', { id: 't2', name: 'Read', summary: 'src/MapView.cpp' }],
     ['claude:toolDone', { id: 't2', error: false }],
+    ['claude:tool', { id: 't4', name: 'Edit', summary: 'src/MapView.cpp', change: { file: 'src/MapView.cpp', hunks: [{ line: 41, before: 'void MapView::Draw()\n{\n    DrawTerrain();\n    DrawRoads();\n}', after: 'void MapView::Draw()\n{\n    DrawTerrain();\n    DrawRivers();\n    DrawRoads(m_showPaths);\n}' }] } }],
+    ['claude:toolDone', { id: 't4', error: false }],
     ['claude:tool', { id: 't3', name: 'Bash', summary: 'git log --oneline -5' }],
     ['claude:toolDone', { id: 't3', error: true }],
     ['claude:delta', 'Il progetto ha tre parti principali. Comincerei dalla vista della mappa, che è il punto dove si incrociano le altre:\n\n- **MapView.cpp**: il disegno della mappa\n- `RouteFinder`: il calcolo dei sentieri\n\n```cpp\nm_pRouteFinder->FindPath(start, goal);\n```\n\nSe vuoi, apro il primo file e ti mostro la funzione.'],

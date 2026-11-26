@@ -153,12 +153,14 @@ I nomi dei disegni sono liberi: sono quelli che il layout usa. Due nomi sono spe
 - `palette` serve ai disegni a pixel. Le chiavi di partenza sono in `PALETTES` di `theming.js`, a cui si
   aggiungono quelle che servono ai disegni del tema. Si scrivono solo le chiavi che cambiano.
 - `vars` serve all'interfaccia. Sono le variabili CSS elencate in cima a `style.css` (`ink`, `gold`, `edge`,
-  `btn-bg`, `deny-bg`, `font-body`…), scritte senza `--`. Un tema può aggiungerne di sue e usarle nel proprio CSS.
+  `btn-bg`, `deny-bg`, `font-body`…), scritte senza `--`. Fra queste ci sono anche `font-code`, il carattere del
+  codice e delle differenze, e `add-bg`, `del-bg`, `plus` e `minus`, i colori delle righe aggiunte e tolte. Un tema
+  può aggiungerne di sue e usarle nel proprio CSS.
 
 ## `theme.css` e `style.css`
 
 - `style.css` vale per tutti i temi. Contiene le variabili, le voci della conversazione (domande, risposte, azioni,
-  permessi, codice), i pulsanti `.pix` e `.ctl`, le righe delle cronache e le barre di scorrimento. Non contiene
+  permessi, codice, differenze delle modifiche ai file), i pulsanti `.pix` e `.ctl`, le righe delle cronache e le barre di scorrimento. Non contiene
   nessuna forma di finestra.
 - `theme.css` è attivo solo mentre il tema è in uso, quindi le regole non hanno bisogno di prefissi. Contiene la
   forma della finestra e può ridefinire qualunque cosa di `style.css`.

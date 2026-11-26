@@ -35,6 +35,11 @@ npm 11 altrimenti non arriva.
   `%USERPROFILE%\.local\bin\claude.exe`, con il prompt di sistema di Claude Code più la "personalità" del tema (lo
   scriba di Gran Burrone per Terra di Mezzo, il cronista per Pergamena). Gli hook dell'utente sono spenti per queste
   conversazioni.
+- **Modifiche ai file:** quando Claude usa `Edit`, `MultiEdit` o `Write`, sotto la riga dello strumento compare il
+  riquadro delle differenze (righe tolte in rosso, aggiunte in verde, numeri di riga del file quando si trovano) e
+  nella riga il conto `+N −M`; un clic sulla riga lo chiude e lo riapre, oltre le 16 righe c'è "mostra altre N
+  righe". La stessa vista compare nella domanda di permesso, così si vede cosa si sta approvando. Per un `Write` il
+  "prima" si legge dal disco: se il file è già stato scritto si vede il contenuto intero.
 - **Permessi:** modo `auto` (un classificatore decide; quando non sa, la domanda compare nel rotolo con Permetti,
   Sempre, Nega). In `src/claude-bridge.js`, `this.mode = 'default'` fa chiedere ogni azione a rischio.
 - **Cronache (annali):** l'elenco delle sessioni di Claude Code nella cartella di lavoro, comprese quelle dell'app
@@ -49,4 +54,4 @@ npm 11 altrimenti non arriva.
   uno screenshot della finestra ed esce, senza chiamare Claude. Per guardare un tema senza Electron basta aprire
   `src/renderer/index.html?tema=<id>` nel browser.
 
-Caratteri: Pixelify Sans e Jacquarda Bastarda 9 (Google Fonts, licenza SIL Open Font License).
+Caratteri: Pixelify Sans, Jacquarda Bastarda 9 e VT323 (per il codice) (Google Fonts, licenza SIL Open Font License).

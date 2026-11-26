@@ -66,6 +66,8 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
   installata, così valgono il suo login e la sua versione), `permissionMode: 'auto'`, `systemPrompt: { type:
   'preset', preset: 'claude_code', append: <tono da cronista> }`, `settings: { disableAllHooks: true }`,
   `includePartialMessages: true` (eventi `stream_event` con `text_delta`), `resume` per continuare la sessione,
+  `change()` che allega a `Edit`/`MultiEdit`/`Write`/`NotebookEdit` la modifica da mostrare (prima, dopo, riga
+  d'inizio trovata nel file; il "prima" di un `Write` letto dal disco), negli eventi `tool` e nelle domande,
   `canUseTool` che gira la domanda alla finestra e aspetta la risposta (`{ behavior: 'allow', updatedPermissions }`
   per "Sempre", con le `suggestions` ricevute; `{ behavior: 'deny', message }` per "Nega"). `Query.interrupt()` per
   Ferma. `listSessions({ dir, limit })` e `getSessionMessages(id, { dir })` per le cronache: `customTitle` è il titolo
@@ -78,6 +80,9 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
 - `src/preload.js` — il ponte tra pagina e processo principale (`contextBridge`), niente Node nella pagina.
 - `src/renderer/` — la pagina.
   - `index.html` è vuoto: solo `<div id="app">`, dove si monta il `layout` del tema.
+  - `diff.js` calcola le differenze riga per riga (sottosequenza comune più lunga, dopo aver tolto le righe uguali
+    in testa e in coda; oltre 4 milioni di celle mostra blocco tolto e blocco aggiunto) e le raggruppa con 3 righe
+    di contesto. Funzioni pure, si provano con node.
   - `pixel.js` contiene gli attrezzi del disegno (`bitmap`, `mirror`, `seeded`, `upscale`), le icone 8×8 dei
     "mestieri" di partenza e una libreria di disegni pronti (`Pixel.lib`: carta, capo del rotolo, tratteggio,
     candela, rotolino del vassoio). Si disegna dal codice a bassa risoluzione e si ingrandisce senza sfumature.
@@ -100,6 +105,8 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
 - **Caratteri a pixel:** Pixelify Sans unisce "fi" in un segno che sembra una A ("file" → "Ale"): legature spente
   (`font-variant-ligatures: none`). Le misure fuori dal suo reticolo si deformano: testo a 16 px, note a 12-14.
   Jacquarda Bastarda 9 (gotico a pixel) va bene per le parole, non per i numeri romani ("III" sembra "333").
+- **Pixelify per il codice no:** il 5 sembra una S, il 2 una Z, e non è monospaziato. Codice, differenze e dettagli
+  dei permessi usano VT323 (`--font-code`), a pixel e monospaziato, a 18-19 px perché è piccolo.
 - **npm 11** non esegue lo script di installazione di Electron: `node node_modules/electron/install.js`.
 - **`listSessions({ dir })`** vuole il percorso come Claude Code lo registra (`C:/cartella`); scritto in altro modo
   torna un elenco vuoto senza errore.
@@ -127,8 +134,9 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
    - La scelta del tema anche dalla finestra, oltre che dal vassoio: `skins.setTheme(id)` c'è già nel preload.
    - Un'eredità fra temi (`extends`), se nasceranno varianti dello stesso scheletro.
 1. **Più conversazioni in schede**, ognuna col suo `query()` e la sua sessione.
-2. **Modifiche ai file**: mostrare le differenze degli `Edit`/`Write` (l'`input` dello strumento ha `old_string`,
-   `new_string`, `content`) in un riquadro a pixel.
+2. ~~**Modifiche ai file**~~: fatto (riquadro delle differenze nella conversazione e nei permessi). Restano: le
+   modifiche anche nelle cronache riaperte (oggi si ricopia solo il testo), e un riepilogo dei file toccati nel
+   capitolo.
 3. **Interruzione più fine e scelta del modo dei permessi** dalla finestra (auto / chiedi sempre / piano).
 4. **Comandi con `/`, skill e plugin**: il motore li carica già; servono un modo di scriverli e di mostrarne l'esito.
 5. **Un personaggio** in pixel art accanto al rotolo (lo sprite si disegna come le icone, a griglia), che reagisce

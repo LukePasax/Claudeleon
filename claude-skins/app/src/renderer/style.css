@@ -1,5 +1,7 @@
 @font-face { font-family: 'Pixelify'; src: url('fonts/pixelify-sans.woff2') format('woff2'); font-weight: 400 700; }
 @font-face { font-family: 'Bastarda'; src: url('fonts/jacquarda-bastarda-9.woff2') format('woff2'); }
+/* Per il codice: a pixel e monospaziato, con cifre chiare (in Pixelify il 5 sembra una S e le colonne non si allineano) */
+@font-face { font-family: 'VT323'; src: url('fonts/vt323.woff2') format('woff2'); }
 
 /* Il foglio comune a tutti i temi: variabili, voci della conversazione (domande, risposte, azioni, permessi),
    pulsanti, righe delle cronache, barre di scorrimento. La forma della finestra no: quella sta nel layout e nel
@@ -10,7 +12,7 @@
    linea di body e quindi vincono su queste. Stanno su body e non su :root perché le variabili composte (--strong ecc.)
    si calcolano dove sono dichiarate: così usano i colori del tema */
 body {
-  --font-body: 'Pixelify', monospace; --font-display: 'Bastarda', serif;
+  --font-body: 'Pixelify', monospace; --font-display: 'Bastarda', serif; --font-code: 'VT323', monospace;
   --ink: #e8d9b5; --ink-soft: #a8946a; --gold: #d4a338; --gold-light: #ffe7a0; --gold-dark: #7a5418; --red: #e0663a;
   --edge: #1c160d; --edge-light: #5a4526; --field: rgba(0, 0, 0, 0.28); --code: rgba(0, 0, 0, 0.3);
   /* Testi in evidenza: grassetto, titolo della domanda, cronaca aperta */
@@ -24,11 +26,15 @@ body {
   --ctl-bg: #3d2e18; --ctl-hover: #5a4526; --ctl-light: #7a5f35; --ctl-dark: #1c160d; --ctl-ink: #ffe7a0;
   /* La riga sotto il rotolo, sopra le finestre degli altri programmi */
   --bar-ink: var(--gold); --bar-hover: var(--gold-light); --bar-shadow: rgba(0, 0, 0, 0.7);
+  /* Le modifiche ai file: righe aggiunte e tolte, e i loro conti */
+  --add-bg: rgba(120, 170, 70, 0.2); --add-ink: var(--ink); --del-bg: rgba(210, 80, 50, 0.2); --del-ink: var(--ink);
+  --plus: #8fbf5a; --minus: var(--red);
 }
 body.giorno {
   --ink: #3a2a18; --ink-soft: #7b6343; --gold: #9a6a1a; --gold-light: #c8963a; --red: #a0381a;
   --edge: #a8783f; --edge-light: #c8a462; --field: rgba(255, 255, 255, 0.35); --code: rgba(120, 90, 30, 0.15);
   --strong: var(--gold); --initial-ink: #ffe7a0; --initial-bg: #5a4526;
+  --add-bg: rgba(80, 140, 40, 0.18); --del-bg: rgba(190, 60, 30, 0.16); --plus: #3f6a2e;
 }
 
 * { box-sizing: border-box; }
@@ -75,9 +81,9 @@ button { font-family: inherit; }
   color: var(--initial-ink); background: var(--initial-bg);
   box-shadow: inset 0 0 0 3px var(--gold), inset 0 0 0 6px var(--initial-bg);
 }
-.text code { font-family: var(--font-body); background: var(--code); padding: 0 4px; }
-.text pre { background: var(--code); padding: 8px 10px; overflow-x: auto; font-size: 14px; box-shadow: inset 3px 0 0 var(--gold); }
-.text pre code { background: none; padding: 0; }
+.text code { font-family: var(--font-code); font-size: 1.2em; line-height: 1; background: var(--code); padding: 0 4px; }
+.text pre { background: var(--code); padding: 8px 10px; overflow-x: auto; font-size: 15px; box-shadow: inset 3px 0 0 var(--gold); }
+.text pre code { background: none; padding: 0; line-height: 1.25; }
 .text ul, .text ol { margin: 0 0 8px 20px; padding: 0; }
 .text h3 { font-family: var(--font-display); font-weight: normal; font-size: 27px; color: var(--gold); margin: 10px 0 4px; }
 .text b { color: var(--strong); font-weight: 600; }
@@ -91,11 +97,36 @@ button { font-family: inherit; }
 .footnote { font-size: 13px; color: var(--ink-soft); text-align: right; margin: -8px 0 16px; }
 .error { color: var(--red); white-space: pre-wrap; margin: 0 0 14px; }
 
+/* Le modifiche ai file: il conto nella riga dello strumento (un clic chiude e riapre), le differenze sotto */
+.tool.has-change { cursor: pointer; }
+.tool .counts { flex: none; font-size: 12px; }
+.tool .counts .plus { color: var(--plus); }
+.tool .counts .minus { color: var(--minus); }
+.change { margin: 2px 0 12px 32px; }
+.diff { background: var(--code); box-shadow: inset 3px 0 0 var(--edge-light); user-select: text; }
+.diff-note { font-size: 12px; color: var(--ink-soft); padding: 5px 10px 0; }
+.diff-body { overflow-x: auto; padding: 5px 0; }
+.dl { display: flex; min-width: max-content; white-space: pre; font-family: var(--font-code); font-size: 19px; line-height: 1.1; tab-size: 4; }
+.dl .ln { flex: none; width: 5ch; padding-right: 8px; text-align: right; color: var(--ink-soft); opacity: 0.7; user-select: none; }
+.dl .sg { flex: none; width: 2ch; user-select: none; }
+.dl .tx { padding-right: 10px; }
+.dl.add { background: var(--add-bg); color: var(--add-ink); }
+.dl.add .sg { color: var(--plus); }
+.dl.del { background: var(--del-bg); color: var(--del-ink); }
+.dl.del .sg { color: var(--minus); }
+.dl.ctx { color: var(--ink-soft); }
+.dl.gap { color: var(--ink-soft); opacity: 0.75; }
+.dl.sep { height: 0; margin: 4px 0; box-shadow: 0 -1px 0 var(--edge-light); }
+.diff:not(.open) .dl.more { display: none; }
+.diff-more { display: block; width: 100%; border: none; background: none; cursor: pointer; color: var(--gold); font-size: 12px; text-align: left; padding: 2px 10px 6px; }
+.diff-more:hover { color: var(--strong); }
+.ask .diff { margin-bottom: 10px; }
+
 /* La domanda di permesso: un riquadro a gradino con i tre pulsanti */
 .ask { margin: 6px 0 16px; padding: 10px 12px; background: var(--code); box-shadow: inset 3px 3px 0 var(--gold), inset -3px -3px 0 var(--edge); }
 .ask .ask-title { color: var(--strong); margin-bottom: 4px; }
 .ask .ask-desc { font-size: 14px; color: var(--ink-soft); margin-bottom: 6px; }
-.ask .ask-detail { font-size: 14px; background: var(--code); padding: 4px 6px; margin-bottom: 8px; word-break: break-all; }
+.ask .ask-detail { font-family: var(--font-code); font-size: 18px; background: var(--code); padding: 4px 6px; margin-bottom: 8px; word-break: break-all; }
 .ask .ask-buttons { display: flex; gap: 12px; margin: 4px 0 2px 3px; }
 .ask .ask-outcome { font-size: 14px; color: var(--ink-soft); }
 

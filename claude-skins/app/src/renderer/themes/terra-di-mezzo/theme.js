@@ -91,6 +91,9 @@
     notte: 'stelle',
     giorno: 'Contea',
     newChapter: 'Nuovo capitolo',
+    diffMore: 'Sfoglia altre {n} righe',
+    diffLess: 'Richiudi',
+    diffNew: 'Pagina nuova.',
     gripTip: 'Trascina per allargare o allungare il libro',
   },
 

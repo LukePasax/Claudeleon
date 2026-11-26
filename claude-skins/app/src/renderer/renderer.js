@@ -187,6 +187,76 @@
     api.setTrayIcon(Theming.trayIcon(Theming.palette('notte')))
   }
 
+  // ------------------------------------------------------------------ modifiche ai file
+
+  // Quante righe di una modifica si vedono subito; le altre dietro "mostra altre N righe"
+  const DIFF_LIMIT = 16
+
+  // Il riquadro delle differenze di una modifica (change dal messaggero: { file, created, whole, tooBig, hunks }).
+  // Restituisce il riquadro e il conto delle righe aggiunte e tolte
+  function changeView(change) {
+    const box = document.createElement('div')
+    box.className = 'diff'
+    const notes = []
+    if (change.created) notes.push('diffNew')
+    if (change.whole) notes.push('diffWhole')
+    if (change.hunks.some((h) => h.all)) notes.push('diffAll')
+    if (change.tooBig) notes.push('diffTooBig')
+    for (const key of notes) {
+      const n = document.createElement('div')
+      n.className = 'diff-note'
+      box.appendChild(label(n, key))
+    }
+    let added = 0
+    let removed = 0
+    const body = document.createElement('div')
+    body.className = 'diff-body'
+    let count = 0
+    const line = (cls, ln, sign, text) => {
+      const d = document.createElement('div')
+      d.className = `dl ${cls}${count >= DIFF_LIMIT ? ' more' : ''}`
+      d.innerHTML = '<span class="ln"></span><span class="sg"></span><span class="tx"></span>'
+      d.children[0].textContent = ln
+      d.children[1].textContent = sign
+      d.children[2].textContent = text
+      body.appendChild(d)
+      count++
+      return d
+    }
+    change.hunks.forEach((h, i) => {
+      const ops = Diff.lines(h.before, h.after)
+      const st = Diff.stats(ops)
+      added += st.added
+      removed += st.removed
+      const off = h.line ? h.line - 1 : null
+      if (i > 0) line('sep', '', '', '')
+      for (const op of Diff.hunks(ops)) {
+        if (op.t === 'gap') { label(line('gap', '', '', '').children[2], 'diffGap', { n: op.count }); continue }
+        const n = off == null ? '' : String((op.t === '-' ? op.a : op.b) + off)
+        line(op.t === '+' ? 'add' : op.t === '-' ? 'del' : 'ctx', n, op.t === ' ' ? '' : op.t === '-' ? '−' : '+', op.text)
+      }
+    })
+    if (!change.tooBig && !count) {
+      const n = document.createElement('div')
+      n.className = 'diff-note'
+      box.appendChild(label(n, 'diffSame'))
+    }
+    if (count) box.appendChild(body)
+    if (count > DIFF_LIMIT) {
+      const more = document.createElement('button')
+      more.className = 'diff-more'
+      const hiddenLines = count - DIFF_LIMIT
+      label(more, 'diffMore', { n: hiddenLines })
+      more.addEventListener('click', () => {
+        const open = box.classList.toggle('open')
+        if (open) label(more, 'diffLess')
+        else label(more, 'diffMore', { n: hiddenLines })
+      })
+      box.appendChild(more)
+    }
+    return { box, added, removed }
+  }
+
   // ------------------------------------------------------------------ conversazione
 
   function startReply() {
@@ -227,7 +297,7 @@
     r.raw += d
     if (!pending) { pending = true; requestAnimationFrame(renderReply) }
   })
-  api.onTool(({ id, name, summary }) => {
+  api.onTool(({ id, name, summary, change }) => {
     renderReply()
     reply = null
     const craft = craftOf(name)
@@ -235,6 +305,22 @@
     row.dataset.craft = craft
     row.querySelector('img').src = Theming.icon(craft, Theming.palette(scene))
     tools.set(id, row)
+    // Le modifiche ai file: il conto delle righe nella riga dello strumento, le differenze sotto; un clic sulla
+    // riga le chiude e le riapre
+    if (change) {
+      const view = changeView(change)
+      if (view.added || view.removed) {
+        const counts = document.createElement('span')
+        counts.className = 'counts'
+        counts.innerHTML = `<span class="plus">+${view.added}</span> <span class="minus">−${view.removed}</span>`
+        row.insertBefore(counts, row.querySelector('.what').nextSibling)
+      }
+      const item = add('change', '')
+      item.appendChild(view.box)
+      row.classList.add('has-change')
+      row.addEventListener('click', () => { item.hidden = !item.hidden })
+      scrollDown()
+    }
   })
   api.onToolDone(({ id, error }) => {
     const row = tools.get(id)
@@ -297,7 +383,7 @@
 
   const asks = new Map()
 
-  api.onAsk(({ id, title, description, detail, canAlways }) => {
+  api.onAsk(({ id, title, description, detail, change, canAlways }) => {
     renderReply()
     reply = null
     const card = add('ask', '<div class="ask-title"></div><div class="ask-desc"></div><div class="ask-detail"></div><div class="ask-buttons"></div>')
@@ -306,6 +392,9 @@
     card.querySelector('.ask-detail').textContent = detail
     if (!description) card.querySelector('.ask-desc').remove()
     if (!detail) card.querySelector('.ask-detail').remove()
+    // Per una modifica a un file, la domanda mostra che cosa cambierà
+    if (change) card.insertBefore(changeView(change).box, card.querySelector('.ask-buttons'))
+    scrollDown()
     const buttons = card.querySelector('.ask-buttons')
     const choice = (key, cls, allow, always, outcome) => {
       const b = document.createElement('button')
@@ -503,6 +592,21 @@
 
   // ------------------------------------------------------------------ anteprima senza Electron
 
+  // Due modifiche finte per l'anteprima: un Edit con il suo contesto e un file nuovo lungo
+  const FAKE_EDIT = {
+    file: 'src/MapView.cpp',
+    hunks: [{
+      line: 41,
+      before: 'void MapView::Draw()\n{\n    DrawTerrain();\n    DrawRoads();\n}',
+      after: 'void MapView::Draw()\n{\n    DrawTerrain();\n    DrawRivers();\n    DrawRoads(m_showPaths);\n}',
+    }],
+  }
+  const FAKE_WRITE = {
+    file: 'src/RouteFinder.h',
+    created: true,
+    hunks: [{ line: 1, before: '', after: ['#pragma once', '', '#include <vector>', '', 'class RouteFinder', '{', 'public:', '    explicit RouteFinder(const Map& map);', '', '    // Il sentiero più breve fra due punti, o vuoto', '    std::vector<Point> FindPath(Point start, Point goal) const;', '', 'private:', '    const Map& m_map;', '    float Cost(Point a, Point b) const;', '    float Heuristic(Point a, Point b) const;', '    bool Walkable(Point p) const;', '};', ''].join('\n') }],
+  }
+
   function fakeApi() {
     const handlers = {}
     const on = (name) => (cb) => { handlers[name] = cb }
@@ -532,11 +636,13 @@
       newChapter: async () => ++n,
       send(text) {
         fire('onTool', { id: 't1', name: 'Read', summary: 'src/MapView.cpp' }, 300)
-        fire('onToolDone', { id: 't1', error: false }, 700)
+        fire('onToolDone', { id: 't1', error: false }, 500)
+        fire('onTool', { id: 't2', name: 'Edit', summary: 'src/MapView.cpp', change: FAKE_EDIT }, 600)
+        fire('onToolDone', { id: 't2', error: false }, 800)
         const answer = `Ecco quanto mi chiedi: "${text}".\n\nLa risposta arriva a pezzi, come in una vera conversazione, con **grassetto** e \`codice\`.`
         ;[...answer].forEach((ch, i) => fire('onDelta', ch, 900 + i * 15))
         fire('onDone', { durationMs: 2400 }, 900 + answer.length * 15 + 100)
-        fire('onAsk', { id: 1, title: 'Claude vuole eseguire un comando', description: 'Il comando scrive fuori dalla cartella di lavoro.', detail: 'git push origin feature/sentieri', canAlways: true }, 900 + answer.length * 15 + 200)
+        fire('onAsk', { id: 1, title: 'Claude vuole creare un file', description: '', detail: 'src/RouteFinder.h', change: FAKE_WRITE, canAlways: true }, 900 + answer.length * 15 + 200)
       },
       onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'),
     }
