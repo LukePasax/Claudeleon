@@ -35,6 +35,11 @@ npm 11 altrimenti non arriva.
   `%USERPROFILE%\.local\bin\claude.exe`, con il prompt di sistema di Claude Code più la "personalità" del tema (lo
   scriba di Gran Burrone per Terra di Mezzo, il cronista per Pergamena). Gli hook dell'utente sono spenti per queste
   conversazioni.
+- **Comandi con `/`:** scrivendo `/` all'inizio della penna si apre l'elenco dei comandi di Claude Code, comprese
+  le tue skill, i plugin e i comandi del progetto (con la tacca verde). Si filtra scrivendo; frecce per scegliere,
+  Tab o Invio per completare, Invio di nuovo per spedire, Esc per chiudere. I comandi locali come `/usage` e
+  `/context` rispondono in un riquadro a parte; `/compact` lascia una nota con i token prima e dopo; `/clear` (o
+  `/new`) apre un nuovo capitolo. L'elenco si aggiorna a ogni avvio senza spedire messaggi, e resta in cache.
 - **Risposte:** markdown completo (titoli, elenchi annidati, tabelle, citazioni, caselle, codice). I link si aprono
   nel browser di sistema, mai dentro la finestra; le immagini restano link.
 - **Modifiche ai file:** quando Claude usa `Edit`, `MultiEdit` o `Write`, sotto la riga dello strumento compare il

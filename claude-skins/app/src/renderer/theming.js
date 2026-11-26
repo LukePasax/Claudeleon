@@ -9,7 +9,7 @@
     title: 'Pergamena',
     chapter: 'Capitolo',
     placeholder: 'Intingi la penna e scrivi...',
-    hint: 'Invio spedisce, Maiusc+Invio va a capo',
+    hint: 'Invio spedisce, Maiusc+Invio va a capo, / per i comandi',
     busyHint: 'Il messaggero è in viaggio...',
     send: 'Spedisci',
     stop: 'Ferma',
@@ -26,6 +26,13 @@
     grantedAlways: 'Permesso concesso, anche per le prossime volte.',
     denied: 'Permesso negato.',
     cancelled: 'Richiesta annullata.',
+    // I comandi con /
+    cmdNone: 'Nessun comando con questo nome.',
+    cmdLoading: 'Chiedo i comandi a Claude Code...',
+    cmdUnavailable: 'Claude Code non ha dato l\'elenco dei comandi; si possono scrivere lo stesso.',
+    cmdCompacting: 'Riassumo la conversazione...',
+    cmdCompacted: 'Conversazione riassunta: da {pre} a {post} token.',
+    cmdCompactedShort: 'Conversazione riassunta.',
     // Il modo dei permessi
     modesLabel: 'Permessi:',
     modeAuto: 'automatico',

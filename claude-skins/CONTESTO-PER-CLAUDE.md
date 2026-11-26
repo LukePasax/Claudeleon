@@ -118,6 +118,14 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
   torna un elenco vuoto senza errore.
 - **Permessi in modo `auto`:** il classificatore approva da solo le azioni chiare, quindi la domanda nella finestra
   compare di rado. Per provarla, il modo "chiedi sempre" dal selettore sopra la penna.
+- **Comandi con `/`:** si eseguono spedendo il testo `/nome argomenti` come prompt. L'elenco viene da
+  `Query.supportedCommands()` (nome, descrizione, `argumentHint`, alias, `builtin`), aggiornato dai messaggi
+  `system` `commands_changed`; quelli di `terminal_slash_commands` (nel messaggio `init`) non si offrono. Per averlo
+  prima del primo messaggio, `loadCommands()` avvia una query con un prompt in streaming che non manda mai nulla,
+  chiede i comandi e chiude: nessun costo. Cache in `commands.json` accanto a `config.json`. I comandi locali
+  rispondono con `system` `local_command_output` (o con `<local-command-stdout>` in un messaggio utente, o solo nel
+  `result`): il messaggero li gira come `commandOutput`. `/compact` manda `compact_boundary` e lo stato
+  `compacting`. `/clear` e `/new` li intercetta la pagina: nuovo capitolo.
 - **Modi dei permessi:** `setPermissionMode()` sulla `Query` li cambia a risposta in corso; i messaggi `system`
   `init` e `status` portano `permissionMode`, e il messaggero ci si allinea (`setMode(mode, true)`). Il modo piano
   finisce con lo strumento `ExitPlanMode`, che passa da `canUseTool`: il piano è in `input.plan` (o in un file,
@@ -150,7 +158,8 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
    capitolo.
 3. ~~**Scelta del modo dei permessi**~~: fatto (selettore sopra la penna, scheda del piano). Resta l'interruzione
    più fine (fermare un solo strumento, non tutta la risposta).
-4. **Comandi con `/`, skill e plugin**: il motore li carica già; servono un modo di scriverli e di mostrarne l'esito.
+4. ~~**Comandi con `/`, skill e plugin**~~: fatto (menu sopra la penna, uscita dei comandi locali). Resta da provare
+   con i comandi veri su Windows quali escono come testo e quali come risposta di Claude.
 5. **Un personaggio** in pixel art accanto al rotolo (lo sprite si disegna come le icone, a griglia), che reagisce
    al mouse e a cosa sta facendo Claude. Per la Terra di Mezzo, uno stregone grigio o un hobbit con lo zaino.
 6. **Suoni** (penna che scrive, sigillo) e la mappa del viaggio che avanza a ogni conversazione.

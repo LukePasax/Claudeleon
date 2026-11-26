@@ -176,10 +176,133 @@
   }
   api.onMode((m) => { mode = m; renderModes() })
 
+  // ------------------------------------------------------------------ comandi con /
+
+  // L'elenco viene da Claude Code (skill, plugin, comandi del progetto e i suoi): all'avvio dalla cache, poi
+  // aggiornato. Scrivendo / all'inizio della penna si apre il menu sopra di essa
+  let commands = []
+  const menu = { el: null, items: [], index: 0 }
+  // Se Claude Code non risponde (non installato, senza login) il menu lo dice invece di aspettare per sempre
+  let commandsFailed = false
+  api.onCommands((list) => { commands = list || []; commandsFailed = false; if (menu.el) updateMenu() })
+  api.onCommandsError(() => { commandsFailed = true; if (menu.el) updateMenu() })
+
+  // Il nome che si sta scrivendo, se la penna comincia con / e il cursore è ancora sul nome
+  function typedCommand() {
+    const input = part('input')
+    if (!input) return null
+    const m = /^\/([^\s]*)$/.exec(input.value.slice(0, input.selectionStart))
+    return m && !/\s/.test(input.value.slice(0, input.selectionStart)) ? m[1].toLowerCase() : null
+  }
+
+  // Prima i comandi il cui nome comincia con quello scritto, poi quelli che lo contengono nel nome o nella descrizione
+  function matchCommands(q) {
+    const names = (c) => [c.name, ...(c.aliases || [])].map((n) => n.toLowerCase())
+    const starts = commands.filter((c) => names(c).some((n) => n.startsWith(q)))
+    const contains = commands.filter((c) => !starts.includes(c) && (names(c).some((n) => n.includes(q)) || c.description.toLowerCase().includes(q)))
+    return [...starts.sort((a, b) => a.name.localeCompare(b.name)), ...contains].slice(0, 50)
+  }
+
+  function updateMenu() {
+    const q = typedCommand()
+    if (q == null) return closeMenu()
+    const input = part('input')
+    if (!menu.el || !menu.el.isConnected) {
+      menu.el = document.createElement('div')
+      menu.el.className = 'cmd-menu'
+      const host = input.parentElement
+      if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+      host.appendChild(menu.el)
+    }
+    // Sopra la penna, largo come lei
+    menu.el.style.left = `${input.offsetLeft}px`
+    menu.el.style.width = `${input.offsetWidth}px`
+    menu.el.style.bottom = `${input.offsetParent === menu.el.offsetParent ? menu.el.parentElement.clientHeight - input.offsetTop + 6 : 6}px`
+    menu.items = matchCommands(q)
+    menu.index = Math.min(menu.index, Math.max(0, menu.items.length - 1))
+    menu.el.innerHTML = ''
+    if (!menu.items.length) {
+      const empty = document.createElement('div')
+      empty.className = 'cmd-empty'
+      menu.el.appendChild(label(empty, commands.length ? 'cmdNone' : commandsFailed ? 'cmdUnavailable' : 'cmdLoading'))
+      return
+    }
+    menu.items.forEach((c, i) => {
+      const row = document.createElement('div')
+      row.className = 'cmd' + (i === menu.index ? ' active' : '')
+      row.innerHTML = '<span class="cmd-name"></span><span class="cmd-args"></span><span class="cmd-desc"></span>'
+      row.children[0].textContent = `/${c.name}`
+      row.children[1].textContent = c.argumentHint
+      row.children[2].textContent = c.description
+      if (!c.builtin) row.classList.add('custom')
+      row.addEventListener('mousedown', (e) => { e.preventDefault(); completeCommand(c) })
+      menu.el.appendChild(row)
+    })
+    menu.el.children[menu.index]?.scrollIntoView({ block: 'nearest' })
+  }
+
+  function closeMenu() {
+    if (menu.el) menu.el.remove()
+    menu.el = null
+    menu.items = []
+    menu.index = 0
+  }
+
+  // Completa il nome nella penna, con uno spazio per gli argomenti
+  function completeCommand(c) {
+    const input = part('input')
+    const rest = input.value.slice(input.selectionStart).replace(/^\S*/, '')
+    input.value = `/${c.name} ${rest.trimStart()}`
+    const pos = c.name.length + 2
+    input.setSelectionRange(pos, pos)
+    input.focus()
+    closeMenu()
+  }
+
+  // I tasti del menu: frecce per scegliere, Tab o Invio per completare, Esc per chiudere. Invio su un nome già
+  // scritto per intero spedisce il comando
+  function menuKey(e) {
+    if (!menu.el || !menu.items.length) {
+      if (e.key === 'Escape' && menu.el) { closeMenu(); return true }
+      return false
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      menu.index = (menu.index + (e.key === 'ArrowDown' ? 1 : -1) + menu.items.length) % menu.items.length
+      updateMenu()
+      return true
+    }
+    if (e.key === 'Escape') { closeMenu(); return true }
+    if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+      const c = menu.items[menu.index]
+      if (e.key === 'Enter' && typedCommand() === c.name.toLowerCase()) { closeMenu(); return false }
+      completeCommand(c)
+      return true
+    }
+    return false
+  }
+
+  // L'uscita di un comando locale (/usage, /context...): un riquadro a parte, nel carattere del codice
+  api.onCommandOutput((text) => {
+    renderReply()
+    reply = null
+    if (!text) return
+    const box = add('cmd-output', '')
+    box.textContent = text
+  })
+  api.onCompacted(({ pre, post }) => {
+    // Il punto delle migliaia sempre, anche sotto i 10.000 (toLocaleString in italiano lo toglie)
+    const n = (x) => String(x).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+    labelled('footnote', post ? 'cmdCompacted' : 'cmdCompactedShort', { pre: n(pre), post: n(post) })
+  })
+  api.onStatus((st) => {
+    for (const el of all('[data-part="hint"]')) el.textContent = t(st === 'compacting' ? 'cmdCompacting' : busy ? 'busyHint' : 'hint')
+  })
+
   // ------------------------------------------------------------------ il layout del tema
 
   // Monta il tema: il suo HTML prende il posto del precedente, la conversazione, la bozza e lo stato passano al nuovo
   async function mount(id) {
+    closeMenu()
     const items = [...all('[data-part="log"] > .item')]
     const draft = part('input') ? part('input').value : ''
     const theme = await Theming.use(id)
@@ -294,6 +417,9 @@
     const input = part('input')
     const text = input ? input.value.trim() : ''
     if (!text || busy) return
+    closeMenu()
+    // /clear e /new: un nuovo capitolo, come il pulsante
+    if (/^\/(clear|new)\s*$/i.test(text)) { input.value = ''; newChapter(); return }
     input.value = ''
     reply = null
     entry('you').querySelector('.text').textContent = text
@@ -574,8 +700,14 @@
     if (b && app.contains(b) && actions[b.dataset.action]) actions[b.dataset.action](e)
   })
   document.addEventListener('keydown', (e) => {
-    if (e.target.matches('[data-part="input"]') && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
+    if (!e.target.matches('[data-part="input"]')) return
+    if (menuKey(e)) { e.preventDefault(); return }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
   })
+  // Il menu dei comandi segue quello che si scrive e dove sta il cursore
+  document.addEventListener('input', (e) => { if (e.target.matches('[data-part="input"]')) updateMenu() })
+  document.addEventListener('keyup', (e) => { if (e.target.matches('[data-part="input"]') && /^(ArrowLeft|ArrowRight|Home|End)$/.test(e.key)) updateMenu() })
+  document.addEventListener('focusout', (e) => { if (e.target.matches('[data-part="input"]')) setTimeout(closeMenu, 100) })
   api.onReset(newChapter)
   // Il tema scelto dal vassoio: si rimonta sul posto, la conversazione resta
   api.onTheme((id) => mount(id))
@@ -626,6 +758,8 @@
     workdir = info.workdir || ''
     chapter = info.chapter || 1
     mode = info.mode || 'auto'
+    // I comandi della cache; l'elenco aggiornato arriva poi da onCommands
+    api.commands().then((list) => { if (!commands.length) commands = list || [] }).catch(() => {})
     await Theming.load(info.themes || [])
     await mount(info.theme)
     if (part('input')) part('input').focus()
@@ -647,6 +781,18 @@
     created: true,
     hunks: [{ line: 1, before: '', after: ['#pragma once', '', '#include <vector>', '', 'class RouteFinder', '{', 'public:', '    explicit RouteFinder(const Map& map);', '', '    // Il sentiero più breve fra due punti, o vuoto', '    std::vector<Point> FindPath(Point start, Point goal) const;', '', 'private:', '    const Map& m_map;', '    float Cost(Point a, Point b) const;', '    float Heuristic(Point a, Point b) const;', '    bool Walkable(Point p) const;', '};', ''].join('\n') }],
   }
+
+  // Comandi finti per l'anteprima
+  const FAKE_COMMANDS = [
+    { name: 'compact', description: 'Riassume la conversazione per liberare contesto', argumentHint: '[istruzioni]', builtin: true },
+    { name: 'context', description: 'Mostra quanto contesto è in uso', argumentHint: '', builtin: true },
+    { name: 'init', description: 'Crea un CLAUDE.md con la documentazione del progetto', argumentHint: '', builtin: true },
+    { name: 'review', description: 'Rivede una pull request', argumentHint: '[numero]', builtin: true },
+    { name: 'usage', description: 'Mostra uso e costi della sessione', argumentHint: '', aliases: ['cost'], builtin: true },
+    { name: 'archivio-personale-drive', description: 'Classifica e carica documenti personali su Google Drive', argumentHint: '', builtin: false },
+    { name: 'catalogo-to-excel', description: 'Converte cataloghi PDF di ricambi in Excel', argumentHint: '<file.pdf>', builtin: false },
+    { name: 'deploy', description: 'Comando del progetto: compila e pubblica', argumentHint: '<ambiente>', builtin: false },
+  ]
 
   // Una risposta finta che usa tutto il markdown
   const FAKE_ANSWER = [
@@ -701,6 +847,7 @@
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
       setMode: (m) => fire('onMode', m, 0),
       openLink: (url) => window.open(url, '_blank', 'noopener'),
+      commands: async () => FAKE_COMMANDS,
       sessions: async () => [
         { id: 's1', title: 'Temi per la Pergamena', lastModified: Date.now() - 3600000 },
         { id: 's2', title: 'Il calcolo dei sentieri in RouteFinder', lastModified: Date.now() - day },
@@ -711,6 +858,14 @@
       onAsk: on('onAsk'), onAskClosed: on('onAskClosed'),
       newChapter: async () => ++n,
       send(text) {
+        if (text.startsWith('/')) {
+          // I comandi finti: uno locale con la sua uscita, gli altri come una risposta
+          if (/^\/usage/.test(text)) fire('onCommandOutput', 'Sessione corrente\n  Token in ingresso   12.408\n  Token in uscita     3.215\n  Costo stimato       0,21 $', 400)
+          else if (/^\/compact/.test(text)) fire('onCompacted', { pre: 48210, post: 6120 }, 600)
+          else fire('onDelta', `Eseguo ${text.split(' ')[0]}.`, 400)
+          fire('onDone', { durationMs: 900 }, 800)
+          return
+        }
         fire('onTool', { id: 't1', name: 'Read', summary: 'src/MapView.cpp' }, 300)
         fire('onToolDone', { id: 't1', error: false }, 500)
         fire('onTool', { id: 't2', name: 'Edit', summary: 'src/MapView.cpp', change: FAKE_EDIT }, 600)
@@ -720,7 +875,7 @@
         fire('onDone', { durationMs: 2400 }, 900 + answer.length * 15 + 100)
         fire('onAsk', { id: 1, title: 'Claude vuole creare un file', description: '', detail: 'src/RouteFinder.h', change: FAKE_WRITE, canAlways: true }, 900 + answer.length * 15 + 200)
       },
-      onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'), onMode: on('onMode'),
+      onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'), onMode: on('onMode'), onCommands: on('onCommands'), onCommandsError: on('onCommandsError'), onCommandOutput: on('onCommandOutput'), onCompacted: on('onCompacted'), onStatus: on('onStatus'),
     }
   }
 })()

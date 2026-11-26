@@ -153,6 +153,27 @@ button { font-family: inherit; }
 .diff-more:hover { color: var(--strong); }
 .ask .diff { margin-bottom: 10px; }
 
+/* Il menu dei comandi con /, sopra la penna: nome d'oro, argomenti, descrizione; i comandi propri (skill, plugin,
+   progetto) con una tacca verde */
+.cmd-menu {
+  position: absolute; z-index: 5; max-height: 280px; overflow-y: auto; padding: 4px 0;
+  background: var(--edge); color: var(--ink); box-shadow: inset 0 0 0 3px var(--gold-dark), 0 4px 0 rgba(0, 0, 0, 0.35);
+}
+body.giorno .cmd-menu { background: #f4e6c0; }
+.cmd { display: flex; align-items: baseline; gap: 8px; padding: 3px 12px; cursor: pointer; white-space: nowrap; }
+.cmd.active { background: var(--code); box-shadow: inset 3px 0 0 var(--gold); }
+.cmd.custom .cmd-name::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 6px; background: var(--plus); vertical-align: 2px; }
+.cmd-name { font-family: var(--font-code); font-size: 19px; color: var(--gold); flex: none; }
+.cmd.active .cmd-name { color: var(--strong); }
+.cmd-args { font-family: var(--font-code); font-size: 17px; color: var(--ink-soft); flex: none; }
+.cmd-desc { font-size: 13px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.cmd-empty { padding: 4px 12px; font-size: 13px; color: var(--ink-soft); }
+/* L'uscita di un comando locale */
+.cmd-output {
+  margin: 0 0 14px; padding: 8px 12px; white-space: pre-wrap; font-family: var(--font-code); font-size: 18px; line-height: 1.15;
+  background: var(--code); box-shadow: inset 3px 0 0 var(--gold-dark); user-select: text;
+}
+
 /* Il modo dei permessi: l'etichetta e un pulsante per modo, quello attivo d'oro */
 .modes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-bottom: 8px; }
 .modes-label { color: var(--ink-soft); margin-right: 2px; }

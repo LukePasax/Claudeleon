@@ -44,6 +44,19 @@ function planText(input) {
   return ''
 }
 
+// L'uscita di un comando locale (/usage, /context...) può avere i colori del terminale: via
+function plainOutput(text) {
+  return String(text || '').replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, '').replace(/\r\n?/g, '\n').trim()
+}
+
+// Il testo di <local-command-stdout> in un messaggio, se c'è (così alcune versioni restituiscono l'uscita dei comandi)
+function localStdout(message) {
+  const content = message && message.content
+  const text = typeof content === 'string' ? content : Array.isArray(content) ? content.filter((b) => b && b.type === 'text').map((b) => b.text).join('\n') : ''
+  const m = /<local-command-stdout>([\s\S]*?)<\/local-command-stdout>/.exec(text)
+  return m ? m[1] : null
+}
+
 // Oltre questa misura (prima o dopo) una modifica non si mostra riga per riga: basterebbe a bloccare la finestra
 const MAX_CHANGE = 400 * 1024
 
@@ -90,6 +103,43 @@ class ClaudeBridge extends EventEmitter {
     this.beforePlan = null
     // Le domande che sono piani da approvare: id → input di ExitPlanMode
     this.plans = new Map()
+    // I comandi con / di questa cartella (di Claude Code, skill, plugin, progetto), e quelli che funzionano solo
+    // nel terminale, da non offrire
+    this.commandList = []
+    this.terminalOnly = new Set()
+  }
+
+  // Aggiorna l'elenco dei comandi e lo dice alla finestra
+  setCommands(list) {
+    if (!Array.isArray(list)) return
+    this.commandList = list
+      .filter((c) => c && c.name && !this.terminalOnly.has(c.name))
+      .map((c) => ({ name: c.name, description: c.description || '', argumentHint: c.argumentHint || '', aliases: c.aliases || [], builtin: !!c.builtin }))
+    this.emit('commands', this.commandList)
+  }
+
+  // Chiede i comandi a Claude Code senza spedire nessun messaggio (nessun costo): si avvia, risponde, si chiude.
+  // Serve all'avvio dell'app, prima del primo messaggio
+  loadCommands() {
+    if (this.commandsLoading) return this.commandsLoading
+    this.commandsLoading = (async () => {
+      const { query } = await loadSdk()
+      let release
+      const idle = new Promise((resolve) => { release = resolve })
+      async function* nothing() { await idle }
+      const q = query({
+        prompt: nothing(),
+        options: { cwd: this.workdir, pathToClaudeCodeExecutable: CLAUDE, permissionMode: this.mode, settings: { disableAllHooks: true } },
+      })
+      try {
+        const list = await Promise.race([q.supportedCommands(), new Promise((_, reject) => setTimeout(() => reject(new Error('tempo scaduto')), 60000))])
+        this.setCommands(list)
+      } finally {
+        release()
+        try { q.close() } catch {}
+      }
+    })().catch(() => { if (!this.commandList.length) this.emit('commandsError') }).finally(() => { this.commandsLoading = null })
+    return this.commandsLoading
   }
 
   // Cambia modo, anche mentre Claude lavora: vale da subito per la conversazione in corso
@@ -197,13 +247,23 @@ class ClaudeBridge extends EventEmitter {
         },
       })
       this.query = current
+      // L'elenco dei comandi di questa conversazione (può cambiare con la cartella e i plugin)
+      current.supportedCommands().then((list) => { if (this.query === current) this.setCommands(list) }).catch(() => {})
       let sawDelta = false
       let wroteText = false
+      let sawOutput = false
       for await (const msg of current) {
         if (this.query !== current) break
         if (msg.session_id) this.session.setSession(msg.session_id)
         // Claude Code dice in che modo è (all'inizio di ogni turno e quando cambia): la finestra si allinea
         if (msg.type === 'system' && (msg.subtype === 'init' || msg.subtype === 'status') && msg.permissionMode) this.setMode(msg.permissionMode, true)
+        if (msg.type === 'system') {
+          if (msg.subtype === 'init' && Array.isArray(msg.terminal_slash_commands)) this.terminalOnly = new Set(msg.terminal_slash_commands)
+          else if (msg.subtype === 'commands_changed') this.setCommands(msg.commands)
+          else if (msg.subtype === 'local_command_output') { sawOutput = true; this.emit('commandOutput', plainOutput(msg.content)) }
+          else if (msg.subtype === 'compact_boundary') this.emit('compacted', { pre: msg.compact_metadata?.pre_tokens || 0, post: msg.compact_metadata?.post_tokens || 0 })
+          else if (msg.subtype === 'status') this.emit('status', msg.status || null)
+        }
         if (msg.type === 'stream_event') {
           const ev = msg.event || {}
           if (ev.type === 'content_block_start' && ev.content_block?.type === 'text' && wroteText) {
@@ -223,12 +283,18 @@ class ClaudeBridge extends EventEmitter {
           }
           sawDelta = false
         } else if (msg.type === 'user') {
-          for (const block of msg.message?.content || []) {
+          const out = localStdout(msg.message)
+          if (out != null && !sawOutput) { sawOutput = true; this.emit('commandOutput', plainOutput(out)) }
+          for (const block of Array.isArray(msg.message?.content) ? msg.message.content : []) {
             if (block.type === 'tool_result') this.emit('toolDone', { id: block.tool_use_id, error: !!block.is_error })
           }
         } else if (msg.type === 'result') {
           if (msg.is_error || msg.subtype !== 'success') this.emit('error', msg.result || `Il messaggero si è fermato (${msg.subtype}).`)
-          else this.emit('done', { durationMs: msg.duration_ms || 0 })
+          else {
+            // Un comando che non ha fatto scrivere Claude né mandato un'uscita: il suo esito è nel risultato
+            if (!wroteText && !sawOutput && msg.result) this.emit('commandOutput', plainOutput(msg.result))
+            this.emit('done', { durationMs: msg.duration_ms || 0 })
+          }
         }
       }
     } catch (err) {

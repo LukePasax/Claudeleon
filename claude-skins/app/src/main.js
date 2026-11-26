@@ -259,6 +259,10 @@ function registerIpc() {
   ipcMain.on('chat:stop', () => bridge.cancel())
   ipcMain.on('perm:answer', (_e, { id, allow, always }) => bridge.answer(id, !!allow, !!always))
   ipcMain.handle('sessions:list', () => bridge.sessions())
+  ipcMain.handle('commands:get', () => {
+    if (bridge.commandList.length) return bridge.commandList
+    try { return JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'commands.json'), 'utf8')) } catch { return [] }
+  })
   // Apre una sessione di Claude Code, anche dell'app desktop: i messaggi dopo continuano quella
   ipcMain.handle('session:open', async (_e, id) => {
     bridge.cancel()
@@ -283,6 +287,15 @@ function registerIpc() {
   bridge.on('ask', (q) => { if (!win.isVisible()) win.show(); send('perm:ask', q) })
   bridge.on('askClosed', (q) => send('perm:closed', q))
   // Il modo cambia dalla finestra, dall'approvazione di un piano o da Claude Code stesso: si ricorda e si mostra
+  // I comandi con /: si ricordano su disco, così ci sono subito al prossimo avvio
+  bridge.on('commands', (list) => {
+    try { fs.writeFileSync(path.join(app.getPath('userData'), 'commands.json'), JSON.stringify(list)) } catch {}
+    send('commands:list', list)
+  })
+  bridge.on('commandsError', () => send('commands:error'))
+  bridge.on('commandOutput', (text) => send('claude:commandOutput', text))
+  bridge.on('compacted', (c) => send('claude:compacted', c))
+  bridge.on('status', (st) => send('claude:status', st))
   bridge.on('mode', (mode) => { config.permissionMode = mode; saveConfig(); send('mode:changed', mode) })
 }
 
@@ -362,6 +375,8 @@ app.whenReady().then(() => {
     return
   }
   globalShortcut.register(TOGGLE_SHORTCUT, toggleVisible)
+  // L'elenco aggiornato dei comandi, senza aspettare il primo messaggio (Claude Code si avvia e si chiude, nessun costo)
+  win.webContents.once('did-finish-load', () => setTimeout(() => bridge.loadCommands(), 1500))
 })
 
 app.on('will-quit', () => {
