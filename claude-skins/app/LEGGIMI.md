@@ -11,7 +11,7 @@ aggiungono come cartelle in `src/renderer/themes/`, ognuno con il proprio schele
 Serve Windows con [Node.js](https://nodejs.org) LTS e Claude Code installato a parte, con il login fatto
 (`irm https://claude.ai/install.ps1 | iex`, poi `claude` e `/login`).
 
-Basta fare doppio clic su `avvia.cmd`. La prima volta (e dopo ogni clone nuovo, perché `node_modules` non sta nel
+Basta fare doppio clic su `avvia.cmd`, qui o quello nella cartella principale del repo, che fa lo stesso. La prima volta (e dopo ogni clone nuovo, perché `node_modules` non sta nel
 repo) installa da sola le dipendenze ed Electron, in qualche minuto; le volte dopo parte subito.
 
 A mano: `npm install` nella cartella dell'app. Lo script `postinstall` scarica anche il binario di Electron, che con
