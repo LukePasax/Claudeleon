@@ -1,13 +1,15 @@
-// La pagina del rotolo: disegna la pixel art, mostra la conversazione e passa i messaggi al processo principale.
-// Scritte, colori e disegni vengono dal tema in uso (theming.js); cambiando tema si ridisegna tutto sul posto.
+// La pagina: monta il layout del tema in uso, mostra la conversazione e passa i messaggi al processo principale.
+// Il motore non conosce la forma della finestra: trova i pezzi che gli servono per attributo, ovunque il tema li
+// metta (data-part="log", data-action="send", data-drag, data-art...; elenco in themes/LEGGIMI.md). Gli eventi sono
+// delegati al documento, così un cambio di tema sostituisce tutto l'HTML senza perdere la conversazione.
 // Senza Electron (aperta in un browser) la chat risponde con un'eco finta, per guardare la grafica.
 (function () {
   const api = window.pergamena || fakeApi()
-  const $ = (id) => document.getElementById(id)
-  const log = $('log')
-  const input = $('input')
+  const app = document.getElementById('app')
   const t = Theming.t
   const MONTHS = Theming.MONTHS
+  const part = (name) => app.querySelector(`[data-part="${name}"]`)
+  const all = (sel) => app.querySelectorAll(sel)
 
   let scene = 'notte'
   let busy = false
@@ -15,6 +17,8 @@
   let pending = false
   let chapter = 1
   let workdir = ''
+  // La cronaca aperta, se c'è: { id, title, lastModified }
+  let currentSession = null
   const tools = new Map()
 
   function craftOf(tool) {
@@ -29,9 +33,9 @@
   }
 
   function roman(n) {
-    const t = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']]
+    const r = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']]
     let out = ''
-    for (const [v, s] of t) while (n >= v) { out += s; n -= v }
+    for (const [v, s] of r) while (n >= v) { out += s; n -= v }
     return out
   }
 
@@ -46,13 +50,13 @@
   }
   function markdown(src) {
     const out = []
-    src.replace(/\r/g, '').split(/\n?```/).forEach((part, i) => {
+    src.replace(/\r/g, '').split(/\n?```/).forEach((chunk, i) => {
       if (i % 2 === 1) {
-        const nl = part.indexOf('\n')
-        out.push('<pre><code>' + esc(nl >= 0 ? part.slice(nl + 1) : part) + '</code></pre>')
+        const nl = chunk.indexOf('\n')
+        out.push('<pre><code>' + esc(nl >= 0 ? chunk.slice(nl + 1) : chunk) + '</code></pre>')
         return
       }
-      for (const para of part.split(/\n{2,}/)) {
+      for (const para of chunk.split(/\n{2,}/)) {
         const lines = para.split('\n').filter((l) => l.trim() !== '')
         if (!lines.length) continue
         if (/^#{1,6} /.test(lines[0])) { out.push('<h3>' + inline(lines.shift().replace(/^#+ /, '')) + '</h3>') }
@@ -65,14 +69,23 @@
     return out.join('')
   }
 
-  function scrollDown() { log.scrollTop = log.scrollHeight }
+  // ------------------------------------------------------------------ la conversazione nel log
+
+  function scrollDown() { const l = part('log'); if (l) l.scrollTop = l.scrollHeight }
+
+  // Le voci della conversazione hanno la classe "item": sono le sole che si spostano da un layout all'altro e che
+  // un nuovo capitolo cancella (il resto del log, se il tema ci mette qualcosa, resta)
   function add(cls, html) {
     const d = document.createElement('div')
-    d.className = cls
+    d.className = `item ${cls}`
     d.innerHTML = html
-    log.appendChild(d)
+    part('log').appendChild(d)
     scrollDown()
     return d
+  }
+  function clearLog() {
+    for (const el of all('[data-part="log"] > .item')) el.remove()
+    tools.clear()
   }
 
   // Un elemento con una scritta del tema: la chiave resta nell'attributo, così al cambio di tema si riscrive
@@ -85,7 +98,6 @@
   function labelled(cls, key, vars) {
     return label(add(cls, ''), key, vars)
   }
-  // Una voce della conversazione: chi scrive (dal tema) e il testo
   function entry(who) {
     const d = add(`entry ${who}`, '<div class="who"></div><div class="text"></div>')
     label(d.querySelector('.who'), who === 'you' ? 'you' : 'claude')
@@ -97,20 +109,22 @@
     for (const el of document.querySelectorAll('[data-s-placeholder]')) el.placeholder = t(el.dataset.sPlaceholder)
     for (const el of document.querySelectorAll('[data-s-title]')) el.title = t(el.dataset.sTitle)
     for (const el of document.querySelectorAll('[data-status-key]')) el.dataset.status = t(el.dataset.statusKey)
-    $('hint').textContent = t(busy ? 'busyHint' : 'hint')
-    $('btn-scene').textContent = t(scene === 'notte' ? 'giorno' : 'notte')
+    // Il pulsante della scena porta il nome dell'altra
+    for (const el of all('[data-action="scene"]')) if (!el.children.length) el.textContent = t(scene === 'notte' ? 'giorno' : 'notte')
+    for (const el of all('[data-part="hint"]')) el.textContent = t(busy ? 'busyHint' : 'hint')
     document.title = t('title')
   }
 
-  // ------------------------------------------------------------------ pixel art e scena
+  // ------------------------------------------------------------------ disegni
 
-  // Copia un disegno a bassa risoluzione nel suo canvas; la misura a schermo la decide il CSS o, se cssSize, il disegno
-  function blit(target, drawn, cssSize) {
+  // Copia un disegno a bassa risoluzione nel suo canvas; la misura a schermo la decide il CSS, o il disegno stesso
+  // (× SCALE) con data-art-fit="natural"
+  function blit(target, drawn, natural) {
     if (target.width !== drawn.width || target.height !== drawn.height) {
       target.width = drawn.width
       target.height = drawn.height
     }
-    if (cssSize) {
+    if (natural) {
       target.style.width = `${drawn.width * Pixel.SCALE}px`
       target.style.height = `${drawn.height * Pixel.SCALE}px`
     }
@@ -119,28 +133,59 @@
     ctx.drawImage(drawn, 0, 0)
   }
 
+  let frame = 0
+  function artOptions(el) {
+    const width = el.clientWidth
+    const height = el.clientHeight
+    return { width, height, w: Math.floor(width / Pixel.SCALE), h: Math.floor(height / Pixel.SCALE), pal: Theming.palette(scene), scene, frame, busy, el, arg: el.dataset.artArg }
+  }
+
+  // <canvas data-art="nome">: il disegno del tema, nel canvas
+  function drawArt(el) {
+    const drawn = Theming.art(el.dataset.art, artOptions(el))
+    if (drawn) blit(el, drawn, el.dataset.artFit === 'natural')
+  }
+  // data-art-bg="nome" su qualunque elemento: il disegno come sfondo ripetuto, ingrandito a pixel pieni
+  function drawBackground(el) {
+    const drawn = Theming.art(el.dataset.artBg, artOptions(el))
+    if (!drawn) return
+    el.style.backgroundImage = `url(${drawn.toDataURL()})`
+    el.style.backgroundSize = `${drawn.width * Pixel.SCALE}px ${drawn.height * Pixel.SCALE}px`
+  }
+
   function paint() {
-    const pal = Theming.palette(scene)
     Theming.applyScene(scene)
-    $('sheet').style.backgroundImage = `url(${Theming.draw.paperTile(pal)})`
-    for (const [id, where] of [['roll-top', 'top'], ['roll-bottom', 'bottom']]) {
-      const target = $(id)
-      blit(target, Theming.draw.roll(target.clientWidth || 452, pal, where))
-    }
-    const div = $('chapter-divider')
-    const drawn = Theming.draw.divider(div.clientWidth || 240, pal)
-    blit(div, drawn)
-    div.style.height = `${drawn.height * Pixel.SCALE}px`
-    for (const row of log.querySelectorAll('.tool')) row.querySelector('img').src = Theming.draw.icon(row.dataset.craft, pal)
-    drawLamp()
+    for (const el of all('[data-art-bg]')) drawBackground(el)
+    for (const el of all('canvas[data-art]')) drawArt(el)
+    const pal = Theming.palette(scene)
+    for (const row of all('.tool')) row.querySelector('img').src = Theming.icon(row.dataset.craft, pal)
     applyStrings()
   }
 
-  let lampFrame = 0
-  function drawLamp() {
-    blit($('lamp'), Theming.draw.lamp(Theming.palette(scene), lampFrame, busy), true)
+  // I disegni animati (data-art-anim) avanzano di un fotogramma ogni 180 ms
+  setInterval(() => {
+    frame++
+    for (const el of all('canvas[data-art][data-art-anim]')) drawArt(el)
+  }, 180)
+
+  // ------------------------------------------------------------------ il layout del tema
+
+  // Monta il tema: il suo HTML prende il posto del precedente, la conversazione, la bozza e lo stato passano al nuovo
+  async function mount(id) {
+    const items = [...all('[data-part="log"] > .item')]
+    const draft = part('input') ? part('input').value : ''
+    const theme = await Theming.use(id)
+    app.innerHTML = theme.layout || '<div data-solid style="background:#000;color:#fff;padding:20px">Questo tema non ha un layout.</div>'
+    const log = part('log')
+    if (log) for (const it of items) log.appendChild(it)
+    if (part('input')) part('input').value = draft
+    setBusy(busy)
+    renderChapterHead()
+    paint()
+    scrollDown()
+    if (sessionsPinned()) refreshSessions()
+    api.setTrayIcon(Theming.trayIcon(Theming.palette('notte')))
   }
-  setInterval(() => { lampFrame++; drawLamp() }, 180)
 
   // ------------------------------------------------------------------ conversazione
 
@@ -160,13 +205,15 @@
 
   function setBusy(on) {
     busy = on
-    $('btn-send').hidden = on
-    $('btn-stop').hidden = !on
-    $('hint').textContent = t(on ? 'busyHint' : 'hint')
+    for (const el of all('[data-action="send"]')) el.hidden = on
+    for (const el of all('[data-action="stop"]')) el.hidden = !on
+    for (const el of all('[data-part="hint"]')) el.textContent = t(on ? 'busyHint' : 'hint')
+    document.body.classList.toggle('busy', on)
   }
 
   function sendMessage() {
-    const text = input.value.trim()
+    const input = part('input')
+    const text = input ? input.value.trim() : ''
     if (!text || busy) return
     input.value = ''
     reply = null
@@ -175,9 +222,9 @@
     api.send(text)
   }
 
-  api.onDelta((t) => {
+  api.onDelta((d) => {
     const r = startReply()
-    r.raw += t
+    r.raw += d
     if (!pending) { pending = true; requestAnimationFrame(renderReply) }
   })
   api.onTool(({ id, name, summary }) => {
@@ -186,7 +233,7 @@
     const craft = craftOf(name)
     const row = add('tool', `<img alt=""><span>${esc(name)}</span><span class="what">${esc(summary || '')}</span>`)
     row.dataset.craft = craft
-    row.querySelector('img').src = Theming.draw.icon(craft, Theming.palette(scene))
+    row.querySelector('img').src = Theming.icon(craft, Theming.palette(scene))
     tools.set(id, row)
   })
   api.onToolDone(({ id, error }) => {
@@ -201,6 +248,8 @@
     labelled('footnote', 'took', { s: Math.round((durationMs || 0) / 1000) })
     reply = null
     setBusy(false)
+    // Una conversazione nuova compare negli annali
+    if (sessionsPinned()) refreshSessions()
   })
   api.onError((msg) => {
     renderReply()
@@ -211,12 +260,13 @@
 
   async function newChapter() {
     const n = await api.newChapter()
-    for (const el of [...log.children]) if (!el.classList.contains('chapter')) el.remove()
+    clearLog()
     reply = null
     currentSession = null
     setBusy(false)
     setChapter(n)
-    input.focus()
+    markCurrentSession()
+    if (part('input')) part('input').focus()
   }
 
   // Il titolo del capitolo: "Capitolo" e la data vengono dal tema. Con una cronaca aperta il titolo è il suo
@@ -225,14 +275,22 @@
     renderChapterHead()
   }
   function renderChapterHead() {
-    if (currentSession) return
-    const title = $('chapter-title')
-    title.textContent = t('chapter')
-    const num = document.createElement('span')
-    num.className = 'num'
-    num.textContent = roman(chapter)
-    title.appendChild(num)
-    $('chapter-date').textContent = Theming.chapterDate(new Date())
+    const title = part('chapter-title')
+    const date = part('chapter-date')
+    if (currentSession) {
+      const s = currentSession
+      if (title) title.textContent = s.title.length > 34 ? s.title.slice(0, 33) + '…' : s.title
+      if (date) date.textContent = formatWhen(s.lastModified)
+      return
+    }
+    if (title) {
+      title.textContent = t('chapter')
+      const num = document.createElement('span')
+      num.className = 'num'
+      num.textContent = roman(chapter)
+      title.appendChild(num)
+    }
+    if (date) date.textContent = Theming.chapterDate(new Date())
   }
 
   // ------------------------------------------------------------------ permessi
@@ -284,48 +342,75 @@
 
   // ------------------------------------------------------------------ cronache: le sessioni di Claude Code
 
-  let currentSession = null
-
   function formatWhen(ms) {
     const d = new Date(ms)
     return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   }
 
-  async function showSessions() {
-    if (busy) return
-    const panel = $('sessions')
-    const list = $('sessions-list')
-    list.innerHTML = '<div class="session-row"><span class="when"></span></div>'
-    list.querySelector('.when').textContent = t('sessionsLoading')
-    panel.hidden = false
+  // Il pannello delle cronache: in sovrimpressione (si apre col pulsante, hidden altrimenti) o fisso nel layout, con
+  // data-mode="always" (come la barra laterale dell'app desktop)
+  function sessionsPinned() {
+    const p = part('sessions')
+    return !!p && p.dataset.mode === 'always'
+  }
+
+  function sessionNote(list, key, vars) {
+    list.innerHTML = '<div class="session-row note"><span class="when"></span></div>'
+    list.querySelector('.when').textContent = t(key, vars)
+  }
+
+  let sessionsLoad = 0
+  async function refreshSessions() {
+    const list = part('sessions-list')
+    if (!list) return
+    const mine = ++sessionsLoad
+    if (!list.children.length) sessionNote(list, 'sessionsLoading')
     try {
       const sessions = await api.sessions()
+      if (mine !== sessionsLoad || !list.isConnected) return
       list.innerHTML = ''
       for (const s of sessions) {
         const row = document.createElement('div')
-        row.className = 'session-row' + (s.id === currentSession ? ' current' : '')
+        row.className = 'session-row'
+        row.dataset.id = s.id
         row.innerHTML = '<div class="title"></div><div class="when"></div>'
         row.querySelector('.title').textContent = s.title
         row.querySelector('.when').textContent = formatWhen(s.lastModified)
         row.addEventListener('click', () => openSession(s))
         list.appendChild(row)
       }
-      if (!sessions.length) {
-        list.innerHTML = '<div class="session-row"><span class="when"></span></div>'
-        list.querySelector('.when').textContent = t('sessionsEmpty', { dir: workdir || 'cartella di lavoro' })
-      }
+      if (!sessions.length) sessionNote(list, 'sessionsEmpty', { dir: workdir || 'cartella di lavoro' })
+      markCurrentSession()
     } catch (err) {
       list.innerHTML = `<div class="error">${esc(String(err.message || err))}</div>`
     }
   }
 
+  function markCurrentSession() {
+    for (const row of all('.session-row[data-id]')) row.classList.toggle('current', !!currentSession && row.dataset.id === currentSession.id)
+  }
+
+  function showSessions() {
+    const p = part('sessions')
+    if (!p) return
+    if (!sessionsPinned()) {
+      if (busy) return
+      const list = part('sessions-list')
+      if (list) list.innerHTML = ''
+      p.hidden = false
+    }
+    refreshSessions()
+  }
+
   async function openSession(s) {
-    $('sessions').hidden = true
-    for (const el of [...log.children]) if (!el.classList.contains('chapter')) el.remove()
+    if (!sessionsPinned() && part('sessions')) part('sessions').hidden = true
+    // Aprire una cronaca ferma la risposta in corso (lo fa anche il processo principale)
+    if (busy) setBusy(false)
+    clearLog()
     reply = null
-    currentSession = s.id
-    $('chapter-title').textContent = s.title.length > 34 ? s.title.slice(0, 33) + '…' : s.title
-    $('chapter-date').textContent = formatWhen(s.lastModified)
+    currentSession = s
+    renderChapterHead()
+    markCurrentSession()
     const loading = labelled('footnote', 'copying')
     try {
       const history = await api.openSession(s.id)
@@ -340,46 +425,58 @@
       loading.remove()
       add('error', esc(String(err.message || err)))
     }
-    input.focus()
+    if (part('input')) part('input').focus()
   }
 
-  // ------------------------------------------------------------------ comandi e finestra
+  // ------------------------------------------------------------------ comandi, delegati al documento
 
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } })
-  $('btn-send').addEventListener('click', sendMessage)
-  $('btn-stop').addEventListener('click', () => { api.stop(); labelled('error', 'stopped'); reply = null; setBusy(false) })
-  $('btn-hide').addEventListener('click', () => api.hide())
-  $('btn-quit').addEventListener('click', () => api.quit())
-  $('btn-new').addEventListener('click', newChapter)
-  $('btn-sessions').addEventListener('click', showSessions)
-  $('btn-back').addEventListener('click', () => { $('sessions').hidden = true })
-  $('btn-scene').addEventListener('click', () => { scene = scene === 'notte' ? 'giorno' : 'notte'; api.setScene(scene); paint() })
+  const actions = {
+    send: sendMessage,
+    stop: () => { api.stop(); labelled('error', 'stopped'); reply = null; setBusy(false) },
+    hide: () => api.hide(),
+    quit: () => api.quit(),
+    new: newChapter,
+    sessions: showSessions,
+    'sessions-close': () => { if (part('sessions') && !sessionsPinned()) part('sessions').hidden = true },
+    scene: () => { scene = scene === 'notte' ? 'giorno' : 'notte'; api.setScene(scene); paint() },
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-action]')
+    if (b && app.contains(b) && actions[b.dataset.action]) actions[b.dataset.action](e)
+  })
+  document.addEventListener('keydown', (e) => {
+    if (e.target.matches('[data-part="input"]') && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
+  })
   api.onReset(newChapter)
-  // Il tema scelto dal vassoio: si cambia sul posto, la conversazione resta
-  api.onTheme((id) => { Theming.use(id); paint(); renderChapterHead(); api.setTrayIcon(Theming.draw.trayIcon(Theming.palette('notte'))) })
+  // Il tema scelto dal vassoio: si rimonta sul posto, la conversazione resta
+  api.onTheme((id) => mount(id))
 
-  // Spostare dal capo alto (non dai suoi pulsanti) e ridimensionare dalla maniglia: il gesto lo segue il processo
-  // principale, la pagina dice solo quando comincia e quando finisce
-  let gesturing = false
-  function beginGesture(kind, e) {
+  // Spostare da data-drag (non dai suoi pulsanti e campi) e ridimensionare da data-grip: il gesto lo segue il
+  // processo principale, la pagina dice solo quando comincia e quando finisce
+  let gesturing = null
+  document.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return
+    const grip = e.target.closest('[data-grip]')
+    const drag = e.target.closest('[data-drag]')
+    let kind = null
+    if (grip) kind = 'resize'
+    else if (drag && !e.target.closest('button, input, textarea, select, a, [data-action], [data-no-drag], .session-row')) kind = 'move'
+    if (!kind) return
     e.preventDefault()
-    gesturing = true
-    document.querySelector('.roll.top').classList.toggle('dragging', kind === 'move')
+    gesturing = grip || drag
+    gesturing.classList.add('dragging')
     api.gestureStart(kind)
-  }
+  })
   function endGesture() {
     if (!gesturing) return
-    gesturing = false
-    document.querySelector('.roll.top').classList.remove('dragging')
+    gesturing.classList.remove('dragging')
+    gesturing = null
     api.gestureEnd()
   }
-  document.querySelector('.roll.top').addEventListener('mousedown', (e) => { if (!e.target.closest('button')) beginGesture('move', e) })
-  $('grip').addEventListener('mousedown', (e) => beginGesture('resize', e))
   window.addEventListener('mouseup', endGesture)
   window.addEventListener('blur', endGesture)
 
-  // A ogni cambio di larghezza i capi del rotolo si ridisegnano, al più una volta per fotogramma
+  // A ogni cambio di misura i disegni si rifanno, al più una volta per fotogramma
   let repaintQueued = false
   window.addEventListener('resize', () => {
     if (repaintQueued) return
@@ -387,10 +484,10 @@
     requestAnimationFrame(() => { repaintQueued = false; paint() })
   })
 
-  // I clic attraversano la finestra tranne sopra il rotolo
+  // I clic attraversano la finestra tranne sopra gli elementi data-solid del layout
   let interactive = null
   document.addEventListener('mousemove', (e) => {
-    const over = !!document.elementFromPoint(e.clientX, e.clientY)?.closest('#scroll')
+    const over = !!document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-solid]')
     if (over !== interactive) { interactive = over; api.setInteractive(over) }
   })
   document.addEventListener('mouseleave', () => { interactive = false; api.setInteractive(false) })
@@ -398,12 +495,10 @@
   api.info().then(async (info) => {
     scene = info.scene === 'giorno' ? 'giorno' : 'notte'
     workdir = info.workdir || ''
+    chapter = info.chapter || 1
     await Theming.load(info.themes || [])
-    Theming.use(info.theme)
-    setChapter(info.chapter)
-    paint()
-    api.setTrayIcon(Theming.draw.trayIcon(Theming.palette('notte')))
-    input.focus()
+    await mount(info.theme)
+    if (part('input')) part('input').focus()
   })
 
   // ------------------------------------------------------------------ anteprima senza Electron
@@ -412,23 +507,29 @@
     const handlers = {}
     const on = (name) => (cb) => { handlers[name] = cb }
     const fire = (name, v, ms) => setTimeout(() => handlers[name] && handlers[name](v), ms)
-    let chapter = 1
+    let n = 1
     // Dalla console dell'anteprima: anteprima.tema('pergamena'), anteprima.permesso()
     window.anteprima = {
       tema: (id) => fire('onTheme', id, 0),
       permesso: () => fire('onAsk', { id: Date.now(), title: 'Claude vuole modificare un file', description: '', detail: 'src/MapView.cpp', canAlways: true }, 0),
     }
+    const day = 86400000
     return {
       // ?tema=<id>&scena=giorno nell'indirizzo per guardare un tema
       info: async () => {
         const q = new URLSearchParams(location.search)
-        return { scene: q.get('scena') || 'notte', chapter, theme: q.get('tema') || 'terra-di-mezzo', themes: ['terra-di-mezzo', 'pergamena'], workdir: 'C:/Workspace' }
+        return { scene: q.get('scena') || 'notte', chapter: n, theme: q.get('tema') || 'terra-di-mezzo', themes: ['terra-di-mezzo', 'pergamena'], workdir: 'C:/Workspace' }
       },
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
-      sessions: async () => [{ id: 's1', title: '10/11 · Mod desktop Signore degli Anelli', lastModified: Date.now() }],
+      sessions: async () => [
+        { id: 's1', title: 'Temi per la Pergamena', lastModified: Date.now() - 3600000 },
+        { id: 's2', title: 'Il calcolo dei sentieri in RouteFinder', lastModified: Date.now() - day },
+        { id: 's3', title: 'Mod desktop Signore degli Anelli', lastModified: Date.now() - 4 * day },
+        { id: 's4', title: 'Profilo di Windows Terminal', lastModified: Date.now() - 9 * day },
+      ],
       openSession: async () => [{ role: 'user', text: 'Ciao' }, { role: 'assistant', text: 'Salve, viandante.' }],
       onAsk: on('onAsk'), onAskClosed: on('onAskClosed'),
-      newChapter: async () => ++chapter,
+      newChapter: async () => ++n,
       send(text) {
         fire('onTool', { id: 't1', name: 'Read', summary: 'src/MapView.cpp' }, 300)
         fire('onToolDone', { id: 't1', error: false }, 700)

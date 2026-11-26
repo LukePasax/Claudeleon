@@ -1,15 +1,85 @@
-/* Tema "Terra di Mezzo": ritocchi oltre alle variabili. Ogni regola comincia con body[data-theme="terra-di-mezzo"],
-   così non tocca gli altri temi (i fogli di tutti i temi sono caricati insieme). */
+/* Tema "Terra di Mezzo": il Libro Rosso aperto. È attivo solo con questo tema, quindi le regole non hanno prefissi.
+   Il libro lascia libera una striscia in basso, trasparente: lì pende il segnalibro e sta la maniglia. */
+
+.book {
+  position: absolute; left: 4px; right: 4px; top: 4px; bottom: 26px;
+  display: flex; flex-direction: column; padding: 0 16px 16px;
+  /* Il bordo della copertina: cuoio scuro, un filetto d'oro, di nuovo cuoio */
+  box-shadow: inset 0 0 0 3px var(--leather-dark), inset 0 0 0 7px transparent, inset 0 0 0 9px var(--gold-dark),
+    0 0 0 3px var(--leather-dark);
+}
+
+/* La testata: si trascina da qui */
+.book-head { flex: none; height: 48px; display: flex; align-items: center; justify-content: center; gap: 18px; position: relative; }
+.book-head .title {
+  font-family: var(--font-display); font-size: 30px; color: var(--title-ink); text-shadow: 0 3px 0 var(--title-glow);
+  pointer-events: none; letter-spacing: 1px;
+}
+.book-head .brooch { pointer-events: none; }
+.book-head .controls { position: absolute; right: 2px; top: 12px; display: flex; gap: 6px; }
+
+/* Le due pagine aperte */
+.spread { flex: 1; min-height: 0; display: flex; }
+.page { position: relative; display: flex; flex-direction: column; min-height: 0; }
+.page.left {
+  flex: none; width: 300px; padding: 22px 20px 12px 24px;
+  box-shadow: inset 3px 0 0 var(--edge), inset 6px 0 0 var(--edge-light), inset 0 3px 0 var(--edge), inset 0 -3px 0 var(--edge);
+}
+.page.right {
+  flex: 1; min-width: 0;
+  box-shadow: inset -3px 0 0 var(--edge), inset -6px 0 0 var(--edge-light), inset 0 3px 0 var(--edge), inset 0 -3px 0 var(--edge);
+}
+.spine { flex: none; width: 24px; height: auto; align-self: stretch; }
+
+/* La pagina sinistra: capitolo, annali, scena */
+.chapter { text-align: center; color: var(--gold); }
+.chapter-title { font-size: 32px; overflow-wrap: anywhere; }
+.chapter-title .num { font-size: 26px; }
+.chapter-divider { width: 100%; height: 15px; margin: 12px 0 0; }
+.new-chapter { align-self: center; margin: 16px 0 14px; }
+.annali { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.annali-head { font-family: var(--font-display); font-size: 24px; color: var(--gold); margin-bottom: 6px; }
+.sessions-list { flex: 1; overflow-y: auto; margin-right: -8px; padding-right: 4px; }
+.session-row .title { font-size: 14px; line-height: 1.3; }
+.page-foot { flex: none; text-align: center; padding-top: 8px; }
+.page-foot .scene { background: none; border: none; cursor: pointer; color: var(--gold); font-size: 14px; }
+.page-foot .scene:hover { color: var(--strong); }
+
+/* La pagina destra: la conversazione in una colonna leggibile, e la penna */
+.log { flex: 1; padding: 26px 30px 8px 22px; }
+.log > * { max-width: 780px; margin-left: auto; margin-right: auto; }
+.quill { flex: none; padding: 10px 30px 16px 22px; box-shadow: inset 0 3px 0 var(--edge-light); }
+.quill > * { max-width: 780px; margin-left: auto; margin-right: auto; }
+.quill textarea {
+  display: block; width: 100%; height: 72px; background: var(--field); color: var(--ink); padding: 8px 10px;
+  box-shadow: inset 3px 3px 0 var(--edge), inset -3px -3px 0 var(--edge-light);
+}
+.quill textarea::placeholder { color: var(--ink-soft); }
+.quill-row { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.lamp { flex: none; }
+.hint { flex: 1; font-size: 12px; color: var(--ink-soft); line-height: 1.2; }
+
+/* Il segnalibro pende dal fondo, poco a destra del dorso; la maniglia nell'angolo */
+.ribbon { position: absolute; left: 312px; bottom: 0; pointer-events: auto; }
+.grip {
+  position: absolute; right: 4px; bottom: 2px; width: 18px; height: 18px;
+  background:
+    linear-gradient(var(--gold), var(--gold)) 12px 0 / 6px 6px no-repeat,
+    linear-gradient(var(--gold), var(--gold)) 6px 6px / 6px 6px no-repeat,
+    linear-gradient(var(--gold), var(--gold)) 12px 6px / 6px 6px no-repeat,
+    linear-gradient(var(--gold), var(--gold)) 0 12px / 18px 6px no-repeat;
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.6));
+}
 
 /* Il viandante scrive in verde Contea; le azioni riuscite in verde, quelle fallite restano rosse */
-body[data-theme="terra-di-mezzo"] .entry.you .who { color: var(--green); }
-body[data-theme="terra-di-mezzo"] .tool.done::after { color: var(--green); }
+.entry.you .who { color: var(--green); }
+.tool.done::after { color: var(--green); }
 
 /* Il capolettera rubricato: lettera d'oro su cuoio rosso, come nei manoscritti */
-body[data-theme="terra-di-mezzo"] .entry.claude .text > p:first-child::first-letter {
+.entry.claude .text > p:first-child::first-letter {
   box-shadow: inset 0 0 0 3px var(--gold), inset 0 0 0 6px var(--initial-bg), inset 0 0 0 9px var(--gold-dark);
   padding: 9px 11px 7px;
 }
 
 /* La domanda di permesso come un cancello: bordo d'oro tutto intorno, il rifiuto in pietra */
-body[data-theme="terra-di-mezzo"] .ask { box-shadow: inset 0 0 0 3px var(--gold), inset 0 0 0 6px var(--edge); padding: 12px 14px; }
+.ask { box-shadow: inset 0 0 0 3px var(--gold), inset 0 0 0 6px var(--edge); padding: 12px 14px; }

@@ -1,16 +1,14 @@
-// La finestra a rotolo: trasparente, senza bordi, sempre in primo piano. Dove non c'è il rotolo i clic passano
-// alle finestre sotto; il rotolo si trascina dal capo alto.
+// La finestra: trasparente, senza bordi, sempre in primo piano. La sua forma la decide il tema in uso; dove il tema
+// non disegna nulla i clic passano alle finestre sotto, e si trascina dalla parte che il tema indica (data-drag).
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, globalShortcut } = require('electron')
 const fs = require('fs')
 const path = require('path')
 const { ClaudeBridge } = require('./claude-bridge')
 const { listThemes, DEFAULT_THEME } = require('./themes')
 
-const WIN_W = 460
-const WIN_H = 720
-// Più stretto o più basso di così il rotolo non ha posto per la penna e i pulsanti
-const MIN_W = 360
-const MIN_H = 480
+// La misura di partenza, simile a quella dell'app desktop, e la minima, per i temi che non dicono le loro
+// (campo window del theme.js). La finestra di partenza non supera mai il 92% dello schermo
+const DEFAULT_WINDOW = { width: 1080, height: 760, minWidth: 360, minHeight: 480 }
 const TOGGLE_SHORTCUT = 'Control+Alt+P'
 
 if (!app.requestSingleInstanceLock()) {
@@ -22,8 +20,9 @@ let tray = null
 let bridge = null
 let configFile = null
 // workdir: la cartella in cui lavora Claude Code e di cui si elencano le cronache; vuota, la cartella utente
-// theme: l'id del tema in uso (una cartella di src/renderer/themes)
-let config = { workdir: '', position: null, size: null, sessionId: null, scene: 'notte', chapter: 0, theme: DEFAULT_THEME }
+// theme: l'id del tema in uso (una cartella di src/renderer/themes); sizes: la misura scelta per ogni tema, perché un
+// rotolo e un libro aperto non stanno bene alla stessa misura
+let config = { workdir: '', position: null, sizes: {}, sessionId: null, scene: 'notte', chapter: 0, theme: DEFAULT_THEME }
 let themes = []
 // Il trascinamento o il ridimensionamento in corso: il processo principale segue il cursore
 let gesture = null
@@ -35,6 +34,8 @@ function loadConfig() {
   } catch {
     // Primo avvio o file non valido: restano i valori di partenza
   }
+  // La misura unica delle versioni precedenti (460×720) non vale più: ogni tema ha la sua, più grande
+  delete config.size
 }
 
 function saveConfig() {
@@ -42,15 +43,32 @@ function saveConfig() {
   fs.writeFileSync(configFile, JSON.stringify(config, null, 2))
 }
 
-function windowSize() {
-  const s = config.size
-  return s && s.w >= MIN_W && s.h >= MIN_H ? { w: s.w, h: s.h } : { w: WIN_W, h: WIN_H }
+// Le misure del tema in uso: di partenza e minime
+function themeWindow() {
+  return Object.assign({}, DEFAULT_WINDOW, currentTheme().window || {})
 }
 
+function defaultSize() {
+  const tw = themeWindow()
+  const wa = screen.getPrimaryDisplay().workArea
+  return {
+    w: Math.max(tw.minWidth, Math.min(tw.width, Math.floor(wa.width * 0.92))),
+    h: Math.max(tw.minHeight, Math.min(tw.height, Math.floor(wa.height * 0.92))),
+  }
+}
+
+// La misura salvata per il tema in uso, se non è sotto la minima; altrimenti quella di partenza
+function windowSize() {
+  const tw = themeWindow()
+  const s = config.sizes && config.sizes[currentTheme().id]
+  return s && s.w >= tw.minWidth && s.h >= tw.minHeight ? { w: s.w, h: s.h } : defaultSize()
+}
+
+// Al centro dello schermo principale, come una finestra normale
 function defaultPosition() {
   const wa = screen.getPrimaryDisplay().workArea
   const { w, h } = windowSize()
-  return { x: wa.x + wa.width - w - 12, y: wa.y + wa.height - h }
+  return { x: Math.round(wa.x + (wa.width - w) / 2), y: Math.round(wa.y + (wa.height - h) / 2) }
 }
 
 // Una posizione salvata su un monitor ora scollegato lascerebbe la finestra fuori dallo schermo
@@ -72,6 +90,16 @@ function setTheme(id) {
   config.theme = id
   saveConfig()
   bridge.persona = currentTheme().persona
+  // La finestra prende la misura del nuovo tema, attorno allo stesso centro e dentro lo schermo
+  const [x, y] = win.getPosition()
+  const [ow, oh] = win.getSize()
+  const { w, h } = windowSize()
+  const wa = screen.getDisplayNearestPoint({ x: x + ow / 2, y: y + oh / 2 }).workArea
+  const nx = Math.max(wa.x, Math.min(Math.round(x + (ow - w) / 2), wa.x + wa.width - w))
+  const ny = Math.max(wa.y, Math.min(Math.round(y + (oh - h) / 2), wa.y + wa.height - h))
+  win.setBounds({ x: nx, y: ny, width: w, height: h })
+  config.position = { x: nx, y: ny }
+  saveConfig()
   send('theme:apply', id)
   refreshTray()
 }
@@ -94,7 +122,7 @@ function createWindow() {
     maximizable: false,
     fullscreenable: false,
     hasShadow: false,
-    alwaysOnTop: true,
+    alwaysOnTop: config.onTop !== false,
     backgroundColor: '#00000000',
     title: 'Pergamena',
     webPreferences: {
@@ -104,7 +132,7 @@ function createWindow() {
       sandbox: true,
     },
   })
-  win.setAlwaysOnTop(true, 'floating')
+  if (config.onTop !== false) win.setAlwaysOnTop(true, 'floating')
   // Finché il mouse non è sul rotolo, i clic attraversano la finestra (lo segnala la pagina)
   win.setIgnoreMouseEvents(true, { forward: true })
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'))
@@ -134,8 +162,9 @@ function startGesture(kind) {
       win.setBounds({ x: x + dx, y: y + dy, width: w, height: h })
     } else {
       const wa = screen.getDisplayNearestPoint(c).workArea
-      const nw = Math.max(MIN_W, Math.min(w + dx, wa.x + wa.width - x))
-      const nh = Math.max(MIN_H, Math.min(h + dy, wa.y + wa.height - y))
+      const { minWidth, minHeight } = themeWindow()
+      const nw = Math.max(minWidth, Math.min(w + dx, wa.x + wa.width - x))
+      const nh = Math.max(minHeight, Math.min(h + dy, wa.y + wa.height - y))
       win.setBounds({ x, y, width: nw, height: nh })
     }
   }, 1000 / 60)
@@ -151,7 +180,7 @@ function stopGesture() {
   config.position = { x, y }
   if (kind === 'resize') {
     const [w, h] = win.getSize()
-    config.size = { w, h }
+    config.sizes = Object.assign({}, config.sizes, { [currentTheme().id]: { w, h } })
   }
   saveConfig()
 }
@@ -164,14 +193,29 @@ function toggleVisible() {
 
 function trayMenu() {
   return Menu.buildFromTemplate([
-    { label: win && win.isVisible() ? 'Nascondi il rotolo' : 'Mostra il rotolo', click: toggleVisible },
+    { label: win && win.isVisible() ? 'Nascondi' : 'Mostra', click: toggleVisible },
     { label: 'Nuovo capitolo', click: () => send('chat:reset') },
     { label: 'Tema', submenu: themes.map((t) => ({ label: t.name, type: 'radio', checked: t.id === currentTheme().id, click: () => setTheme(t.id) })) },
-    { label: 'Riporta in basso a destra', click: () => { const p = defaultPosition(); const [w, h] = win.getSize(); win.setBounds({ x: p.x, y: p.y, width: w, height: h }); config.position = p; saveConfig() } },
-    { label: 'Dimensione iniziale', click: () => { win.setSize(WIN_W, WIN_H); config.size = null; saveConfig() } },
+    { label: 'Sempre in primo piano', type: 'checkbox', checked: config.onTop !== false, click: (item) => setOnTop(item.checked) },
+    { label: 'Riporta al centro', click: () => { const p = defaultPosition(); const [w, h] = win.getSize(); win.setBounds({ x: p.x, y: p.y, width: w, height: h }); config.position = p; saveConfig() } },
+    { label: 'Dimensione iniziale', click: () => {
+      if (config.sizes) delete config.sizes[currentTheme().id]
+      const { w, h } = defaultSize()
+      const p = defaultPosition()
+      win.setBounds({ x: p.x, y: p.y, width: w, height: h })
+      config.position = p
+      saveConfig()
+    } },
     { type: 'separator' },
     { label: 'Esci', click: () => app.quit() },
   ])
+}
+
+// Con una finestra grande come l'app desktop, stare sempre sopra le altre può dare fastidio: si sceglie dal vassoio
+function setOnTop(on) {
+  config.onTop = !!on
+  saveConfig()
+  win.setAlwaysOnTop(config.onTop, 'floating')
 }
 
 function refreshTray() {
@@ -255,7 +299,7 @@ function captureArgs() {
 function fakeConversation(capture) {
   if (capture.view === 'cronache') {
     // Le cronache vere, lette dal disco: nessuna chiamata a Claude
-    win.webContents.executeJavaScript(`document.getElementById('btn-sessions').click()`)
+    win.webContents.executeJavaScript(`document.querySelector('[data-action="sessions"]')?.click()`)
     setTimeout(async () => {
       fs.writeFileSync(capture.file, (await win.webContents.capturePage()).toPNG())
       app.quit()
@@ -273,7 +317,7 @@ function fakeConversation(capture) {
     ['claude:done', { durationMs: 18400 }],
     ['perm:ask', { id: 1, title: 'Claude vuole eseguire un comando', description: 'Il comando scrive fuori dalla cartella di lavoro.', detail: 'git push origin feature/sentieri', canAlways: true }],
   ]
-  win.webContents.executeJavaScript(`document.getElementById('input').value = 'Mostrami i file del progetto e dimmi da dove cominceresti'; document.getElementById('btn-send').click()`)
+  win.webContents.executeJavaScript(`document.querySelector('[data-part="input"]').value = 'Mostrami i file del progetto e dimmi da dove cominceresti'; document.querySelector('[data-action="send"]').click()`)
   ev.forEach(([ch, payload], i) => setTimeout(() => send(ch, payload), 300 + i * 120))
   setTimeout(async () => {
     const image = await win.webContents.capturePage()
@@ -288,9 +332,10 @@ app.whenReady().then(() => {
   if (capture) {
     // Le prove non toccano la configurazione vera
     configFile = path.join(app.getPath('temp'), 'pergamena-prova.json')
-    config = { workdir: config.workdir, position: { x: 20, y: 20 }, size: capture.size, sessionId: null, scene: capture.scene, chapter: 3, theme: capture.theme || config.theme }
+    config = { workdir: config.workdir, position: { x: 20, y: 20 }, sizes: {}, sessionId: null, scene: capture.scene, chapter: 3, theme: capture.theme || config.theme }
   }
   themes = listThemes()
+  if (capture && capture.size) config.sizes[currentTheme().id] = capture.size
   if (!config.chapter) { config.chapter = 1; saveConfig() }
   bridge = new ClaudeBridge({
     getSession: () => config.sessionId,

@@ -1,7 +1,11 @@
 @font-face { font-family: 'Pixelify'; src: url('fonts/pixelify-sans.woff2') format('woff2'); font-weight: 400 700; }
 @font-face { font-family: 'Bastarda'; src: url('fonts/jacquarda-bastarda-9.woff2') format('woff2'); }
 
-/* I colori e i caratteri dell'interfaccia: questi sono i valori di partenza, notte e giorno (body.giorno). Un tema
+/* Il foglio comune a tutti i temi: variabili, voci della conversazione (domande, risposte, azioni, permessi),
+   pulsanti, righe delle cronache, barre di scorrimento. La forma della finestra no: quella sta nel layout e nel
+   theme.css di ogni tema, che può anche ridefinire tutto quello che c'è qui.
+
+   I colori e i caratteri dell'interfaccia: questi sono i valori di partenza, notte e giorno (body.giorno). Un tema
    ridefinisce quelli che vuole nelle "vars" delle sue scene (vedi themes/LEGGIMI.md), che finiscono nello stile in
    linea di body e quindi vincono su queste. Stanno su body e non su :root perché le variabili composte (--strong ecc.)
    si calcolano dove sono dichiarate: così usano i colori del tema */
@@ -31,27 +35,18 @@ body.giorno {
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; }
 /* Senza legature: in Pixelify "fi" diventa un segno solo che sembra una A */
 body { font-family: var(--font-body); font-size: 16px; color: var(--ink); font-variant-ligatures: none; font-feature-settings: 'liga' 0, 'clig' 0; }
+#app { position: absolute; inset: 0; }
 canvas { image-rendering: pixelated; display: block; }
+[data-art-bg] { image-rendering: pixelated; background-repeat: repeat; }
 button { font-family: inherit; }
+[hidden] { display: none !important; }
 
-.scroll { position: absolute; left: 0; right: 0; top: 0; bottom: 0; display: flex; flex-direction: column; padding: 6px 4px 4px; }
-
-/* I capi arrotolati: il canvas è a un terzo della risoluzione e si ingrandisce a pixel pieni */
-.roll { position: relative; height: 36px; flex: none; z-index: 2; }
-.roll canvas { width: 100%; height: 36px; }
-.roll.top { cursor: grab; }
-.roll.top.dragging { cursor: grabbing; }
-
-/* La maniglia per ridimensionare: tre gradini di pixel nell'angolo in basso a destra */
-.grip {
-  position: absolute; right: 4px; bottom: 2px; width: 18px; height: 18px; cursor: nwse-resize; z-index: 4;
-  background:
-    linear-gradient(var(--gold), var(--gold)) 12px 0 / 6px 6px no-repeat,
-    linear-gradient(var(--gold), var(--gold)) 6px 6px / 6px 6px no-repeat,
-    linear-gradient(var(--gold), var(--gold)) 12px 6px / 6px 6px no-repeat,
-    linear-gradient(var(--gold), var(--gold)) 0 12px / 18px 6px no-repeat;
-  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.6));
-}
+/* I pezzi che il motore usa, con il minimo perché funzionino in qualunque layout */
+[data-part="log"] { overflow-y: auto; user-select: text; }
+[data-part="input"] { resize: none; border: none; outline: none; font: inherit; user-select: text; }
+[data-drag] { cursor: grab; }
+[data-drag].dragging { cursor: grabbing; }
+[data-grip] { cursor: nwse-resize; }
 
 /* Le barre di scorrimento a pixel: binario incavato, cursore d'oro a rilievo, niente frecce */
 ::-webkit-scrollbar { width: 12px; height: 12px; }
@@ -60,34 +55,14 @@ button { font-family: inherit; }
 ::-webkit-scrollbar-thumb { background: var(--gold); box-shadow: inset -3px -3px 0 var(--gold-dark), inset 3px 3px 0 var(--gold-light); }
 ::-webkit-scrollbar-thumb:hover { background: var(--gold-light); }
 ::-webkit-scrollbar-corner { background: transparent; }
-.roll .title {
-  position: absolute; left: 0; right: 0; top: 0; line-height: 36px; text-align: center;
-  font-family: var(--font-display); font-size: 27px; color: var(--title-ink); text-shadow: 0 2px 0 var(--title-glow); pointer-events: none;
-}
-.controls { position: absolute; right: 34px; top: 6px; display: flex; gap: 6px; -webkit-app-region: no-drag; }
-.controls button {
-  width: 24px; height: 24px; border: none; cursor: pointer; font-size: 16px; line-height: 20px; padding: 0;
-  background: var(--ctl-bg); color: var(--ctl-ink); box-shadow: inset -3px -3px 0 var(--ctl-dark), inset 3px 3px 0 var(--ctl-light);
-}
-.controls button:hover { background: var(--ctl-hover); }
 
-/* Il foglio: grana a pixel, bordi a gradino scuri, rientrato sotto i capi */
-.sheet {
-  flex: 1; min-height: 0; margin: -6px 15px; position: relative; display: flex; flex-direction: column;
-  background-repeat: repeat; background-size: 96px 96px; image-rendering: pixelated;
-  box-shadow: inset 3px 0 0 var(--edge), inset -3px 0 0 var(--edge), inset 6px 0 0 var(--edge-light), inset -6px 0 0 var(--edge-light);
-}
-
-.log { flex: 1; overflow-y: auto; padding: 24px 26px 8px; user-select: text; }
-
-.chapter { text-align: center; color: var(--gold); margin: 0 0 18px; }
+/* Il titolo del capitolo (dove il layout lo mette) */
 .chapter-title { font-family: var(--font-display); font-size: 36px; line-height: 1; }
 /* Il numero romano col carattere a pixel normale: in gotico "III" si legge "333" */
 .chapter-title .num { font-family: var(--font-body); font-weight: 700; font-size: 30px; margin-left: 6px; }
 .chapter-date { font-size: 14px; color: var(--ink-soft); margin-top: 4px; }
-/* Il divisore lo disegna il tema, a pixel: qui solo la sua misura */
-.chapter-divider { width: 60%; margin: 10px auto 0; }
 
+/* Le voci della conversazione */
 .entry { margin: 0 0 16px; line-height: 1.45; }
 .who { font-size: 14px; color: var(--ink-soft); margin-bottom: 2px; }
 .entry.you { padding-left: 14%; }
@@ -123,41 +98,29 @@ button { font-family: inherit; }
 .ask .ask-detail { font-size: 14px; background: var(--code); padding: 4px 6px; margin-bottom: 8px; word-break: break-all; }
 .ask .ask-buttons { display: flex; gap: 12px; margin: 4px 0 2px 3px; }
 .ask .ask-outcome { font-size: 14px; color: var(--ink-soft); }
-.pix.small { font-size: 14px; padding: 3px 8px; }
-.pix.deny { background: var(--deny-bg); box-shadow: inset -3px -3px 0 var(--deny-dark), inset 3px 3px 0 var(--deny-light), 0 0 0 3px var(--btn-ring); color: var(--deny-ink); }
 
-/* Le cronache: l'elenco delle sessioni, sopra il foglio */
-.sessions { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; background: inherit; background-size: 96px 96px; padding: 16px 22px; }
-.sessions[hidden] { display: none; }
-.sessions-head { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-display); font-size: 27px; color: var(--gold); margin-bottom: 10px; }
-.sessions-head button { font-family: var(--font-body); }
-.sessions-list { flex: 1; overflow-y: auto; }
+/* Le righe delle cronache */
 .session-row { padding: 6px 8px; cursor: pointer; margin-bottom: 4px; box-shadow: inset 3px 0 0 var(--edge-light); }
 .session-row:hover { background: var(--code); box-shadow: inset 3px 0 0 var(--gold); }
+.session-row.note { cursor: default; }
+.session-row.note:hover { background: none; box-shadow: inset 3px 0 0 var(--edge-light); }
 .session-row .when { font-size: 12px; color: var(--ink-soft); }
 .session-row.current .title { color: var(--strong); }
 
-/* La penna */
-.quill { padding: 8px 24px 12px; box-shadow: inset 0 3px 0 var(--edge-light); }
-.quill textarea {
-  width: 100%; height: 66px; resize: none; border: none; outline: none; background: var(--field); color: var(--ink);
-  font: inherit; padding: 8px 10px; user-select: text;
-  box-shadow: inset 3px 3px 0 var(--edge), inset -3px -3px 0 var(--edge-light);
-}
-.quill textarea::placeholder { color: var(--ink-soft); }
-.quill-row { display: flex; align-items: flex-end; gap: 10px; margin-top: 8px; }
-/* Il lume: la sua misura la decide il disegno del tema (pixel × 3) */
-#lamp { flex: none; }
-.hint { flex: 1; font-size: 12px; color: var(--ink-soft); line-height: 1.2; }
+/* I pulsanti a gradino */
 .pix {
   border: none; cursor: pointer; padding: 6px 12px; font-size: 16px; color: var(--btn-ink); background: var(--btn-bg);
   box-shadow: inset -3px -3px 0 var(--btn-dark), inset 3px 3px 0 var(--btn-light), 0 0 0 3px var(--btn-ring);
 }
 .pix:hover { background: var(--btn-hover); }
-.pix.deny:hover { filter: brightness(1.1); }
 .pix:active { box-shadow: inset 3px 3px 0 var(--btn-dark), inset -3px -3px 0 var(--btn-light), 0 0 0 3px var(--btn-ring); }
 .pix[disabled] { opacity: 0.5; cursor: default; }
-
-.bar { text-align: center; font-size: 16px; color: var(--bar-ink); padding-top: 2px; text-shadow: 0 2px 0 var(--bar-shadow); }
-.bar button { background: none; border: none; color: var(--bar-ink); cursor: pointer; font-size: 16px; padding: 0 4px; text-shadow: inherit; }
-.bar button:hover { color: var(--bar-hover); }
+.pix.small { font-size: 14px; padding: 3px 8px; }
+.pix.deny { background: var(--deny-bg); box-shadow: inset -3px -3px 0 var(--deny-dark), inset 3px 3px 0 var(--deny-light), 0 0 0 3px var(--btn-ring); color: var(--deny-ink); }
+.pix.deny:hover { filter: brightness(1.1); }
+/* I pulsanti quadrati della finestra (nascondi, chiudi) */
+.ctl {
+  width: 24px; height: 24px; border: none; cursor: pointer; font-size: 16px; line-height: 20px; padding: 0;
+  background: var(--ctl-bg); color: var(--ctl-ink); box-shadow: inset -3px -3px 0 var(--ctl-dark), inset 3px 3px 0 var(--ctl-light);
+}
+.ctl:hover { background: var(--ctl-hover); }

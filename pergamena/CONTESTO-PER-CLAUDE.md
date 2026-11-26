@@ -20,6 +20,12 @@ peso: citazioni dai libri o dai film (anche la persona chiede a Claude di non fa
 film o dei libri. Tutto si disegna a pixel dal codice. Il secondo obiettivo è un'app **a temi**: Terra di Mezzo è il
 primo; il rotolo generico resta come tema "Pergamena", e se ne potranno aggiungere altri.
 
+**Secondo passo (novembre 2026).** I temi non condividono più lo scheletro del rotolo: ogni tema porta il proprio
+layout HTML e il proprio CSS, e il motore trova i suoi pezzi per attributo. La finestra di partenza è grande come
+l'app desktop (circa 1100×760, centrata), con la misura ricordata per tema; "sempre in primo piano" si può spegnere
+dal vassoio. Terra di Mezzo è diventato il Libro Rosso aperto: annali sempre visibili a sinistra (come la barra
+laterale dell'app desktop), conversazione a destra.
+
 ## Le strade provate, in ordine
 
 1. **Una mod per Claude desktop** (plugin con un modulo di hook, API `$.theme`, `ui.render`). La mappa come sfondo a
@@ -42,9 +48,11 @@ primo; il rotolo generico resta come tema "Pergamena", e se ne potranno aggiunge
 
 ## Com'è fatta
 
-L'app è divisa in un **motore** comune (finestra, conversazione, permessi, cronache, il disegno a pixel) e in
-**temi** che ne cambiano scritte, colori, disegni e tono di Claude. La guida per scrivere un tema è
-`src/renderer/themes/LEGGIMI.md`.
+L'app è divisa in un **motore** comune (finestra, conversazione, permessi, cronache, gli attrezzi del disegno a
+pixel) e in **temi** che decidono tutto quello che si vede: forma della finestra (HTML e CSS), misura, scritte,
+colori, disegni e tono di Claude. Il motore non conosce la forma: cerca i pezzi per attributo (`data-part="log"`,
+`data-action="send"`, `data-drag`, `data-art`...) e delega gli eventi al documento, così un cambio di tema sostituisce
+tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un tema è `src/renderer/themes/LEGGIMI.md`.
 
 - `src/main.js` — processo principale: finestra trasparente, senza bordi, sempre in primo piano; i clic passano alle
   finestre sotto finché il mouse non è sul rotolo (`setIgnoreMouseEvents(true, { forward: true })`, la pagina dice
@@ -61,25 +69,29 @@ L'app è divisa in un **motore** comune (finestra, conversazione, permessi, cron
   Ferma. `listSessions({ dir, limit })` e `getSessionMessages(id, { dir })` per le cronache: `customTitle` è il titolo
   che l'app desktop dà alle sessioni. L'SDK è un modulo ES: dal processo principale CommonJS si carica con `import()`.
 - `src/themes.js` — l'elenco dei temi per il processo principale (le cartelle di `src/renderer/themes/` con un
-  `theme.js`, letto con `require`): nome per il sottomenu **Tema** del vassoio e `persona` per il prompt di sistema.
-  `config.theme` ricorda la scelta; il cambio arriva alla pagina con `theme:apply` e al messaggero in
-  `bridge.persona`.
+  `theme.js`, letto con `require`): nome per il sottomenu **Tema** del vassoio, misure della finestra (`window`) e
+  `persona` per il prompt di sistema. `config.theme` ricorda la scelta, `config.sizes[id]` la misura per tema; al
+  cambio la finestra prende la misura del nuovo tema attorno allo stesso centro, la pagina riceve `theme:apply` e il
+  messaggero il nuovo `bridge.persona`.
 - `src/preload.js` — il ponte tra pagina e processo principale (`contextBridge`), niente Node nella pagina.
 - `src/renderer/` — la pagina.
-  - `pixel.js` è il motore del disegno: attrezzi comuni (`bitmap`, `mirror`, `seeded`, `upscale`) e i disegni di
-    partenza (grana della carta, capi del rotolo, divisore, icone 8×8 dei "mestieri", lume a candela, icona del
-    vassoio). Disegna dal codice a bassa risoluzione e ingrandisce senza sfumature (`image-rendering: pixelated`).
-  - `theming.js` carica i temi e risponde alla pagina con quello in uso: scritte (`t(chiave)`, con le scritte di
-    partenza in `STRINGS`), palette per scena (unite a quelle di partenza), variabili CSS (in linea su `body`, così
-    battono `style.css`), data del capitolo e disegni (quello del tema o quello di partenza).
-  - `renderer.js` gestisce la conversazione con un markdown minimo, i permessi, le cronache, la scena giorno/notte
-    e i gesti. Ogni scritta tiene la chiave in `data-s`: al cambio di tema `applyStrings()` riscrive tutto sul posto.
-  - `style.css` contiene i valori di partenza di tutte le variabili, su `body` e `body.giorno`. Bordi e pulsanti
-    sono a gradino con `box-shadow`, le barre di scorrimento a pixel.
-  - `themes/<id>/theme.js` (più l'eventuale `theme.css`) sono i temi. **Terra di Mezzo**, il predefinito: il Libro
-    Rosso in cuoio con fregi d'oro e spille a foglia, rune inventate come divisore, calendario della Contea,
-    l'Anello come lume (lettere di fuoco mentre Claude lavora), palantír, fiala di luce, "Non passerai" per il
-    rifiuto, uno scriba di Gran Burrone come persona. **Pergamena**: il rotolo di prima, senza ridefinire nulla.
+  - `index.html` è vuoto: solo `<div id="app">`, dove si monta il `layout` del tema.
+  - `pixel.js` contiene gli attrezzi del disegno (`bitmap`, `mirror`, `seeded`, `upscale`), le icone 8×8 dei
+    "mestieri" di partenza e una libreria di disegni pronti (`Pixel.lib`: carta, capo del rotolo, tratteggio,
+    candela, rotolino del vassoio). Si disegna dal codice a bassa risoluzione e si ingrandisce senza sfumature.
+  - `theming.js` carica i temi e risponde con quello in uso: layout, scritte (`t(chiave)`, partenza in `STRINGS`),
+    palette per scena, variabili CSS (in linea su `body`, così battono `style.css`), data del capitolo, disegni per
+    nome (`art(nome, opzioni)`). Tiene attivo un solo `theme.css` alla volta, quindi i temi non usano prefissi.
+  - `renderer.js` monta il layout (`mount`), gestisce la conversazione con un markdown minimo, i permessi, le
+    cronache (in sovrimpressione o fisse, `data-mode="always"`), la scena giorno/notte e i gesti. Ogni scritta tiene
+    la chiave in `data-s`; i canvas `data-art` e gli sfondi `data-art-bg` si ridisegnano a ogni cambio di misura.
+  - `style.css` è comune a tutti i temi ma senza forma: variabili, voci della conversazione, pulsanti, righe delle
+    cronache, barre di scorrimento.
+  - `themes/<id>/` sono i temi. **Terra di Mezzo**, il predefinito: il Libro Rosso aperto in cuoio con titolo
+    d'oro e spille a foglia, pagina degli annali e pagina della conversazione, dorso cucito, segnalibro verde, rune
+    inventate, calendario della Contea, l'Anello come lume (lettere di fuoco mentre Claude lavora), palantír, fiala
+    di luce, "Non passerai" per il rifiuto, uno scriba di Gran Burrone come persona. **Pergamena**: il rotolo, con
+    i disegni di `Pixel.lib`.
 
 ## Lezioni pratiche (costate tempo)
 
@@ -107,12 +119,11 @@ L'app è divisa in un **motore** comune (finestra, conversazione, permessi, cron
 ## Prossimi passi possibili
 
 0. **Temi.**
-   - Una struttura sostituibile per tema: ora la forma rotolo + foglio è comune a tutti, e un libro aperto o una
-     mappa a tutta finestra richiederebbero di cambiare `index.html`.
    - Caratteri propri per tema, già possibili con `@font-face` nel `theme.css`: per la Terra di Mezzo, un carattere
      a pixel in stile onciale o runico con licenza libera.
    - Suoni e personaggio per tema.
    - La scelta del tema anche dalla finestra, oltre che dal vassoio: `pergamena.setTheme(id)` c'è già nel preload.
+   - Un'eredità fra temi (`extends`), se nasceranno varianti dello stesso scheletro.
 1. **Più conversazioni in schede**, ognuna col suo `query()` e la sua sessione.
 2. **Modifiche ai file**: mostrare le differenze degli `Edit`/`Write` (l'`input` dello strumento ha `old_string`,
    `new_string`, `content`) in un riquadro a pixel.

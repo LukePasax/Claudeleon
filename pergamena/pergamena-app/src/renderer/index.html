@@ -6,51 +6,9 @@
 <title>Pergamena</title>
 <link rel="stylesheet" href="style.css">
 </head>
-<!-- Le scritte vengono dal tema: data-s mette il testo, data-s-placeholder e data-s-title gli attributi -->
 <body>
-<div class="scroll" id="scroll">
-  <div class="roll top">
-    <canvas id="roll-top"></canvas>
-    <div class="title" data-s="title"></div>
-    <div class="controls">
-      <button id="btn-hide" data-s-title="hideTip">_</button>
-      <button id="btn-quit" data-s-title="quitTip">x</button>
-    </div>
-  </div>
-  <div class="sheet" id="sheet">
-    <div class="sessions" id="sessions" hidden>
-      <div class="sessions-head"><span data-s="sessionsTitle"></span><button class="pix small" id="btn-back" data-s="back"></button></div>
-      <div class="sessions-list" id="sessions-list"></div>
-    </div>
-    <div class="log" id="log">
-      <div class="chapter">
-        <div class="chapter-title" id="chapter-title"></div>
-        <div class="chapter-date" id="chapter-date"></div>
-        <canvas class="chapter-divider" id="chapter-divider"></canvas>
-      </div>
-    </div>
-    <div class="quill">
-      <textarea id="input" data-s-placeholder="placeholder" spellcheck="false"></textarea>
-      <div class="quill-row">
-        <canvas id="lamp"></canvas>
-        <span class="hint" id="hint"></span>
-        <button class="pix" id="btn-send" data-s="send"></button>
-        <button class="pix" id="btn-stop" data-s="stop" hidden></button>
-      </div>
-    </div>
-  </div>
-  <div class="roll bottom">
-    <canvas id="roll-bottom"></canvas>
-  </div>
-  <div class="grip" id="grip" data-s-title="gripTip"></div>
-  <div class="bar">
-    <button id="btn-scene"></button>
-    <span>&middot;</span>
-    <button id="btn-new" data-s="newChapter"></button>
-    <span>&middot;</span>
-    <button id="btn-sessions" data-s="sessions"></button>
-  </div>
-</div>
+<!-- Qui si monta il layout del tema in uso (campo layout del suo theme.js) -->
+<div id="app"></div>
 <script src="pixel.js"></script>
 <script src="theming.js"></script>
 <script src="renderer.js"></script>

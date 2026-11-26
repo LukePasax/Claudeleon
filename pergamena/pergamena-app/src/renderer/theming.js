@@ -1,6 +1,6 @@
 // I temi: ognuno è una cartella in themes/ con un theme.js (e, se vuole, un theme.css). Questo file li carica, tiene
-// il tema in uso e risponde alla pagina con le sue scritte, i suoi colori e i suoi disegni; quello che un tema non
-// definisce viene dai valori di partenza qui sotto e dai disegni di partenza di pixel.js. Guida: themes/LEGGIMI.md.
+// il tema in uso e risponde alla pagina con il suo layout, le sue scritte, i suoi colori e i suoi disegni. Le scritte
+// e i colori che un tema non definisce vengono dai valori di partenza qui sotto e in style.css. Guida: themes/LEGGIMI.md.
 (function () {
   const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre']
 
@@ -66,7 +66,7 @@
   }
 
   const registry = new Map()
-  let current = null
+  let current = { id: 'nessuno' }
   let setVars = []
 
   function loadScript(src) {
@@ -80,29 +80,33 @@
     })
   }
 
-  // ids: le cartelle dei temi. I theme.js si registrano in window.PergamenaThemes; i theme.css valgono solo sotto
-  // body[data-theme="<id>"], quindi si caricano tutti subito e cambiare tema non ricarica nulla
+  // ids: le cartelle dei temi. Ogni theme.js si registra in window.PergamenaThemes
   async function load(ids) {
     window.PergamenaThemes = window.PergamenaThemes || []
     await Promise.all(ids.map((id) => loadScript(`themes/${id}/theme.js`)))
-    for (const t of window.PergamenaThemes) {
-      if (!t || !t.id || registry.has(t.id)) continue
-      registry.set(t.id, t)
-      if (t.css) {
-        const link = document.createElement('link')
-        link.rel = 'stylesheet'
-        link.href = `themes/${t.id}/theme.css`
-        document.head.appendChild(link)
-      }
-    }
-    return [...registry.values()].map((t) => ({ id: t.id, name: t.name || t.id }))
+    for (const th of window.PergamenaThemes) if (th && th.id && !registry.has(th.id)) registry.set(th.id, th)
+    return [...registry.values()].map((th) => ({ id: th.id, name: th.name || th.id }))
   }
 
-  // Sceglie il tema; se l'id non c'è, il primo caricato
+  // Sceglie il tema (se l'id non c'è, il primo caricato) e carica il suo theme.css al posto di quello del tema
+  // precedente: è attivo un solo foglio di tema alla volta, quindi le sue regole non hanno bisogno di prefissi
   function use(id) {
-    current = registry.get(id) || registry.values().next().value || { id: 'nessuno', scenes: {} }
+    current = registry.get(id) || registry.values().next().value || { id: 'nessuno' }
     document.body.dataset.theme = current.id
-    return current
+    const old = document.getElementById('theme-css')
+    if (!current.css) {
+      if (old) old.remove()
+      return Promise.resolve(current)
+    }
+    return new Promise((resolve) => {
+      const link = document.createElement('link')
+      link.id = 'theme-css'
+      link.rel = 'stylesheet'
+      link.href = `themes/${current.id}/theme.css`
+      link.onload = link.onerror = () => resolve(current)
+      if (old) old.replaceWith(link)
+      else document.head.appendChild(link)
+    })
   }
 
   // Le scene sono due, 'notte' e 'giorno'; un tema può definirne una sola o nessuna
@@ -111,7 +115,7 @@
     return (current.scenes && current.scenes[key]) || {}
   }
 
-  // Le variabili CSS della scena: le precedenti si tolgono, così un tema non lascia colori a quello dopo
+  // Le variabili CSS della scena, in linea su body: le precedenti si tolgono, così un tema non lascia colori a quello dopo
   function applyScene(name) {
     const root = document.body.style
     for (const v of setVars) root.removeProperty(v)
@@ -134,22 +138,36 @@
     return current.date ? current.date(d, plainDate) : plainDate(d)
   }
 
-  // I disegni: quello del tema se c'è, altrimenti quello di partenza
-  function art(name) {
-    const a = current.art || {}
-    return typeof a[name] === 'function' ? a[name] : Pixel.defaults[name]
+  // Un disegno del tema per nome (data-art, data-art-bg): restituisce un canvas, o null se il tema non ce l'ha
+  const warned = new Set()
+  function art(name, options) {
+    const fn = current.art && current.art[name]
+    if (typeof fn !== 'function') {
+      if (!warned.has(current.id + name)) { warned.add(current.id + name); console.warn(`Il tema ${current.id} non disegna "${name}"`) }
+      return null
+    }
+    try {
+      return fn(options)
+    } catch (err) {
+      console.warn(`Tema ${current.id}, disegno "${name}":`, err)
+      return null
+    }
   }
-  const draw = {
-    paperTile: (pal) => art('paperTile')(pal),
-    roll: (w, pal, where) => art('roll')(w, pal, where),
-    divider: (w, pal) => art('divider')(w, pal),
-    icon: (craft, pal) => Pixel.defaults.icon(craft, pal, Object.assign({}, Pixel.ICONS, (current.art && current.art.icons) || {})),
-    lamp: (pal, frame, busy) => art('lamp')(pal, frame, busy),
-    trayIcon: (pal) => art('trayIcon')(pal),
+
+  // Le icone dei mestieri: quelle del tema, altrimenti quelle di partenza
+  function icon(craft, pal) {
+    return Pixel.icon(craft, pal, Object.assign({}, Pixel.ICONS, (current.art && current.art.icons) || {}))
+  }
+
+  // L'icona del vassoio, 32×32: quella del tema (un canvas 16×16) o il rotolino di partenza
+  function trayIcon(pal) {
+    const fn = current.art && current.art.trayIcon
+    const drawn = typeof fn === 'function' ? fn({ pal }) : Pixel.lib.trayScroll()
+    return Pixel.upscale(drawn, 32, 32)
   }
 
   window.Theming = {
-    load, use, applyScene, t, chapterDate, plainDate, draw, MONTHS,
+    load, use, applyScene, t, chapterDate, plainDate, art, icon, trayIcon, MONTHS,
     get current() { return current },
     palette: (name) => Object.assign({}, PALETTES[name === 'giorno' ? 'giorno' : 'notte'], scene(name).palette || {}),
   }

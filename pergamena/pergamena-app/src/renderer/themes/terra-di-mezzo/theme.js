@@ -1,15 +1,64 @@
-// Tema "Terra di Mezzo": il rotolo diventa una pagina del Libro Rosso, la cronaca dei viaggi degli hobbit. Copertina
-// in cuoio rosso con fregi d'oro e spille a foglia, rune al posto del tratteggio, la data nel calendario della Contea,
-// l'Anello al posto della candela (le lettere di fuoco compaiono mentre Claude lavora), il palantír per i messaggi,
-// la fiala di luce per le ricerche. Tutto disegnato qui a pixel: nessuna immagine, logo o testo preso dai libri o
-// dai film; le rune sono segni inventati nello stile, non un alfabeto vero.
+// Tema "Terra di Mezzo": la finestra è il Libro Rosso aperto, la cronaca dei viaggi degli hobbit. Copertina in cuoio
+// rosso con il titolo d'oro e spille a foglia; a sinistra la pagina del capitolo e degli annali (le sessioni, sempre
+// in vista come nella barra laterale dell'app desktop), a destra la conversazione; un segnalibro verde pende sotto.
+// Rune al posto del tratteggio, la data nel calendario della Contea, l'Anello come lume (le lettere di fuoco
+// compaiono mentre Claude lavora), il palantír per i messaggi, la fiala di luce per le ricerche. Tutto disegnato qui
+// a pixel: nessuna immagine, logo o testo preso dai libri o dai film; le rune sono segni inventati, non un alfabeto.
 ;(function (theme) {
   if (typeof module === 'object' && module.exports) module.exports = theme
   else (window.PergamenaThemes = window.PergamenaThemes || []).push(theme)
 })({
   id: 'terra-di-mezzo',
   name: 'Terra di Mezzo',
-  description: 'Il Libro Rosso: cuoio, rune, il calendario della Contea e un Anello che arde mentre Claude lavora.',
+  description: 'Il Libro Rosso aperto: cuoio, rune, il calendario della Contea e un Anello che arde mentre Claude lavora.',
+
+  // La finestra: grande come l'app desktop; sotto i 760 px le due pagine non ci stanno
+  window: { width: 1180, height: 780, minWidth: 760, minHeight: 520 },
+
+  css: true,
+
+  layout: `
+<div class="book" data-solid data-art-bg="leather">
+  <header class="book-head" data-drag>
+    <canvas class="brooch" data-art="leaf" data-art-fit="natural"></canvas>
+    <div class="title" data-s="title"></div>
+    <canvas class="brooch" data-art="leaf" data-art-arg="destra" data-art-fit="natural"></canvas>
+    <div class="controls">
+      <button class="ctl" data-action="hide" data-s-title="hideTip">_</button>
+      <button class="ctl" data-action="quit" data-s-title="quitTip">x</button>
+    </div>
+  </header>
+  <div class="spread">
+    <section class="page left" data-art-bg="paper">
+      <div class="chapter">
+        <div class="chapter-title" data-part="chapter-title"></div>
+        <div class="chapter-date" data-part="chapter-date"></div>
+        <canvas class="chapter-divider" data-art="divider"></canvas>
+      </div>
+      <button class="pix small new-chapter" data-action="new" data-s="newChapter"></button>
+      <div class="annali" data-part="sessions" data-mode="always">
+        <div class="annali-head" data-s="sessionsTitle"></div>
+        <div class="sessions-list" data-part="sessions-list"></div>
+      </div>
+      <div class="page-foot"><button class="scene" data-action="scene"></button></div>
+    </section>
+    <canvas class="spine" data-art="spine"></canvas>
+    <section class="page right" data-art-bg="paper">
+      <div class="log" data-part="log"></div>
+      <div class="quill">
+        <textarea data-part="input" data-s-placeholder="placeholder" spellcheck="false"></textarea>
+        <div class="quill-row">
+          <canvas class="lamp" data-art="lamp" data-art-anim data-art-fit="natural"></canvas>
+          <span class="hint" data-part="hint"></span>
+          <button class="pix" data-action="send" data-s="send"></button>
+          <button class="pix" data-action="stop" data-s="stop" hidden></button>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<canvas class="ribbon" data-art="ribbon" data-art-fit="natural" data-solid></canvas>
+<div class="grip" data-grip data-solid data-s-title="gripTip"></div>`,
 
   persona: [
     'Le tue risposte compaiono in una piccola finestra in pixel art che imita una pagina del Libro Rosso, la cronaca dei viaggi degli hobbit nella Terra di Mezzo.',
@@ -41,6 +90,7 @@
     continueHere: 'Da qui in poi si scrive nello stesso annale.',
     notte: 'stelle',
     giorno: 'Contea',
+    newChapter: 'Nuovo capitolo',
     gripTip: 'Trascina per allargare o allungare il libro',
   },
 
@@ -77,7 +127,7 @@
         iconColors: { v: '#4f7a3a', s: '#c8d0dc', w: '#f4f8ff', b: '#1e2638', k: '#2a0a08' },
       },
       vars: {
-        green: '#8fbf5a',
+        green: '#8fbf5a', 'leather-dark': '#1e0806',
         'title-ink': '#ffe7a0', 'title-glow': 'rgba(20, 4, 2, 0.8)',
         'initial-bg': '#4a1410',
         'ctl-bg': '#3a0f0c', 'ctl-hover': '#5a1a14', 'ctl-light': '#8a3022', 'ctl-dark': '#1e0806', 'ctl-ink': '#ffe7a0',
@@ -93,7 +143,7 @@
         iconColors: { v: '#3f6a2e', s: '#8a96a8', w: '#ffffff', b: '#1e2638', k: '#4a1410' },
       },
       vars: {
-        green: '#3f6a2e',
+        green: '#3f6a2e', 'leather-dark': '#2a0a08',
         'title-ink': '#ffe7a0', 'title-glow': 'rgba(40, 8, 4, 0.8)',
         'initial-bg': '#7a261c',
         'ctl-bg': '#4a1410', 'ctl-hover': '#6a2018', 'ctl-light': '#9a3626', 'ctl-dark': '#2a0a08', 'ctl-ink': '#ffe7a0',
@@ -103,48 +153,61 @@
   },
 
   art: {
-    // Il dorso del Libro Rosso: cuoio a fasce di luce, due filetti d'oro, piccoli fregi a rombo lontano dal titolo,
-    // e una spilla a foglia a ogni estremità
-    roll(widthCss, pal) {
+    // La grana del cuoio della copertina: riquadro 24×24 a toni di rosso, con qualche piega più scura
+    leather({ pal }) {
       const P = window.Pixel
-      const w = Math.floor(widthCss / P.SCALE)
-      const h = 12
-      const c = P.canvas(w, h)
+      const c = P.canvas(24, 24)
       const ctx = c.getContext('2d')
-      const bands = [6, 5, 3, 2, 3, 3, 1, 1, 0, 4, 5, 6]
-      for (let y = 0; y < h; y++) {
-        ctx.fillStyle = pal.roll[bands[y]]
-        ctx.fillRect(5, y, w - 10, 1)
+      const rand = P.seeded(5)
+      const [, mid, light, , base, dark] = pal.roll
+      for (let y = 0; y < 24; y++) {
+        for (let x = 0; x < 24; x++) {
+          const r = rand()
+          P.px(ctx, x, y, r < 0.72 ? base : r < 0.9 ? mid : r < 0.98 ? dark : light)
+        }
       }
-      // I filetti d'oro, interrotti a puntini come una doratura a mano
-      for (let x = 10; x < w - 10; x++) {
-        if (x % 7 !== 3) { P.px(ctx, x, 2, pal.gold); P.px(ctx, x, 9, pal.gold) }
-      }
-      // I fregi a rombo, solo nei due quarti esterni: il centro è del titolo
-      const diamond = ['.y.', 'ygy', '.y.']
-      const colors = { y: pal.goldLight, g: pal.gold }
-      for (let x = 14; x < w * 0.27; x += 12) {
-        ctx.drawImage(P.bitmap(diamond, colors), x, 4)
-        ctx.drawImage(P.bitmap(diamond, colors), w - x - 3, 4)
-      }
+      return c
+    },
+
+    paper: ({ pal }) => window.Pixel.lib.paperTile(pal),
+
+    // La spilla a foglia; arg "destra" la specchia
+    leaf({ pal, arg }) {
+      const P = window.Pixel
       const leaf = ['......ss', '....svvs', '...svlvs', '..svlvvs', '.svlvvs.', 'svlvvs..', 'svvss...', 'dss.....', 'd.......']
-      ctx.drawImage(P.bitmap(leaf, pal.leaf), 0, 1)
-      ctx.drawImage(P.bitmap(P.mirror(leaf), pal.leaf), w - 8, 1)
+      return P.bitmap(arg === 'destra' ? P.mirror(leaf) : leaf, pal.leaf)
+    },
+
+    // Il dorso fra le due pagine: la carta che si piega verso la cucitura, con il cuoio che si vede in mezzo
+    spine({ w, h, pal }) {
+      const P = window.Pixel
+      const W = Math.max(4, w)
+      const H = Math.max(1, h)
+      const c = P.canvas(W, H)
+      const ctx = c.getContext('2d')
+      const mid = (W - 1) / 2
+      for (let x = 0; x < W; x++) {
+        const d = Math.abs(x - mid) / mid
+        ctx.fillStyle = d < 0.2 ? pal.roll[6] : d < 0.45 ? pal.paperEdge : d < 0.75 ? pal.paper[2] : pal.paper[0]
+        ctx.fillRect(x, 0, 1, H)
+      }
+      // Qualche punto di cucitura d'oro lungo il dorso
+      for (let y = 4; y < H - 2; y += 9) P.px(ctx, Math.round(mid), y, pal.gold)
       return c
     },
 
     // Una riga di rune d'oro fra due rombi: segni inventati, sempre gli stessi (seme fisso)
-    divider(widthCss, pal) {
+    divider({ w, pal }) {
       const P = window.Pixel
       const RUNES = [
         ['.g.', 'gg.', '.g.', '.gg', '.g.'], ['g.g', '.g.', '.g.', '.g.', '.g.'], ['.g.', '.gg', '.g.', 'gg.', '.g.'],
         ['g..', 'gg.', 'g.g', 'g..', 'g..'], ['..g', '.gg', 'g.g', '..g', '..g'], ['g.g', 'g.g', '.g.', 'g.g', 'g.g'],
         ['.g.', 'g.g', '.g.', '.g.', '.g.'], ['gg.', 'g.g', 'gg.', 'g.g', 'g..'], ['.g.', '.g.', 'ggg', '.g.', '.g.'],
       ]
-      const w = Math.floor(widthCss / P.SCALE)
+      w = Math.max(20, w)
       const c = P.canvas(w, 5)
       const ctx = c.getContext('2d')
-      const colors = { g: pal.gold, y: pal.goldLight, o: pal.inkSoft }
+      const colors = { g: pal.gold, y: pal.goldLight }
       const diamond = ['..y..', '.ygy.', 'ygggy', '.ygy.', '..y..']
       ctx.drawImage(P.bitmap(diamond, colors), 0, 0)
       ctx.drawImage(P.bitmap(diamond, colors), w - 5, 0)
@@ -161,7 +224,16 @@
       return c
     },
 
-    // Le icone che cambiano; le altre (penna, incudine, stendardo, rosa dei venti) restano quelle di partenza.
+    // Il segnalibro di seta verde che pende sotto il libro, con la coda a coda di rondine
+    ribbon({ pal }) {
+      const P = window.Pixel
+      const rows = []
+      for (let i = 0; i < 9; i++) rows.push(i % 4 === 1 ? 'dllvd' : 'dlvvd')
+      rows.push('dlvvd', 'dv.vd', 'd...d')
+      return P.bitmap(rows, { d: pal.leaf.d, v: pal.leaf.v, l: pal.leaf.l })
+    },
+
+    // Le icone che cambiano; le altre (penna, incudine, rosa dei venti) restano quelle di partenza.
     // Colori in più: v verde, s argento, w luce, b pietra scura, k cuoio scuro
     icons: {
       leggere: ['.kkkkkk.', '.krrrrkp', '.krggrkp', '.krrrrkp', '.krrrrkp', '.krrrrkp', '.kkkkkkp', '..ppppp.'],
@@ -173,7 +245,7 @@
 
     // L'Anello, 13×13: a riposo un riflesso gira lungo il cerchio; mentre Claude lavora, sulla fascia compaiono
     // lettere di fuoco che tremolano
-    lamp(pal, frame, busy) {
+    lamp({ pal, frame, busy }) {
       const P = window.Pixel
       const S = 13
       const c = P.canvas(S, S)
@@ -207,7 +279,7 @@
       return c
     },
 
-    // Il vassoio: il Libro Rosso chiuso, con l'Anello d'oro sulla copertina
+    // Il vassoio: il Libro Rosso chiuso, con l'Anello d'oro sulla copertina (16×16)
     trayIcon() {
       const P = window.Pixel
       const rows = [
@@ -215,10 +287,7 @@
         '.krgrryrryrgrkp.', '.krgrrryyrrgrkp.', '.krgrrrrrrrgrkp.', '.krgrrrrrrrgrkp.', '.krgrrrrrrrgrkp.', '.krgrrrrrrrgrkp.',
         '.krgggggggggrkp.', '.krrrrrrrrrrrkp.', '..kkkkkkkkkkkpp.', '................',
       ]
-      return P.upscale(P.bitmap(rows, { k: '#2a0a08', r: '#9a3626', g: '#d4a338', y: '#ffe7a0', p: '#ead9ad' }), 32, 32)
+      return P.bitmap(rows, { k: '#2a0a08', r: '#9a3626', g: '#d4a338', y: '#ffe7a0', p: '#ead9ad' })
     },
   },
-
-  // Qualche ritocco che le variabili non coprono: theme.css, valido solo con questo tema
-  css: true,
 })

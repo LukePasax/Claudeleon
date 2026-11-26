@@ -1,6 +1,6 @@
 // I temi dal lato del processo principale: quali ci sono (le cartelle di renderer/themes con un theme.js) e, di
-// ciascuno, il nome per il menu e la "personalità" da aggiungere al prompt di sistema di Claude Code. Il resto del
-// tema (colori, scritte, disegni) lo usa solo la pagina.
+// ciascuno, il nome per il menu, le misure della finestra e la "personalità" da aggiungere al prompt di sistema di
+// Claude Code. Il resto del tema (layout, colori, scritte, disegni) lo usa solo la pagina.
 const fs = require('fs')
 const path = require('path')
 
@@ -22,7 +22,7 @@ function listThemes() {
     try {
       // theme.js si registra nella pagina, ma qui (CommonJS) esporta lo stesso oggetto
       const t = require(file)
-      if (t && t.id === dir) themes.push({ id: t.id, name: t.name || t.id, persona: t.persona || '' })
+      if (t && t.id === dir) themes.push({ id: t.id, name: t.name || t.id, persona: t.persona || '', window: t.window || null })
       else console.warn(`Tema ${dir}: l'id in theme.js deve essere uguale al nome della cartella`)
     } catch (err) {
       console.warn(`Tema ${dir} non leggibile: ${err.message}`)
