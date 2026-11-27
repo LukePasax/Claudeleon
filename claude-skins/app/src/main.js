@@ -207,17 +207,26 @@ function startGesture(kind) {
   const sides = kind.startsWith('resize') ? (kind.split(':')[1] || 'se') : ''
   const start = screen.getCursorScreenPoint()
   const [x, y] = win.getPosition()
-  const [w, h] = win.getSize()
-  // Su Windows con lo schermo ridimensionato (125%, 150%...) ogni setPosition su una finestra trasparente senza bordi
-  // può allargarla di un pixel per l'arrotondamento fra pixel logici e fisici: chiamata 60 volte al secondo, la
-  // finestra cresce da sola. Per questo si passa sempre la dimensione, e solo quando il cursore si muove
-  let last = null
+  // Su Windows con lo schermo ridimensionato (125%, 150%...) ogni setPosition o setBounds su una finestra trasparente
+  // senza bordi può allargarla di un pixel per l'arrotondamento fra pixel logici e fisici. Per questo: la misura è
+  // sempre quella voluta (ricordata), non quella letta dalla finestra, che può essere già cresciuta di un pixel; e la
+  // finestra si tocca solo quando il cursore si muove davvero, oltre una piccola soglia come in Windows (un semplice
+  // clic sulla testata non la tocca)
+  const want = windowSize()
+  const [gw, gh] = win.getSize()
+  const w = Math.abs(gw - want.w) <= 2 ? want.w : gw
+  const h = Math.abs(gh - want.h) <= 2 ? want.h : gh
+  const THRESHOLD = 4
+  let moving = false
+  let last = start
   const timer = setInterval(() => {
     const c = screen.getCursorScreenPoint()
-    if (last && c.x === last.x && c.y === last.y) return
+    if (c.x === last.x && c.y === last.y) return
     last = c
     const dx = c.x - start.x
     const dy = c.y - start.y
+    if (!moving && Math.abs(dx) < THRESHOLD && Math.abs(dy) < THRESHOLD) return
+    moving = true
     if (!sides) {
       win.setBounds({ x: x + dx, y: y + dy, width: w, height: h })
       return
@@ -235,15 +244,16 @@ function startGesture(kind) {
     if (sides.includes('n')) { nh = Math.max(minHeight, Math.min(h - dy, y + h - wa.y)); ny = y + h - nh }
     win.setBounds({ x: nx, y: ny, width: nw, height: nh })
   }, 1000 / 60)
-  gesture = { kind: sides ? 'resize' : 'move', timer }
+  gesture = { kind: sides ? 'resize' : 'move', timer, moved: () => moving }
 }
 
 function stopGesture() {
   if (!gesture) return
   clearInterval(gesture.timer)
   const kind = gesture.kind
+  const moved = gesture.moved()
   gesture = null
-  if (winMode !== 'normal') return
+  if (winMode !== 'normal' || !moved) return
   const [x, y] = win.getPosition()
   config.position = { x, y }
   if (kind === 'resize') {
