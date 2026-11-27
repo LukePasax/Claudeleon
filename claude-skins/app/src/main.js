@@ -658,8 +658,10 @@ function fakeConversation(capture) {
   }, 2500)
 }
 
-// Il nome con cui Windows raggruppa la finestra nella barra delle applicazioni e riconosce le sue notifiche
-const APP_ID = 'Claude Skins'
+// Il nome con cui Windows raggruppa la finestra nella barra delle applicazioni e riconosce le sue notifiche. Era
+// 'Claude Skins': Windows gli aveva già legato l'icona di Electron (il primo collegamento era nato senza icona) e la
+// teneva in memoria; con un nome nuovo ricomincia da capo
+const APP_ID = 'ClaudeSkins.App'
 if (process.platform === 'win32') app.setAppUserModelId(APP_ID)
 
 // L'icona dell'app, quella del tema in uso, a 256 pixel: va sulla finestra e, come file .ico, sul collegamento del
@@ -694,13 +696,20 @@ function writeIco(img) {
   if (!same) fs.writeFileSync(file, data)
   return !same
 }
+// Un diario di quello che l'app fa con icona e collegamento (userData/icona.log), per capire che cosa non va se
+// Windows mostra ancora l'icona sbagliata
+function iconLog(...parts) {
+  try { fs.appendFileSync(path.join(app.getPath('userData'), 'icona.log'), `${new Date().toISOString()} ${parts.join(' ')}\n`) } catch {}
+}
 function setAppIcon(dataUrl) {
   const img = nativeImage.createFromDataURL(dataUrl)
+  iconLog('icona dal tema:', img.isEmpty() ? 'vuota' : JSON.stringify(img.getSize()))
   if (img.isEmpty()) return
   if (process.platform !== 'darwin') win.setIcon(img)
   if (process.platform !== 'win32') return
   try {
     const changed = writeIco(img)
+    iconLog('file .ico:', iconFile(), changed ? 'scritto' : 'uguale a prima', fs.statSync(iconFile()).size, 'byte')
     ensureStartMenuShortcut(changed)
     // Le proprietà della finestra che la barra delle applicazioni legge per l'icona (anche quando l'app è fissata)
     win.setAppDetails({
@@ -710,25 +719,29 @@ function setAppIcon(dataUrl) {
       relaunchCommand: `"${process.execPath}" "${app.getAppPath()}"`,
       relaunchDisplayName: 'Claude Skins',
     })
-  } catch {}
+    iconLog('setAppDetails fatto, appId', APP_ID)
+  } catch (err) { iconLog('errore:', err && err.message) }
 }
 
 // Il collegamento nel menu Start: Windows mostra le notifiche di un'app non installata solo se ne esiste uno con lo
-// stesso AppUserModelId. Serve anche ad aprire Claude Skins dal menu Start. Si crea (o si aggiorna) all'avvio
+// stesso AppUserModelId. Serve anche ad aprire Claude Skins dal menu Start. Nasce solo quando il file dell'icona
+// esiste già (lo scrive setAppIcon), così Windows non le lega mai l'icona di Electron
 function ensureStartMenuShortcut(iconChanged) {
-  if (process.platform !== 'win32') return
+  if (process.platform !== 'win32' || !fs.existsSync(iconFile())) return
   try {
     const link = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Claude Skins.lnk')
-    const want = { target: process.execPath, args: `"${app.getAppPath()}"`, appUserModelId: APP_ID, description: 'Claude Skins', cwd: app.getAppPath() }
-    // L'icona del tema, se c'è già il file (lo scrive setAppIcon)
-    if (fs.existsSync(iconFile())) Object.assign(want, { icon: iconFile(), iconIndex: 0 })
+    const want = { target: process.execPath, args: `"${app.getAppPath()}"`, appUserModelId: APP_ID, description: 'Claude Skins', cwd: app.getAppPath(), icon: iconFile(), iconIndex: 0 }
     let same = false
     try {
       const cur = shell.readShortcutLink(link)
-      same = cur.target === want.target && cur.args === want.args && cur.appUserModelId === APP_ID && (cur.icon || '') === (want.icon || '')
+      same = cur.target === want.target && cur.args === want.args && cur.appUserModelId === APP_ID && (cur.icon || '') === want.icon
     } catch {}
-    if (!same || iconChanged) shell.writeShortcutLink(link, fs.existsSync(link) ? 'replace' : 'create', want)
-  } catch {}
+    let ok = true
+    if (!same || iconChanged) ok = shell.writeShortcutLink(link, fs.existsSync(link) ? 'replace' : 'create', want)
+    let back = null
+    try { back = shell.readShortcutLink(link) } catch {}
+    iconLog('collegamento:', link, same && !iconChanged ? 'già giusto' : ok ? 'scritto' : 'NON scritto', back ? `icona=${back.icon} appId=${back.appUserModelId}` : 'illeggibile')
+  } catch (err) { iconLog('errore collegamento:', err && err.message) }
 }
 
 // Le notifiche di Windows, quando la finestra non è davanti: Claude ha finito, chiede un permesso o una scelta, si è
@@ -794,7 +807,10 @@ app.whenReady().then(() => {
   }
   activeConv = makeConv(null, null).id
   createWindow()
-  if (!capture) ensureStartMenuShortcut()
+  if (!capture) {
+    try { fs.writeFileSync(path.join(app.getPath('userData'), 'icona.log'), '') } catch {}
+    ensureStartMenuShortcut()
+  }
   if (capture) {
     win.webContents.once('did-finish-load', () => setTimeout(() => fakeConversation(capture), 600))
     return
