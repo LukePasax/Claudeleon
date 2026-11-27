@@ -62,6 +62,9 @@ body.maximized .desk, body.fullscreen .desk { border-radius: 0; }
 .side-foot { flex: none; display: flex; justify-content: space-between; padding: 8px 2px 10px; border-top: 1px solid rgba(232, 200, 114, 0.2); }
 .link { background: none; border: none; cursor: pointer; font-size: 14px; font-style: italic; color: var(--side-soft); padding: 4px 6px; border-radius: var(--radius-small); }
 .link:hover { color: var(--side-ink); background: rgba(244, 234, 210, 0.08); }
+/* L'ingranaggio delle impostazioni, in fondo a destra */
+.link.settings { display: grid; place-items: center; padding: 4px 6px; }
+.side-foot .link[data-action="themes"] { margin-left: auto; }
 
 /* Il foglio: la carta (.sheet-paper) è uno strato sotto, con i bordi rotti e l'ombra sul legno */
 .sheet { flex: 1; min-width: 0; position: relative; margin: 10px 10px 10px 8px; display: flex; flex-direction: column; }
@@ -171,4 +174,3 @@ body:not(.giorno) .candle .glow { opacity: 0.9; }
 .room { flex: 1; min-height: 0; display: flex; }
 .room .sheet { margin-top: 8px; }
 .porthole { margin-top: 10px; }
-.beam .ctl.settings { display: grid; place-items: center; }

@@ -61,7 +61,7 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   in alto: le corrispondenze si evidenziano, Invio e Maiusc+Invio avanti e indietro, Esc chiude), Ctrl+Maiusc+C
   copia l'ultima risposta, Ctrl+, impostazioni, Esc ferma Claude, F11 schermo intero. L'elenco è anche nelle
   impostazioni.
-- **Impostazioni:** l'ingranaggio sulla trave (Terra di Mezzo) o "Impostazioni" in fondo alla barra (Metrios e
+- **Impostazioni:** l'ingranaggio in fondo alla barra laterale (Terra di Mezzo) o "Impostazioni" in fondo alla barra (Metrios e
   Dream), Ctrl+, o il vassoio. Tutto vale subito: tema e scena; sempre in primo piano, avvio con Windows, riporta al
   centro e dimensione iniziale; notifiche; cartella di lavoro, permessi, modello, ragionamento e ultracode; il
   programma di Claude Code (percorso, se c'è e la sua versione, per sceglierne un altro) e come si presentano le
