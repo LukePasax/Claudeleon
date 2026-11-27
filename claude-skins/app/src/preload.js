@@ -33,7 +33,7 @@ contextBridge.exposeInMainWorld('skins', {
   answer: (id, allow, always, answers) => ipcRenderer.send('perm:answer', { id, allow, always, answers }),
   // Modello e ragionamento
   models: () => ipcRenderer.invoke('models:get'),
-  setModel: (model, effort) => ipcRenderer.send('model:set', { model, effort }),
+  setModel: (model, effort, ultracode) => ipcRenderer.send('model:set', { model, effort, ultracode }),
   onModels: listen('models:list'),
   onTodos: listen('claude:todos'),
   onBusy: listen('claude:busy'),

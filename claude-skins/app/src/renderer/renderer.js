@@ -409,6 +409,7 @@
   let models = []
   let model = null
   let effort = null
+  let ultracode = false
   const modelInfo = () => models.find((m) => m.value === model) || null
   function renderModel() {
     for (const box of all('[data-part="model"]')) {
@@ -421,7 +422,7 @@
       }
       const m = modelInfo()
       const name = m ? m.name : model || t('modelDefault')
-      b.textContent = effort ? `${name} · ${t(`effort_${effort}`)}` : name
+      b.textContent = [name, effort ? t(`effort_${effort}`) : '', ultracode ? t('ultracode') : ''].filter(Boolean).join(' · ')
       b.title = m && m.description ? m.description : name
     }
   }
@@ -443,7 +444,7 @@
         model = value || null
         const m = modelInfo()
         if (effort && m && !m.efforts.includes(effort)) effort = null
-        api.setModel(model, effort)
+        api.setModel(model, effort, ultracode)
         renderModel()
         closeFolderMenu()
       })
@@ -464,17 +465,30 @@
         const b = document.createElement('button')
         b.className = 'mode' + (lv === effort ? ' active' : '')
         label(b, lv ? `effort_${lv}` : 'effortAuto')
-        b.addEventListener('click', () => { effort = lv; api.setModel(model, effort); renderModel(); closeFolderMenu() })
+        b.addEventListener('click', () => { effort = lv; api.setModel(model, effort, ultracode); renderModel(); closeFolderMenu() })
         row.appendChild(b)
       }
       menu.appendChild(row)
     }
+    // L'interruttore di ultracode, come nell'app desktop
+    const uc = document.createElement('div')
+    uc.className = 'folder-item toggle-item' + (ultracode ? ' on' : '')
+    uc.innerHTML = '<span class="ti-text"><span class="fi-name"></span><span class="fi-path fi-wrap"></span></span><span class="switch"></span>'
+    label(uc.querySelector('.fi-name'), 'ultracode')
+    label(uc.querySelector('.fi-path'), 'ultracodeDesc')
+    uc.addEventListener('click', () => {
+      ultracode = !ultracode
+      uc.classList.toggle('on', ultracode)
+      api.setModel(model, effort, ultracode)
+      renderModel()
+    })
+    menu.appendChild(uc)
     const note = document.createElement('div')
     note.className = 'folder-note'
     menu.appendChild(label(note, 'modelNote'))
     placeMenu(menu, anchor)
   }
-  if (api.models) api.models().then((x) => { models = x.models || []; model = x.model || null; effort = x.effort || null; renderModel() }).catch(() => {})
+  if (api.models) api.models().then((x) => { models = x.models || []; model = x.model || null; effort = x.effort || null; ultracode = !!x.ultracode; renderModel() }).catch(() => {})
   if (api.onModels) api.onModels((list) => { models = list || []; renderModel() })
 
   function chapterHasMessages() {

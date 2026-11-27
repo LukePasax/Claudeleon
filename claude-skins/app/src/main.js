@@ -396,16 +396,18 @@ function registerIpc() {
   ipcMain.on('chat:stop', () => bridge.stop())
   ipcMain.on('perm:answer', (_e, { id, allow, always, answers }) => bridge.answer(id, !!allow, !!always, answers))
   // Modello e ragionamento, ricordati per le prossime volte
-  ipcMain.on('model:set', (_e, { model, effort }) => {
+  ipcMain.on('model:set', (_e, { model, effort, ultracode }) => {
     config.model = model || null
     config.effort = effort || null
+    config.ultracode = !!ultracode
     bridge.setModel(config.model)
+    bridge.ultracode = config.ultracode
     bridge.setEffort(config.effort)
     saveConfig()
   })
   ipcMain.handle('models:get', () => {
     const cached = (() => { try { return JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'models.json'), 'utf8')) } catch { return [] } })()
-    return { models: bridge.modelList || cached, model: config.model || null, effort: config.effort || null }
+    return { models: bridge.modelList || cached, model: config.model || null, effort: config.effort || null, ultracode: !!config.ultracode }
   })
   ipcMain.handle('sessions:list', () => bridge.sessions())
   ipcMain.handle('commands:get', () => {
@@ -558,6 +560,7 @@ app.whenReady().then(() => {
   // config.json, ad esempio "claude-desktop"
   bridge.entrypoint = config.entrypoint || 'cli'
   bridge.setModel(config.model || null)
+  bridge.ultracode = !!config.ultracode
   bridge.setEffort(config.effort || null)
   bridge.sessionCwd = config.sessionCwd || null
   if (capture) bridge.send = () => {}

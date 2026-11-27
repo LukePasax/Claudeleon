@@ -213,7 +213,9 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
 
 - **Conversazione accesa:** `send()` non lancia più un `query()` per messaggio. `ensureLive()` tiene un `query()` con
   il prompt come flusso (`Inbox`, una coda che resta aperta) e `pump()` legge tutto, turno dopo turno (`handle()`); il
-  turno si chiude col `result`. Si riaccende se cambiano sessione, cartella, ragionamento o tono (la chiave `key`),
+  turno si chiude col `result`. Si riaccende se cambiano sessione, cartella o tono (la chiave `key`); ragionamento e
+  ultracode cambiano al volo con `applyFlagSettings({ effortLevel, ultracode })` (sempre insieme: un livello senza
+  la chiave ultracode la spegne),
   ma mai a turno aperto. Un messaggio mandato a turno aperto va con `priority: 'next'`; se Claude riparte senza un
   messaggio appena spedito, il ponte manda `busy`. `stop()` interrompe (`interrupt()`) e scarta il resto del turno;
   `cancel()` interrompe e spegne. Dopo 30 minuti fermo si spegne da solo.

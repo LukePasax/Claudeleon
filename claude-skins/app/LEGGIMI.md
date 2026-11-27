@@ -47,8 +47,9 @@ npm 11 altrimenti non arriva.
   con quello in corso in evidenza e quelli fatti barrati; chiuso mostra il conto e il passo in corso. Si chiude da sé
   quando è tutto fatto e torna con le cronache riaperte. Questi strumenti non compaiono come righe nella conversazione.
 - **Modello e ragionamento:** accanto alla cartella, il pulsante del modello apre l'elenco dei modelli che Claude Code
-  mette a disposizione (letto all'avvio, poi ricordato) e i livelli di ragionamento. Valgono dal messaggio dopo e si
-  ricordano (`model`, `effort` in config.json). I modi dei permessi stanno in un menu a tendina, come nell'app desktop.
+  mette a disposizione (letto all'avvio, poi ricordato), i livelli di ragionamento coi nomi dell'app desktop (Low,
+  Medium, High, Extra, Max) e l'interruttore **Ultracode** (orchestrazione dinamica dei flussi di lavoro). Valgono
+  subito, anche a conversazione accesa, e si ricordano (`model`, `effort`, `ultracode` in config.json). I modi dei permessi stanno in un menu a tendina, come nell'app desktop.
 - **Allegati:** immagini e file, come nell'app desktop. Si incolla uno screenshot (Ctrl+V) o dei file copiati in
   Esplora file, si trascinano file sulla finestra, o si sceglie col pulsante "+" accanto ai modi. Sopra la penna
   compaiono come miniature ed etichette, ciascuna con la sua ×. Le immagini partono come immagini (rimpicciolite oltre
@@ -107,8 +108,8 @@ npm 11 altrimenti non arriva.
   nuovo, cronaca aperta), si esce dall'app o resta ferma 30 minuti; poi il messaggio dopo lo riaccende riprendendo la
   sessione. Le risposte partono prima, e si può scrivere mentre Claude lavora: il messaggio entra nel turno in corso,
   come nell'app desktop. Gli hook dell'utente funzionano come altrove: `SessionStart` all'accensione, `SessionEnd`
-  allo spegnimento. "Ferma" interrompe la risposta senza spegnere. Tema e ragionamento cambiati valgono dalla
-  prossima accensione; modello e modo dei permessi subito.
+  allo spegnimento. "Ferma" interrompe la risposta senza spegnere. Il tema cambiato vale dalla prossima accensione;
+  modello, ragionamento, ultracode e modo dei permessi subito.
 - **Titolo della conversazione:** l'app dà a Claude lo strumento `set_session_title` con lo stesso nome dell'app
   desktop (`mcp__ccd_session_mgmt__set_session_title`, server MCP in-process); scrive la riga `custom-title` nel
   transcript con `renameSession` dell'SDK, senza chiedere il permesso, e le cronache si ricaricano.

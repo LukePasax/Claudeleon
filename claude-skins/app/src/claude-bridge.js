@@ -221,6 +221,7 @@ class ClaudeBridge extends EventEmitter {
     // Modello e ragionamento (null: quelli di partenza di Claude Code)
     this.model = null
     this.effort = null
+    this.ultracode = false
     // Le attività della conversazione in corso
     this.todos = []
     this.todoCreated = new Map()
@@ -283,8 +284,19 @@ class ClaudeBridge extends EventEmitter {
     this.model = model || null
     if (this.query) this.query.setModel(this.model || undefined).catch(() => {})
   }
+  // Ragionamento e ultracode cambiano anche a conversazione accesa (applyFlagSettings); un livello mandato senza la
+  // chiave ultracode la spegnerebbe, quindi vanno sempre insieme
   setEffort(effort) {
     this.effort = ['low', 'medium', 'high', 'xhigh', 'max'].includes(effort) ? effort : null
+    this.applyLive()
+  }
+  setUltracode(on) {
+    this.ultracode = !!on
+    this.applyLive()
+  }
+  applyLive() {
+    if (!this.live || this.live.ended) return
+    this.live.query.applyFlagSettings({ effortLevel: this.effort, ultracode: this.ultracode ? true : null }).catch(() => {})
   }
 
   // Le attività ricominciano con la conversazione (capitolo nuovo o cronaca aperta)
@@ -418,7 +430,7 @@ class ClaudeBridge extends EventEmitter {
     if (this.live && !this.live.ended && this.live.turn.open) return this.live
     const resume = this.session.getSession()
     const cwd = (resume && this.sessionCwd) || this.workdir
-    const key = JSON.stringify([cwd, this.effort, this.persona])
+    const key = JSON.stringify([cwd, this.persona])
     const cur = this.live
     if (cur && !cur.ended && cur.key === key && (cur.sessionId || null) === (resume || null)) return cur
     if (cur && !cur.ended && cur.key === key && !cur.sessionId && !resume) return cur
@@ -434,6 +446,8 @@ class ClaudeBridge extends EventEmitter {
         permissionMode: this.mode,
         model: this.model || undefined,
         effort: this.effort || undefined,
+        // Ultracode: orchestrazione dinamica dei flussi di lavoro, per la sessione (come l'interruttore dell'app desktop)
+        settings: this.ultracode ? { ultracode: true } : undefined,
         systemPrompt: { type: 'preset', preset: 'claude_code', append: this.persona || FALLBACK_PERSONA },
         env: Object.assign({}, process.env, {
           // Claude Code manda anche una frase che riassume ogni gruppo di azioni (come nell'app desktop)
