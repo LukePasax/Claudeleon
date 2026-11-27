@@ -39,6 +39,10 @@ npm 11 altrimenti non arriva.
   o che si è fermato; nel titolo c'è il nome della conversazione. Un clic riporta davanti la finestra, e tornandoci le
   notifiche aperte si chiudono. Si spengono dal vassoio, "Notifiche". Perché Windows le mostri, all'avvio l'app crea
   (o aggiorna) il collegamento "Claude Skins" nel menu Start, con lo stesso identificativo dell'app.
+- **Icona:** quella del tema in uso (per Terra di Mezzo la porta tonda verde), sulla finestra e nella barra delle
+  applicazioni. Windows prende l'icona della barra dal collegamento del menu Start, quindi l'app scrive l'icona del
+  tema in `%APPDATA%\Claude Skins\claude-skins.ico` e la mette sul collegamento; cambiando tema si aggiorna (Windows
+  a volte la mostra solo dal riavvio dopo).
 - **Scorciatoia:** `Ctrl+Alt+P` riporta davanti la finestra da qualunque programma, o la riduce a icona se è già
   davanti; lo stesso fa un clic sull'icona del vassoio.
 - **Tema:** dalla finestra ("Altre stanze" in fondo alla barra dello scrittoio,

@@ -1036,6 +1036,7 @@
     scrollDown(true)
     if (sessionsPinned()) refreshSessions()
     api.setTrayIcon(Theming.trayIcon(Theming.palette('notte')))
+    if (api.setAppIcon) api.setAppIcon(Theming.appIcon(Theming.palette('notte')))
     hook('mount')
   }
 

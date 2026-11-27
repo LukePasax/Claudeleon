@@ -415,6 +415,7 @@ function registerIpc() {
     mode: config.permissionMode || bridge.mode,
   }))
   ipcMain.on('theme:set', (_e, id) => setTheme(String(id)))
+  ipcMain.on('app:icon', (_e, dataUrl) => { if (!captureMode) setAppIcon(String(dataUrl || '')); else if (process.platform !== 'darwin') win.setIcon(nativeImage.createFromDataURL(String(dataUrl || ''))) })
   // Copiare negli appunti (i pulsanti "copia" di codice e risposte)
   ipcMain.on('clipboard:write', (_e, text) => clipboard.writeText(String(text || '')))
   // La cartella delle conversazioni nuove, dalla finestra: dal dialogo di sistema o da una cartella recente
@@ -524,8 +525,6 @@ function registerIpc() {
   ipcMain.on('tray:icon', (_e, dataUrl) => {
     const img = nativeImage.createFromDataURL(dataUrl)
     trayImage = img
-    // La stessa icona del tema va anche sulla finestra: è quella della barra delle applicazioni
-    if (process.platform !== 'darwin') win.setIcon(img)
     if (tray) { tray.setImage(img); return }
     tray = new Tray(img)
     tray.setToolTip('Claude Skins')
@@ -658,19 +657,64 @@ function fakeConversation(capture) {
 const APP_ID = 'Claude Skins'
 if (process.platform === 'win32') app.setAppUserModelId(APP_ID)
 
+// L'icona dell'app, quella del tema in uso, a 256 pixel: va sulla finestra e, come file .ico, sul collegamento del
+// menu Start. Windows prende l'icona della barra delle applicazioni dal collegamento con lo stesso AppUserModelId:
+// senza un'icona sua, il collegamento mostrerebbe quella di Electron
+function iconFile() {
+  return path.join(app.getPath('userData'), 'claude-skins.ico')
+}
+// Un .ico con dentro i PNG a 256, 48, 32 e 16 pixel (Windows accetta i PNG dentro un .ico)
+function writeIco(img) {
+  const sizes = [256, 48, 32, 16]
+  const pngs = sizes.map((s) => img.resize({ width: s, height: s, quality: 'best' }).toPNG())
+  const head = Buffer.alloc(6 + 16 * sizes.length)
+  head.writeUInt16LE(0, 0)
+  head.writeUInt16LE(1, 2)
+  head.writeUInt16LE(sizes.length, 4)
+  let offset = head.length
+  sizes.forEach((s, i) => {
+    const e = 6 + 16 * i
+    head.writeUInt8(s >= 256 ? 0 : s, e)
+    head.writeUInt8(s >= 256 ? 0 : s, e + 1)
+    head.writeUInt16LE(1, e + 4)
+    head.writeUInt16LE(32, e + 6)
+    head.writeUInt32LE(pngs[i].length, e + 8)
+    head.writeUInt32LE(offset, e + 12)
+    offset += pngs[i].length
+  })
+  const data = Buffer.concat([head, ...pngs])
+  const file = iconFile()
+  let same = false
+  try { same = fs.readFileSync(file).equals(data) } catch {}
+  if (!same) fs.writeFileSync(file, data)
+  return !same
+}
+function setAppIcon(dataUrl) {
+  const img = nativeImage.createFromDataURL(dataUrl)
+  if (img.isEmpty()) return
+  if (process.platform !== 'darwin') win.setIcon(img)
+  if (process.platform !== 'win32') return
+  try {
+    const changed = writeIco(img)
+    ensureStartMenuShortcut(changed)
+  } catch {}
+}
+
 // Il collegamento nel menu Start: Windows mostra le notifiche di un'app non installata solo se ne esiste uno con lo
 // stesso AppUserModelId. Serve anche ad aprire Claude Skins dal menu Start. Si crea (o si aggiorna) all'avvio
-function ensureStartMenuShortcut() {
+function ensureStartMenuShortcut(iconChanged) {
   if (process.platform !== 'win32') return
   try {
     const link = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Claude Skins.lnk')
     const want = { target: process.execPath, args: `"${app.getAppPath()}"`, appUserModelId: APP_ID, description: 'Claude Skins', cwd: app.getAppPath() }
+    // L'icona del tema, se c'è già il file (lo scrive setAppIcon)
+    if (fs.existsSync(iconFile())) Object.assign(want, { icon: iconFile(), iconIndex: 0 })
     let same = false
     try {
       const cur = shell.readShortcutLink(link)
-      same = cur.target === want.target && cur.args === want.args && cur.appUserModelId === APP_ID
+      same = cur.target === want.target && cur.args === want.args && cur.appUserModelId === APP_ID && (cur.icon || '') === (want.icon || '')
     } catch {}
-    if (!same) shell.writeShortcutLink(link, fs.existsSync(link) ? 'replace' : 'create', want)
+    if (!same || iconChanged) shell.writeShortcutLink(link, fs.existsSync(link) ? 'replace' : 'create', want)
   } catch {}
 }
 

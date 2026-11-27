@@ -146,11 +146,12 @@
     },
 
     // Il vassoio: un quadrato arrotondato nel colore d'accento con una stella a quattro punte
-    trayIcon({ pal }) {
+    trayIcon({ pal, size = 32 }) {
       const c = document.createElement('canvas')
-      c.width = 32
-      c.height = 32
+      c.width = size
+      c.height = size
       const g = c.getContext('2d')
+      g.scale(size / 32, size / 32)
       g.beginPath(); g.roundRect(1, 1, 30, 30, 8); g.fillStyle = pal.accent; g.fill()
       g.fillStyle = pal.onAccent || '#ffffff'
       g.beginPath()

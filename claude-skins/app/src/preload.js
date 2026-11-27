@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('skins', {
   readImage: (p) => ipcRenderer.invoke('file:image', p),
   stop: (conv) => ipcRenderer.send('chat:stop', conv),
   setTrayIcon: (dataUrl) => ipcRenderer.send('tray:icon', dataUrl),
+  setAppIcon: (dataUrl) => ipcRenderer.send('app:icon', dataUrl),
   renameSession: (id, title, cwd) => ipcRenderer.invoke('session:rename', id, title, cwd),
   archiveSession: (id, cwd, on) => ipcRenderer.invoke('session:archive', id, cwd, on),
   deleteSession: (id, cwd, title) => ipcRenderer.invoke('session:delete', id, cwd, title),

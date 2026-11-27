@@ -81,6 +81,8 @@
     workingVerbs: 'Claudando|Rimuginando|Elucubrando|Architettando|Cogitando|Ponderando|Arzigogolando|Macinando|Districando|Combinando',
     // Le risposte suggerite
     suggestionTip: 'Manda questa risposta (Tab la scrive nella casella)',
+    // Il nome dell'app, per i temi che lo scrivono nella testata
+    appTitle: 'Claude Skins',
     // Copiare
     copy: 'Copia',
     copied: 'Copiato',
@@ -350,6 +352,16 @@
     return Pixel.upscale(drawn, 32, 32)
   }
 
+  // L'icona dell'app (barra delle applicazioni, menu Start), grande: lo stesso disegno del vassoio a 256 pixel. Un
+  // disegno a misura libera (trayIcon({ size })) si disegna grande; uno a pixel si ingrandisce a pixel pieni
+  function appIcon(pal, size = 256) {
+    const fn = current.art && current.art.trayIcon
+    let drawn = null
+    try { drawn = typeof fn === 'function' ? fn({ pal, size }) : null } catch {}
+    if (!drawn) drawn = Pixel.lib.trayScroll()
+    return Pixel.upscale(drawn, size, size)
+  }
+
   // L'anteprima di un tema qualunque (anche non in uso) per il selettore: 48×30 pixel con la sua carta, il suo
   // capo o la sua copertina (un tratto del disegno roll o leather), un filo d'oro e la sua icona del vassoio
   function preview(id, sceneName) {
@@ -394,7 +406,7 @@
     preview,
     // I temi caricati, per il selettore: id, nome, descrizione
     list: () => [...registry.values()].map((th) => ({ id: th.id, name: th.name || th.id, description: th.description || '' })),
-    load, use, applyScene, t, chapterDate, plainDate, art, icon, trayIcon, hook, asset, artScale, MONTHS,
+    load, use, applyScene, t, chapterDate, plainDate, art, icon, trayIcon, appIcon, hook, asset, artScale, MONTHS,
     get current() { return current },
     palette: (name) => paletteOf(current, name),
   }

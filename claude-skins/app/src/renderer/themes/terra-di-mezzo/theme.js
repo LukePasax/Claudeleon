@@ -179,6 +179,15 @@
 
     layout: `
   <div class="desk" data-solid>
+    <header class="beam" data-drag>
+      <span class="beam-title"><span class="beam-door"></span><span data-s="appTitle"></span></span>
+      <div class="controls">
+        <button class="ctl" data-action="hide" data-s-title="hideTip">&#8211;</button>
+        <button class="ctl max" data-action="maximize" data-s-title="maxTip"></button>
+        <button class="ctl" data-action="quit" data-s-title="quitTip">&#10005;</button>
+      </div>
+    </header>
+    <div class="room">
     <aside class="side">
       <div class="porthole" data-drag></div>
       <div class="side-head" data-drag><span class="brand" data-s="title"></span></div>
@@ -198,11 +207,6 @@
         <div class="top-title">
           <span class="chapter-title" data-part="chapter-title"></span>
           <span class="chapter-date" data-part="chapter-date"></span>
-        </div>
-        <div class="controls">
-          <button class="ctl" data-action="hide" data-s-title="hideTip">&#8211;</button>
-          <button class="ctl max" data-action="maximize" data-s-title="maxTip"></button>
-          <button class="ctl" data-action="quit" data-s-title="quitTip">&#10005;</button>
         </div>
       </header>
       <div class="log" data-part="log"></div>
@@ -227,6 +231,7 @@
         <div class="hint" data-part="hint"></div>
       </div>
     </main>
+    </div>
     <div class="grip" data-grip data-s-title="gripTip"></div>
   </div>`,
 
@@ -388,11 +393,12 @@
       },
 
       // Il vassoio: la porta tonda verde col pomello d'oro (32×32)
-      trayIcon() {
+      trayIcon({ size = 32 } = {}) {
         const c = document.createElement('canvas')
-        c.width = 32
-        c.height = 32
+        c.width = size
+        c.height = size
         const g = c.getContext('2d')
+        g.scale(size / 32, size / 32)
         g.beginPath(); g.arc(16, 16, 15, 0, Math.PI * 2); g.fillStyle = '#5a3a1a'; g.fill()
         g.beginPath(); g.arc(16, 16, 12.5, 0, Math.PI * 2); g.fillStyle = '#2e5c2a'; g.fill()
         g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = 1
