@@ -57,7 +57,46 @@
 
   // ------------------------------------------------------------------ la conversazione nel log
 
-  function scrollDown() { const l = part('log'); if (l) l.scrollTop = l.scrollHeight }
+  // Il log resta agganciato al fondo finché chi legge non risale: ogni cambiamento (testo che arriva, una domanda
+  // riempita dopo, miniature che si caricano, la penna o le attività che cambiano misura) lo riporta giù. Risalendo
+  // si sgancia; tornando in fondo, o spedendo un messaggio, si riaggancia
+  let stick = true
+  // Dove l'app ha portato il log: l'evento di scorrimento arriva un fotogramma dopo, quando il contenuto può essere già
+  // cresciuto, e non va scambiato per chi legge che risale
+  let ownTop = -1
+  function toBottom(l) {
+    l.scrollTop = l.scrollHeight
+    ownTop = l.scrollTop
+  }
+  function scrollDown(force) {
+    const l = part('log')
+    if (!l) return
+    if (force) stick = true
+    if (stick) toBottom(l)
+  }
+  let logWatch = []
+  function watchLog() {
+    for (const o of logWatch) o.disconnect()
+    logWatch = []
+    const log = part('log')
+    if (!log) return
+    let frame = 0
+    const follow = () => {
+      if (frame) return
+      frame = requestAnimationFrame(() => { frame = 0; if (stick) toBottom(log) })
+    }
+    log.addEventListener('scroll', () => {
+      if (Math.abs(log.scrollTop - ownTop) < 2) return
+      stick = log.scrollHeight - log.scrollTop - log.clientHeight < 32
+      ownTop = -1
+    })
+    log.addEventListener('load', follow, true)
+    const ro = new ResizeObserver(follow)
+    ro.observe(log)
+    const mo = new MutationObserver(follow)
+    mo.observe(log, { childList: true, subtree: true, characterData: true })
+    logWatch.push(ro, mo)
+  }
 
   // Le voci della conversazione hanno la classe "item": sono le sole che si spostano da un layout all'altro e che
   // un nuovo capitolo cancella (il resto del log, se il tema ci mette qualcosa, resta)
@@ -732,6 +771,7 @@
     addEdges()
     const log = part('log')
     if (log) for (const it of items) log.appendChild(it)
+    watchLog()
     if (part('input')) part('input').value = draft
     setBusy(busy)
     setWindowState(winMode)
@@ -742,7 +782,7 @@
     renderModel()
     renderChapterHead()
     paint()
-    scrollDown()
+    scrollDown(true)
     if (sessionsPinned()) refreshSessions()
     api.setTrayIcon(Theming.trayIcon(Theming.palette('notte')))
     hook('mount')
@@ -861,6 +901,8 @@
     // /clear e /new: un nuovo capitolo, come il pulsante
     if (/^\/(clear|new)\s*$/i.test(text)) { input.value = ''; newChapter(); return }
     input.value = ''
+    // Chi spedisce vuole vedere il suo messaggio e la risposta: il log torna in fondo
+    stick = true
     // Mentre Claude lavora il messaggio entra nel turno in corso: la risposta continua sotto di lui
     if (busy) renderReply()
     reply = null
@@ -1571,6 +1613,7 @@
     clearLog()
     reply = null
     currentSession = s
+    stick = true
     convoDir = s.cwd || workdir
     renderFolder()
     renderChapterHead()
