@@ -735,3 +735,30 @@ body.busy .entry .edit-btn { display: none; }
 /* Dettatura: il microfono accanto a "+" */
 .dictate-btn { display: inline-grid; place-items: center; }
 .dictate-btn.on { color: var(--btn-ink); background: var(--btn-bg); border-color: var(--btn-bg); }
+
+/* Editor dei temi: le schede in più del selettore e il pannello a destra (fuori dal layout, sopra la finestra) */
+.theme-card.theme-new { align-items: center; justify-content: center; text-align: center; border-style: dashed; min-height: 150px; }
+.tn-plus { font-size: 34px; line-height: 1; color: var(--gold); }
+.theme-actions { display: flex; gap: 6px; margin-top: 2px; }
+.theme-actions .btn.sure { color: var(--minus); }
+.theme-editor {
+  position: fixed; top: 18px; right: 18px; bottom: 18px; z-index: 90; width: 300px; display: flex; flex-direction: column;
+  font-family: 'Segoe UI', system-ui, sans-serif; font-size: 13.5px; color: var(--ink); background: var(--menu-bg, var(--bg));
+  border: var(--line, 1px) solid var(--edge-light); border-radius: 12px; box-shadow: 0 10px 34px rgba(0, 0, 0, 0.35);
+}
+.te-head { padding: 14px 16px 8px; font-size: 17px; font-weight: 600; color: var(--strong, var(--ink)); }
+.te-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 8px; }
+.te-body .set-section { margin: 14px 0 6px; }
+.te-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0; }
+.te-label { flex: none; color: var(--ink); }
+.te-input { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--field, var(--code)); border: 1px solid var(--edge-light); border-radius: 6px; padding: 4px 7px; outline: none; user-select: text; }
+.te-input:focus { border-color: var(--gold); }
+.te-from, .te-font { max-width: 170px; font-size: 13px; }
+.te-color-wrap { display: inline-flex; align-items: center; gap: 8px; }
+.te-color { width: 34px; height: 24px; padding: 0; border: 1px solid var(--edge-light); border-radius: 5px; background: none; cursor: pointer; }
+.te-color::-webkit-color-swatch-wrapper { padding: 2px; }
+.te-color::-webkit-color-swatch { border: none; border-radius: 3px; }
+.te-hex { min-width: 40px; white-space: nowrap; font-family: Consolas, 'Cascadia Code', monospace; font-size: 12px; color: var(--ink-soft); }
+.te-range { width: 92px; accent-color: var(--gold); }
+.te-note { padding: 12px 0 4px; }
+.te-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px 14px; border-top: 1px solid var(--edge-light); }

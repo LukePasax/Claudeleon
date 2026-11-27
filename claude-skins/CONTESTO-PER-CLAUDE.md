@@ -298,6 +298,20 @@ Nella pagina: `data-part="git"` (o dentro `data-part="folder"`), pannello `.git-
 conversazione, `refreshGit()` lo rilegge (cambio di cartella o di conversazione, fine risposta, focus della finestra).
 Prove: `test/unit/git.test.js` (un repo vero con un remoto nudo), e il pannello nelle prove della finestra.
 
+## Editor dei temi
+
+Un tema dell'editor è `{ id, name, description, colors (9), font, textSize, radius }`; `kits/moderno.js` ha
+`fromColors(spec)` (ricava tutte le variabili del kit, chiare o scure secondo la luminanza dello sfondo; `theme.custom`
+tiene la descrizione), `normalizeSpec`, `colorsOf(theme)` (per "Parti da" e "Modifica"), `FONTS`, `readableOn`.
+`themes.js`: `userThemes(dir)` (i JSON di `userData/temi`), `saveUserTheme` (id dal nome senza accenti, diverso dai
+temi del programma e dagli altri; si tiene quando si modifica), `deleteUserTheme`, `userThemeInfo`. main.js:
+`allThemes()` = programma + editor; `app:info` dà `themes` (solo quelli coi file, caricati come script) e
+`userThemes` (le descrizioni, che la pagina costruisce con `Theming.register`); IPC `theme:save` / `theme:delete`
+(eliminato quello in uso: si torna al predefinito). L'editor (`.theme-editor`, in body con `data-solid`, fuori dal
+layout) monta il tema in prova `__bozza` e a ogni scelta lo ri-registra e ridipinge (`paint`); "Salva e usa" chiama
+`setTheme` dopo il salvataggio, "Annulla" rimonta il tema di prima. `Theming.list()` nasconde gli id che cominciano
+con `__`. mount() ora ridisegna anche il pulsante di git (mancava dopo un cambio di tema).
+
 ## Dettatura
 
 Solo Windows (`api.dictate` c'è solo se `process.platform === 'win32'` nel preload). `webkitSpeechRecognition` in

@@ -314,6 +314,36 @@ for (const tema of TEMI) {
     assert.deepEqual(errors, [])
   })
 
+  test(`${tema}: editor dei temi, dal nuovo tema alla modifica`, async () => {
+    await open(tema)
+    await send('Ciao')
+    await done()
+    await page.click('[data-action="themes"]')
+    await page.click('.theme-new')
+    await page.waitForSelector('.theme-editor .te-name')
+    // L'anteprima è la finestra: il tema in prova è già montato, e la conversazione c'è ancora
+    assert.equal(await page.evaluate(() => Theming.current.id), '__bozza')
+    assert.equal(await convo('.entry.you'), 1)
+    await page.fill('.te-name', 'Città di notte')
+    await page.$eval('.te-color[data-key="bg"]', (i) => { i.value = '#101820'; i.dispatchEvent(new Event('input', { bubbles: true })) })
+    await page.waitForFunction(() => getComputedStyle(document.body).getPropertyValue('--bg').trim() === '#101820')
+    // L'accento cambia anche il testo sull'accento, finché è automatico
+    await page.$eval('.te-color[data-key="accent"]', (i) => { i.value = '#f2aa4c'; i.dispatchEvent(new Event('input', { bubbles: true })) })
+    assert.equal(await page.$eval('.te-color[data-key="onAccent"]', (i) => i.value), '#10131a')
+    await page.selectOption('.te-font', 'libro')
+    await page.click('.te-save')
+    await page.waitForFunction(() => Theming.current.id === 'citta-di-notte' && !document.querySelector('.theme-editor'))
+    assert.equal(await convo('.entry.you'), 1)
+    // Fra i temi, coi suoi pulsanti; Annulla nell'editor torna a quello di prima
+    await page.click('[data-action="themes"]')
+    await page.click('.theme-card.mine .btn:has-text("Modifica")')
+    await page.waitForSelector('.theme-editor')
+    assert.equal(await page.inputValue('.te-name'), 'Città di notte')
+    await page.click('.te-cancel')
+    await page.waitForFunction(() => Theming.current.id === 'citta-di-notte' && !document.querySelector('.theme-editor'))
+    assert.deepEqual(errors, [])
+  })
+
   test(`${tema}: impostazioni, estensioni, contesto, cambio di tema che tiene la conversazione`, async () => {
     await open(tema)
     await send('Ciao')

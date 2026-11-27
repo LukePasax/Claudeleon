@@ -1129,13 +1129,190 @@
       card.querySelector('.theme-name').textContent = th.name
       card.querySelector('.theme-desc').textContent = th.description
       if (th.id === Theming.current.id) card.appendChild(label(Object.assign(document.createElement('span'), { className: 'theme-current' }), 'themesCurrent'))
+      // I temi fatti con l'editor: si modificano e si eliminano (con una conferma sul posto)
+      const full = Theming.get(th.id)
+      if (full && full.custom && api.saveTheme) {
+        card.classList.add('mine')
+        const acts = document.createElement('span')
+        acts.className = 'theme-actions'
+        const edit = document.createElement('span')
+        edit.className = 'btn small deny'
+        label(edit, 'themesEdit')
+        edit.addEventListener('click', (e) => { e.stopPropagation(); openThemeEditor(th.id) })
+        const del = document.createElement('span')
+        del.className = 'btn small deny'
+        label(del, 'themesDelete')
+        del.addEventListener('click', async (e) => {
+          e.stopPropagation()
+          if (!del.classList.contains('sure')) { del.classList.add('sure'); label(del, 'themesDeleteSure'); return }
+          if (await api.deleteTheme(th.id)) { Theming.unregister(th.id); openThemes() }
+        })
+        acts.append(edit, del)
+        card.appendChild(acts)
+      }
       card.addEventListener('click', () => {
         closeThemes()
         if (th.id !== Theming.current.id) api.setTheme(th.id)
       })
       cards.appendChild(card)
     }
+    if (api.saveTheme && window.SkinsKits && window.SkinsKits.moderno) {
+      const card = document.createElement('button')
+      card.className = 'theme-card theme-new'
+      card.innerHTML = '<span class="tn-plus">+</span><span class="theme-name"></span><span class="theme-desc"></span>'
+      label(card.querySelector('.theme-name'), 'themesNew')
+      label(card.querySelector('.theme-desc'), 'themesNewDesc')
+      card.addEventListener('click', () => openThemeEditor(null))
+      cards.appendChild(card)
+    }
     host.appendChild(panel)
+  }
+
+  // ------------------------------------------------------------------ editor dei temi
+
+  // Un tema nuovo (o uno dei tuoi da modificare) col kit moderno: nove colori di base, carattere, dimensione del
+  // testo e angoli; il kit ricava il resto. L'anteprima è la finestra stessa: il tema in prova ('__bozza') si monta
+  // subito e ogni scelta cambia le sue variabili sul posto. Il pannello sta fuori dal layout (in body), così il
+  // cambio di tema non lo porta via. "Salva e usa" lo scrive fra i temi tuoi e lo mette in uso; "Annulla" torna a
+  // quello di prima
+  const DRAFT = '__bozza'
+  let themeEditor = null
+  async function openThemeEditor(editId) {
+    closeThemes()
+    const kit = window.SkinsKits.moderno
+    if (themeEditor) themeEditor.el.remove()
+    const prev = Theming.current.id === DRAFT ? (themeEditor && themeEditor.prev) : Theming.current.id
+    const from = editId ? Theming.get(editId) : ((Theming.current.kits || []).includes('moderno') ? Theming.current : Theming.get('metrios'))
+    const spec = kit.colorsOf(from)
+    spec.id = editId || ''
+    spec.name = editId ? from.name : t('teNameDefault')
+    spec.description = editId ? (from.description || '') : ''
+    let autoOn = !editId || spec.colors.onAccent === kit.readableOn(spec.colors.accent)
+    const el = document.createElement('div')
+    el.className = 'theme-editor'
+    el.dataset.solid = ''
+    themeEditor = { el, prev, spec }
+    let raf = 0
+    const apply = (full) => {
+      Theming.register(kit.fromColors(Object.assign({}, spec, { id: DRAFT })))
+      if (full) return
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => paint())
+    }
+    const field = (key, input) => {
+      const r = document.createElement('label')
+      r.className = 'te-row'
+      const l = document.createElement('span')
+      l.className = 'te-label'
+      r.append(label(l, key), input)
+      return r
+    }
+    const build = () => {
+      el.innerHTML = '<div class="te-head"><span></span></div><div class="te-body"></div><div class="te-foot"><button class="btn small deny te-cancel"></button><button class="btn small te-save"></button></div>'
+      label(el.querySelector('.te-head span'), editId ? 'teTitleEdit' : 'teTitleNew')
+      const body = el.querySelector('.te-body')
+      const name = Object.assign(document.createElement('input'), { className: 'te-input te-name', value: spec.name, spellcheck: false })
+      name.addEventListener('input', () => { spec.name = name.value })
+      body.appendChild(field('teName', name))
+      const desc = Object.assign(document.createElement('input'), { className: 'te-input', value: spec.description, spellcheck: false })
+      desc.addEventListener('input', () => { spec.description = desc.value })
+      body.appendChild(field('teDesc', desc))
+      // Parti da: i colori di un altro tema del kit (il nome resta)
+      const fromSel = document.createElement('select')
+      fromSel.className = 'set-select te-from'
+      fromSel.appendChild(Object.assign(document.createElement('option'), { value: '', textContent: t('teFromPick') }))
+      for (const th of Theming.list()) {
+        const full = Theming.get(th.id)
+        if (th.id === DRAFT || !full || !(full.kits || []).includes('moderno')) continue
+        fromSel.appendChild(Object.assign(document.createElement('option'), { value: th.id, textContent: th.name }))
+      }
+      fromSel.addEventListener('change', () => {
+        if (!fromSel.value) return
+        const c = kit.colorsOf(Theming.get(fromSel.value))
+        Object.assign(spec, { colors: c.colors, font: c.font, textSize: c.textSize, radius: c.radius })
+        autoOn = spec.colors.onAccent === kit.readableOn(spec.colors.accent)
+        apply()
+        build()
+      })
+      body.appendChild(field('teFrom', fromSel))
+      const sec = (key) => { const h = document.createElement('div'); h.className = 'set-section'; body.appendChild(label(h, key)) }
+      sec('teColors')
+      for (const k of kit.COLOR_KEYS) {
+        const inp = Object.assign(document.createElement('input'), { type: 'color', className: 'te-color', value: spec.colors[k] })
+        inp.dataset.key = k
+        const code = document.createElement('span')
+        code.className = 'te-hex'
+        code.textContent = k === 'onAccent' && autoOn ? `${spec.colors[k]} · ${t('teAuto')}` : spec.colors[k]
+        const wrap = document.createElement('span')
+        wrap.className = 'te-color-wrap'
+        wrap.append(inp, code)
+        inp.addEventListener('input', () => {
+          spec.colors[k] = inp.value
+          if (k === 'onAccent') autoOn = false
+          if (k === 'accent' && autoOn) {
+            spec.colors.onAccent = kit.readableOn(inp.value)
+            const on = el.querySelector('.te-color[data-key="onAccent"]')
+            if (on) { on.value = spec.colors.onAccent; on.nextElementSibling.textContent = `${spec.colors.onAccent} · ${t('teAuto')}` }
+          }
+          code.textContent = k === 'onAccent' && autoOn ? `${inp.value} · ${t('teAuto')}` : inp.value
+          apply()
+        })
+        body.appendChild(field(`teColor_${k}`, wrap))
+      }
+      sec('teFont')
+      const font = document.createElement('select')
+      font.className = 'set-select te-font'
+      for (const f of Object.keys(kit.FONTS)) font.appendChild(Object.assign(document.createElement('option'), { value: f, textContent: t(`teFont_${f}`), selected: f === spec.font }))
+      font.addEventListener('change', () => { spec.font = font.value; apply() })
+      body.appendChild(field('teFont', font))
+      const range = (key, prop, min, max) => {
+        const wrap = document.createElement('span')
+        wrap.className = 'te-color-wrap'
+        const inp = Object.assign(document.createElement('input'), { type: 'range', min, max, step: 1, value: spec[prop], className: `te-range te-${prop}` })
+        const v = Object.assign(document.createElement('span'), { className: 'te-hex', textContent: `${spec[prop]} px` })
+        inp.addEventListener('input', () => { spec[prop] = Number(inp.value); v.textContent = `${inp.value} px`; apply() })
+        wrap.append(inp, v)
+        body.appendChild(field(key, wrap))
+      }
+      range('teTextSize', 'textSize', 13, 18)
+      range('teRadius', 'radius', 0, 16)
+      const note = document.createElement('div')
+      note.className = 'folder-note te-note'
+      body.appendChild(label(note, 'teNote'))
+      label(el.querySelector('.te-cancel'), 'teCancel')
+      label(el.querySelector('.te-save'), 'teSave')
+      el.querySelector('.te-cancel').addEventListener('click', () => closeThemeEditor(true))
+      el.querySelector('.te-save').addEventListener('click', saveThemeEditor)
+      el.addEventListener('keydown', (e) => { if (!e.ctrlKey && !e.metaKey) e.stopPropagation(); if (e.key === 'Escape') closeThemeEditor(true) })
+    }
+    build()
+    document.body.appendChild(el)
+    apply(true)
+    await mount(DRAFT)
+    el.querySelector('.te-name').focus()
+  }
+  async function saveThemeEditor() {
+    if (!themeEditor) return
+    const { spec, el } = themeEditor
+    const r = await api.saveTheme(spec).catch((err) => ({ ok: false, error: err.message }))
+    if (!r || !r.ok) {
+      let n = el.querySelector('.te-error')
+      if (!n) { n = document.createElement('div'); n.className = 'git-note error te-error'; el.querySelector('.te-body').prepend(n) }
+      n.textContent = t('teSaveFail', { x: (r && r.error) || '?' })
+      return
+    }
+    Theming.register(window.SkinsKits.moderno.fromColors(r.spec))
+    closeThemeEditor(false)
+    // Il processo principale lo mette in uso (misura della finestra, configurazione) e la pagina lo monta
+    api.setTheme(r.spec.id)
+  }
+  function closeThemeEditor(restore) {
+    if (!themeEditor) return
+    const { el, prev } = themeEditor
+    themeEditor = null
+    el.remove()
+    Theming.unregister(DRAFT)
+    if (restore) mount(prev)
   }
 
   function closeThemes() {
@@ -1975,6 +2152,7 @@
     renderUpdateBanner()
     renderChapterHead()
     renderDictate()
+    renderGit()
     // L'anteprima aperta resta aperta col tema nuovo
     if (preview && !preview.hidden) { preview = null; openPreview(previewUrl) } else preview = null
     renderPreviewBtn()
@@ -4055,6 +4233,8 @@
     // I comandi della cache; l'elenco aggiornato arriva poi da onCommands
     api.commands().then((list) => { if (!commands.length) commands = list || [] }).catch(() => {})
     await Theming.load(info.themes || [])
+    // I temi dell'editor si costruiscono dai loro colori
+    for (const spec of info.userThemes || []) Theming.register(window.SkinsKits.moderno.fromColors(spec))
     await mount(info.theme)
     if (part('input')) part('input').focus()
   })
@@ -4262,6 +4442,8 @@
       writeMemory: async (_c, f, text) => { fakeMemory.set(f, text); return { ok: true } },
       openMemory: async () => true,
       dictate: async () => true,
+      saveTheme: async (spec) => { const id = spec.id || String(spec.name || 'tema').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'tema'; return { ok: true, spec: Object.assign(window.SkinsKits.moderno.normalizeSpec(spec), { id }) } },
+      deleteTheme: async () => true,
       capturePreview: async () => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
       gitStatus: async () => JSON.parse(JSON.stringify(fakeGit)),
       gitDiff: async (_c, f) => (f.endsWith('.cpp') ? { file: f, created: f.includes('Rivers'), hunks: [{ before: f.includes('Rivers') ? '' : 'void Draw(Map& map) {\n    DrawRoads(map);\n}\n', after: 'void Draw(Map& map) {\n    DrawRivers(map);\n    DrawRoads(map);\n}\n', line: 1 }] } : { file: f, deleted: true, hunks: [{ before: '# Vecchio\n', after: '', line: 1 }] }),

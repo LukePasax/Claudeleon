@@ -10,7 +10,7 @@ const gitOps = require('./git')
 const permissions = require('./permissions')
 const memory = require('./memory')
 const { plainSnippet } = require('./text')
-const { listThemes, DEFAULT_THEME } = require('./themes')
+const { listThemes, DEFAULT_THEME, userThemes, userThemeInfo, saveUserTheme, deleteUserTheme } = require('./themes')
 
 // La misura di partenza, simile a quella dell'app desktop, e la minima, per i temi che non dicono le loro
 // (campo window del theme.js). La finestra di partenza non supera mai il 92% dello schermo
@@ -108,6 +108,12 @@ function visiblePosition(pos) {
 }
 
 // Il tema in uso, o il predefinito se quello salvato non c'è più
+// I temi del programma e, dopo, quelli fatti con l'editor (cartella temi nei dati dell'app)
+const userThemesDir = () => path.join(app.getPath('userData'), 'temi')
+function allThemes() {
+  return [...listThemes(), ...userThemes(userThemesDir()).map(userThemeInfo)]
+}
+
 function currentTheme() {
   return themes.find((t) => t.id === config.theme) || themes.find((t) => t.id === DEFAULT_THEME) || themes[0] || { id: DEFAULT_THEME, name: DEFAULT_THEME, persona: '' }
 }
@@ -511,7 +517,9 @@ function registerIpc() {
     chapter: config.chapter,
     shortcut: TOGGLE_SHORTCUT.replace('Control', 'Ctrl'),
     theme: currentTheme().id,
-    themes: themes.map((t) => t.id),
+    themes: themes.filter((t) => !t.custom).map((t) => t.id),
+    // I temi dell'editor: la pagina li costruisce dai colori
+    userThemes: userThemes(userThemesDir()),
     workdir: bridge.workdir,
     conv: activeConv,
     sessionId: config.sessionId || null,
@@ -521,6 +529,25 @@ function registerIpc() {
     mode: config.permissionMode || bridge.mode,
   }))
   ipcMain.on('theme:set', (_e, id) => setTheme(String(id)))
+  // L'editor dei temi: salva (nuovo o modificato) e lo mette in uso; elimina (e se era in uso, torna a quello di
+  // partenza)
+  ipcMain.handle('theme:save', (_e, spec) => {
+    try {
+      const saved = saveUserTheme(userThemesDir(), spec)
+      themes = allThemes()
+      refreshTray()
+      return { ok: true, spec: saved }
+    } catch (err) {
+      return { ok: false, error: err.message }
+    }
+  })
+  ipcMain.handle('theme:delete', (_e, id) => {
+    const ok = deleteUserTheme(userThemesDir(), String(id || ''))
+    themes = allThemes()
+    if (ok && config.theme === id) setTheme(DEFAULT_THEME)
+    refreshTray()
+    return ok
+  })
   ipcMain.handle('settings:get', () => settingsState())
   // L'aggiornamento: lo stato, un controllo adesso, l'aggiornamento vero
   ipcMain.handle('update:get', () => (updater ? updater.state : { state: 'unavailable' }))
@@ -999,7 +1026,7 @@ app.whenReady().then(() => {
     configFile = path.join(app.getPath('temp'), 'claude-skins-prova.json')
     config = { workdir: config.workdir, position: { x: 20, y: 20 }, sizes: {}, sessionId: null, scene: capture.scene, chapter: 3, theme: capture.theme || config.theme, permissionMode: 'auto' }
   }
-  themes = listThemes()
+  themes = allThemes()
   if (capture && capture.size) config.sizes[currentTheme().id] = capture.size
   if (!config.chapter) { config.chapter = 1; saveConfig() }
   bridge = new ClaudeBridge({

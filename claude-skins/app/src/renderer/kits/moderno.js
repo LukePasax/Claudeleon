@@ -185,6 +185,84 @@
     }
   }
 
+  // ---------------------------------------------------------------- temi fatti dall'editor
+
+  // Un tema dell'editor dei temi è una descrizione corta: { id, name, description, colors, font, textSize, radius }.
+  // colors ha i nove colori di base (sfondo, barra laterale, riquadri, testo, testo tenue, accento, testo
+  // sull'accento, bordi, i tuoi messaggi); le altre variabili del kit si ricavano da questi, chiare o scure secondo lo
+  // sfondo. Lo usano l'editor (anteprima dal vivo) e il processo principale (temi salvati)
+  const COLOR_KEYS = ['bg', 'side', 'surface', 'ink', 'inkSoft', 'accent', 'onAccent', 'line', 'bubble']
+  const FONTS = {
+    sistema: "'Segoe UI', system-ui, -apple-system, sans-serif",
+    moderno: "Bahnschrift, 'DIN Alternate', 'Segoe UI', system-ui, sans-serif",
+    serif: "Georgia, Cambria, 'Times New Roman', serif",
+    libro: "'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif",
+    mono: "'Cascadia Code', Consolas, 'SF Mono', Menlo, monospace",
+  }
+  const hex = (c) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(c || '').trim()); return m ? `#${m[1].toLowerCase()}` : null }
+  const rgb = (c) => { const h = hex(c) || '#000000'; return [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) }
+  const toHex = (a) => '#' + a.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('')
+  // a verso b di t (0 = a, 1 = b)
+  const mix = (a, b, t) => { const x = rgb(a); const y = rgb(b); return toHex(x.map((v, i) => v + (y[i] - v) * t)) }
+  const lum = (c) => { const [r, g, b] = rgb(c).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }); return 0.2126 * r + 0.7152 * g + 0.0722 * b }
+  // Il testo sull'accento: bianco se si legge abbastanza (contrasto almeno 3, come per i pulsanti), se no quasi nero
+  const readableOn = (c) => (1.05 / (lum(c) + 0.05) >= 3 ? '#ffffff' : '#10131a')
+
+  function normalizeSpec(spec) {
+    const s = spec && typeof spec === 'object' ? spec : {}
+    const colors = {}
+    const base = { bg: '#0f1419', side: '#171c21', surface: '#252a30', ink: '#dee3ea', inkSoft: '#88929d', accent: '#00a2f3', line: '#3e4851', bubble: '#174361' }
+    for (const k of COLOR_KEYS) colors[k] = hex(s.colors && s.colors[k]) || base[k] || null
+    if (!colors.onAccent) colors.onAccent = readableOn(colors.accent)
+    return {
+      id: String(s.id || ''), name: String(s.name || 'Tema nuovo').slice(0, 60), description: String(s.description || '').slice(0, 200),
+      colors, font: FONTS[s.font] ? s.font : 'sistema',
+      textSize: Math.max(12, Math.min(20, Number(s.textSize) || 15)),
+      radius: Math.max(0, Math.min(20, Number.isFinite(Number(s.radius)) ? Number(s.radius) : 8)),
+    }
+  }
+
+  function fromColors(spec) {
+    const n = normalizeSpec(spec)
+    const c = n.colors
+    const dark = lum(c.bg) < 0.4
+    const toward = dark ? '#ffffff' : '#000000'
+    const vars = {
+      ink: c.ink, 'ink-soft': c.inkSoft, strong: mix(c.ink, toward, 0.5),
+      gold: c.accent, 'gold-light': mix(c.accent, toward, 0.15), 'gold-dark': mix(c.accent, c.bg, 0.55), red: dark ? '#ffb4ab' : '#b00020',
+      edge: dark ? mix(c.bg, '#000000', 0.35) : mix(c.bg, '#000000', 0.06), 'edge-light': c.line,
+      field: dark ? mix(c.bg, '#ffffff', 0.05) : c.surface, code: dark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+      bg: c.bg, surface: c.surface, 'side-bg': c.side,
+      'btn-bg': c.accent, 'btn-hover': mix(c.accent, toward, 0.1), 'btn-light': mix(c.accent, toward, 0.15), 'btn-dark': mix(c.accent, '#000000', 0.6), 'btn-ink': c.onAccent,
+      'deny-bg': mix(c.accent, c.surface, 0.82), 'deny-light': mix(c.accent, c.surface, 0.72), 'deny-dark': mix(c.accent, c.surface, 0.62),
+      'deny-ink': dark ? mix(c.accent, '#ffffff', 0.65) : mix(c.accent, '#000000', 0.6),
+      'ctl-hover': dark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+      'add-bg': dark ? 'rgba(46, 160, 67, 0.28)' : 'rgba(12, 174, 49, 0.12)', 'del-bg': dark ? 'rgba(248, 81, 73, 0.25)' : 'rgba(176, 0, 32, 0.1)', plus: dark ? '#a1e399' : '#19a559',
+      'menu-bg': dark ? mix(c.surface, '#ffffff', 0.04) : c.surface,
+      veil: dark ? 'rgba(0, 0, 0, 0.55)' : 'rgba(28, 28, 28, 0.25)',
+      shadow: dark ? '0 8px 28px rgba(0, 0, 0, 0.45)' : '0 8px 28px rgba(0, 0, 0, 0.15)',
+      'frame-shadow': dark ? '0 6px 24px rgba(0, 0, 0, 0.35)' : '0 6px 24px rgba(0, 0, 0, 0.18)',
+      'box-shadow': dark ? '0 2px 10px rgba(0, 0, 0, 0.12)' : '0 2px 10px rgba(0, 0, 0, 0.06)',
+      'you-bg': c.bubble, 'you-edge': 'transparent',
+      'font-body': FONTS[n.font], 'font-display': FONTS[n.font], 'text-size': `${n.textSize}px`,
+      radius: `${n.radius}px`, 'radius-small': `${Math.round(n.radius * 0.6)}px`, 'frame-radius': `${Math.round(n.radius * 1.5)}px`,
+    }
+    const palette = { ink: c.ink, inkSoft: c.inkSoft, accent: c.accent, onAccent: c.onAccent, bg: c.bg, side: c.side, surface: c.surface, line: c.line, bubble: c.bubble }
+    const theme = kit({ id: n.id, name: n.name, description: n.description, look: { palette, vars } })
+    theme.custom = n
+    return theme
+  }
+
+  // I colori di base di un tema del kit, per partire da lui nell'editor
+  function colorsOf(theme) {
+    if (theme && theme.custom) return JSON.parse(JSON.stringify(theme.custom))
+    const sc = (theme && theme.scenes && (theme.scenes.notte || theme.scenes.giorno)) || {}
+    const p = sc.palette || {}
+    return normalizeSpec({ colors: { bg: p.bg, side: p.side, surface: p.surface, ink: p.ink, inkSoft: p.inkSoft, accent: p.accent, onAccent: p.onAccent, line: p.line, bubble: p.bubble } })
+  }
+
+  Object.assign(kit, { fromColors, normalizeSpec, colorsOf, COLOR_KEYS, FONTS, readableOn })
+
   if (typeof module === 'object' && module.exports) module.exports = kit
   else (window.SkinsKits = window.SkinsKits || {}).moderno = kit
 })()

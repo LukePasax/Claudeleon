@@ -105,6 +105,8 @@ contextBridge.exposeInMainWorld('skins', {
   onError: listen('claude:error'),
   onReset: listen('chat:reset'),
   onTheme: listen('theme:apply'),
+  saveTheme: (spec) => ipcRenderer.invoke('theme:save', spec),
+  deleteTheme: (id) => ipcRenderer.invoke('theme:delete', id),
   onWindowState: listen('window:state'),
   onMode: listen('mode:changed'),
   onWorkdir: listen('workdir:changed'),

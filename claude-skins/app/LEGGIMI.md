@@ -130,6 +130,13 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   stato, da quanto, quanti strumenti ha usato, l'ultimo e il riassunto finale, con "Ferma" e "Uscita" (il file con
   l'uscita). Mentre Claude lavora, "Manda in background" (o Ctrl+B) sposta in background il comando o il sotto-agente
   in corso, come nel terminale, e Claude va avanti. Con attività in corso la conversazione non si spegne da sola.
+- **Editor dei temi:** nel selettore dei temi, "Crea un tema" apre un pannello a destra: nome, descrizione, "Parti
+  da" (i colori di un altro tema moderno), nove colori (sfondo, barra laterale, casella e menu, testo, testo tenue,
+  accento, testo sull'accento — automatico finché non lo cambi —, bordi, i tuoi messaggi), carattere, dimensione del
+  testo e angoli. L'anteprima è la finestra stessa, che cambia a ogni scelta. "Salva e usa" lo mette fra i tuoi temi
+  (un file JSON nella cartella `temi` dei dati dell'app, che resta con gli aggiornamenti); sulle schede dei tuoi temi
+  ci sono "Modifica" ed "Elimina". I temi dell'editor hanno la struttura del kit moderno (come Metrios e Dream): per
+  forme diverse (come Casa Baggins) serve ancora un tema scritto a mano.
 - **Dettatura:** su Windows, accanto a "+" c'è un microfono: mette il cursore in fondo alla casella e accende la
   digitazione vocale di Windows (la stessa di Win+H), che scrive quello che dici; un altro clic (o Win+H) la ferma.
   La lingua è quella scelta in Windows (Impostazioni → Ora e lingua → Voce). Il riconoscimento vocale di Chromium

@@ -31,6 +31,43 @@
     themesTitle: 'Scegli il tema',
     themesCurrent: 'in uso',
     themesClose: 'Chiudi',
+    themesNew: 'Crea un tema',
+    themesNewDesc: 'Colori, carattere e angoli a tua scelta, con l\'anteprima dal vivo',
+    themesEdit: 'Modifica',
+    themesDelete: 'Elimina',
+    themesDeleteSure: 'Sicuro?',
+    themesMine: 'tuo',
+    // L'editor dei temi
+    teTitleNew: 'Nuovo tema',
+    teTitleEdit: 'Modifica il tema',
+    teName: 'Nome',
+    teNameDefault: 'Il mio tema',
+    teDesc: 'Descrizione',
+    teFrom: 'Parti da',
+    teFromPick: 'scegli un tema…',
+    teColors: 'Colori',
+    teColor_bg: 'Sfondo',
+    teColor_side: 'Barra laterale',
+    teColor_surface: 'Casella e menu',
+    teColor_ink: 'Testo',
+    teColor_inkSoft: 'Testo tenue',
+    teColor_accent: 'Accento',
+    teColor_onAccent: 'Testo sull\'accento',
+    teColor_line: 'Bordi',
+    teColor_bubble: 'I tuoi messaggi',
+    teAuto: 'automatico',
+    teFont: 'Carattere',
+    teFont_sistema: 'Sistema (Segoe UI)',
+    teFont_moderno: 'Moderno (Bahnschrift)',
+    teFont_serif: 'Serif (Georgia)',
+    teFont_libro: 'Libro (Palatino)',
+    teFont_mono: 'Monospaziato (Cascadia, Consolas)',
+    teTextSize: 'Dimensione del testo',
+    teRadius: 'Angoli',
+    teSave: 'Salva e usa',
+    teCancel: 'Annulla',
+    teNote: 'L\'anteprima è dal vivo: la finestra dietro è già col tema nuovo. Si salva fra i tuoi temi (cartella temi nei dati dell\'app).',
+    teSaveFail: 'Non salvato: {x}',
     // Che cosa fa Claude, a parole ({x}: il file, la ricerca, il sito...); quando Claude scrive lui la descrizione
     // (Bash, Agent) si usa quella
     tool_read: 'Legge {x}',
@@ -703,10 +740,22 @@
     return c
   }
 
+  // I temi che non vengono da un file (quelli dell'editor dei temi): si aggiungono, si sostituiscono, si tolgono. Se è
+  // quello in uso, il nuovo prende il suo posto (l'anteprima dell'editor cambia così a ogni colore)
+  function register(theme) {
+    if (!theme || !theme.id) return
+    registry.set(theme.id, theme)
+    if (current.id === theme.id) current = theme
+  }
+  function unregister(id) {
+    registry.delete(id)
+  }
+
   window.Theming = {
+    register, unregister, get: (id) => registry.get(id),
     preview,
     // I temi caricati, per il selettore: id, nome, descrizione
-    list: () => [...registry.values()].map((th) => ({ id: th.id, name: th.name || th.id, description: th.description || '' })),
+    list: () => [...registry.values()].filter((th) => !String(th.id).startsWith('__')).map((th) => ({ id: th.id, name: th.name || th.id, description: th.description || '' })),
     load, use, applyScene, t, chapterDate, plainDate, art, icon, trayIcon, appIcon, hook, asset, artScale, MONTHS,
     get current() { return current },
     palette: (name) => paletteOf(current, name),
