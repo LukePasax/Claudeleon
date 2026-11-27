@@ -305,7 +305,7 @@ stanno in `src/files.js`, `plainSnippet` in `src/text.js`.
 ubuntu-latest, poi su windows-latest `electron-builder --win nsis --publish never` e `softprops/action-gh-release@v2`
 (tag `v<versione>` sul commit, note generate da GitHub, file: installer, `.blockmap`, `latest.yml`). Si ferma se il
 tag non è la versione del package.json o se la release c'è già. package.json: versione 1.0.0 (la prima pubblica),
-`repository`, `build.publish` github (owner LukePasax, repo Claude-desktop-skins, releaseType release) che mette
+`repository`, `build.publish` github (owner LukePasax, repo Claudeleon, releaseType release) che mette
 `app-update.yml` nell'app impacchettata; `artifactName` coi trattini (GitHub cambia gli spazi dei nomi dei file).
 `src/release-updater.js`: `ReleaseUpdater` con electron-updater (autoDownload spento; `update()` scarica, poi
 `quitAndInstall(true, true)`), stessa forma di stato di `Updater` più `version`, `percent`, `source: 'github'`;

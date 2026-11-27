@@ -2,7 +2,7 @@
 
 Un'app a temi per lavorare con Claude Code: cambia pelle come un camaleonte, la conversazione resta quella.
 
-**Per installarla:** scarica `Claudeleon-Setup-<versione>.exe` dall'[ultima release](https://github.com/LukePasax/Claude-desktop-skins/releases/latest)
+**Per installarla:** scarica `Claudeleon-Setup-<versione>.exe` dall'[ultima release](https://github.com/LukePasax/Claudeleon/releases/latest)
 e lancialo; poi si aggiorna da sola dalle release. Serve Claude Code installato, col login fatto.
 
 Dal repo: doppio clic su `avvia.cmd` per aprirla senza installare, o su `crea-installer.cmd` per farsi l'installer

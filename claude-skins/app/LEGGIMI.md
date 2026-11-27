@@ -15,7 +15,7 @@ Serve Windows e Claude Code installato a parte, con il login fatto (`irm https:/
 ### Dalla release (consigliato, anche per i colleghi)
 
 Si scarica `Claudeleon-Setup-<versione>.exe` dall'ultima release del repo su GitHub
-(<https://github.com/LukePasax/Claude-desktop-skins/releases/latest>) e si lancia: chiede dove installare (di
+(<https://github.com/LukePasax/Claudeleon/releases/latest>) e si lancia: chiede dove installare (di
 partenza nella cartella dell'utente, senza diritti di amministratore), mette Claudeleon nel menu Start e sul
 desktop, e alla fine lo apre. Non serve Node.js né il repo.
 

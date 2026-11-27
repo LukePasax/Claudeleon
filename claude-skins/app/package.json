@@ -3,7 +3,7 @@
   "productName": "Claudeleon",
   "version": "1.0.0",
   "description": "Claude Code in una finestra a temi",
-  "repository": "github:LukePasax/Claude-desktop-skins",
+  "repository": "github:LukePasax/Claudeleon",
   "main": "src/main.js",
   "private": true,
   "scripts": {
@@ -76,7 +76,7 @@
       {
         "provider": "github",
         "owner": "LukePasax",
-        "repo": "Claude-desktop-skins",
+        "repo": "Claudeleon",
         "releaseType": "release"
       }
     ]
