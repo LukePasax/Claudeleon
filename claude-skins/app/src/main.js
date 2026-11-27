@@ -726,8 +726,15 @@ app.whenReady().then(() => {
   bridge.setModel(config.model || null)
   captureMode = !!capture
   registerIpc()
-  // La prima conversazione: quella dell'ultima volta, se c'era
-  activeConv = makeConv(config.sessionId || null, config.sessionCwd || null).id
+  // All'avvio una conversazione nuova, come l'app desktop: quella dell'ultima volta resta negli annali (se c'era, il
+  // capitolo va avanti di uno)
+  if (config.sessionId && !capture) {
+    config.chapter += 1
+    config.sessionId = null
+    config.sessionCwd = null
+    saveConfig()
+  }
+  activeConv = makeConv(null, null).id
   createWindow()
   if (!capture) ensureStartMenuShortcut()
   if (capture) {

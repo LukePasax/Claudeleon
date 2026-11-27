@@ -1921,8 +1921,10 @@
   // nuova, con le sue pagine ricopiate. Le altre restano come sono
   async function openSession(s) {
     if (!sessionsPinned() && part('sessions')) part('sessions').hidden = true
+    // Già aperta: si torna a lei, se ha le sue pagine (una aperta ma vuota si ricopia qui sotto)
     const open = [...convs.values()].find((c) => c.sessionId === s.id)
-    if (open) { switchTo(open); return }
+    if (open && (open.el.querySelector('.entry') || isBusy(open))) { switchTo(open); return }
+    if (open) { open.sessionId = null; dropConv(open) }
     const c = newConv(`local${Date.now()}`)
     c.sessionId = s.id
     c.currentSession = s
@@ -1941,7 +1943,13 @@
     // L'id vero della conversazione, dal processo principale
     if (realId && realId !== c.id) {
       const other = convs.get(realId)
-      if (other && other !== c) { if (active === c) switchTo(other); dropConv(c); return }
+      // Il processo principale aveva già una conversazione su quella sessione: se qui ha le sue pagine si torna a lei,
+      // altrimenti (aperta ma vuota) la si sostituisce con questa
+      if (other && other !== c) {
+        if (other.el.querySelector('.entry') || isBusy(other)) { if (active === c) switchTo(other); dropConv(c); return }
+        other.el.remove()
+        convs.delete(realId)
+      }
       convs.delete(c.id)
       c.id = realId
       c.el.dataset.conv = realId
