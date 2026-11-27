@@ -1,0 +1,167 @@
+/* Kit "pixel": la pixel art dei temi pixel (oggi Terra di Mezzo; c'era anche Pergamena, il rotolo, tolto). Un tema lo include con kits: ['pixel'] nel suo
+   theme.js; si carica dopo style.css e prima del theme.css del tema. Porta i caratteri a pixel, la palette di
+   pergamena di partenza (notte e giorno), angoli vivi, bordi e pulsanti a gradino fatti con box-shadow, barre di
+   scorrimento a pixel, il capolettera e i disegni ingranditi senza sfumature. */
+
+@font-face { font-family: 'Pixelify'; src: url('../fonts/pixelify-sans.woff2') format('woff2'); font-weight: 400 700; }
+@font-face { font-family: 'Bastarda'; src: url('../fonts/jacquarda-bastarda-9.woff2') format('woff2'); }
+/* Per il codice: a pixel e monospaziato, con cifre chiare (in Pixelify il 5 sembra una S e le colonne non si allineano) */
+@font-face { font-family: 'VT323'; src: url('../fonts/vt323.woff2') format('woff2'); }
+
+body {
+  --font-body: 'Pixelify', monospace; --font-display: 'Bastarda', serif; --font-code: 'VT323', monospace;
+  --text-size: 16px; --code-size: 19px; --small-size: 12px;
+  --radius: 0; --radius-small: 0; --line: 3px;
+  --ink: #e8d9b5; --ink-soft: #a8946a; --gold: #d4a338; --gold-light: #ffe7a0; --gold-dark: #7a5418; --red: #e0663a;
+  --edge: #1c160d; --edge-light: #5a4526; --field: rgba(0, 0, 0, 0.28); --code: rgba(0, 0, 0, 0.3);
+  --strong: var(--gold-light);
+  --title-ink: #2a1d0e; --title-glow: rgba(255, 240, 200, 0.6);
+  --initial-ink: var(--gold-light); --initial-bg: var(--edge);
+  --btn-bg: #d4a338; --btn-hover: #e0b54a; --btn-light: #ffe7a0; --btn-dark: #9a6a1a; --btn-ink: #3d2e18; --btn-ring: #3d2e18;
+  --deny-bg: #b8542e; --deny-light: #e8906a; --deny-dark: #7a3418; --deny-ink: #fff0e0;
+  --ctl-bg: #3d2e18; --ctl-hover: #5a4526; --ctl-light: #7a5f35; --ctl-dark: #1c160d; --ctl-ink: #ffe7a0;
+  --bar-ink: var(--gold); --bar-hover: var(--gold-light); --bar-shadow: rgba(0, 0, 0, 0.7);
+  --add-bg: rgba(120, 170, 70, 0.2); --add-ink: var(--ink); --del-bg: rgba(210, 80, 50, 0.2); --del-ink: var(--ink);
+  --plus: #8fbf5a; --minus: var(--red);
+  --menu-bg: var(--edge); --veil: rgba(10, 6, 2, 0.55);
+}
+body.giorno {
+  --ink: #3a2a18; --ink-soft: #7b6343; --gold: #9a6a1a; --gold-light: #c8963a; --gold-dark: #7a5418; --red: #a0381a;
+  --edge: #a8783f; --edge-light: #c8a462; --field: rgba(255, 255, 255, 0.35); --code: rgba(120, 90, 30, 0.15);
+  --strong: var(--gold); --initial-ink: #ffe7a0; --initial-bg: #5a4526;
+  --add-bg: rgba(80, 140, 40, 0.18); --del-bg: rgba(190, 60, 30, 0.16); --plus: #3f6a2e;
+  --deny-bg: #b8542e; --deny-light: #e8906a; --deny-dark: #7a3418; --deny-ink: #fff0e0;
+  --ctl-hover: #5a4526;
+  --menu-bg: #f4e6c0; --veil: rgba(10, 6, 2, 0.55);
+}
+
+/* Senza legature: in Pixelify "fi" diventa un segno solo che sembra una A */
+body { font-variant-ligatures: none; font-feature-settings: 'liga' 0, 'clig' 0; -webkit-font-smoothing: auto; }
+canvas, [data-art-bg], .tool img { image-rendering: pixelated; }
+
+/* Le barre di scorrimento a pixel: binario incavato, cursore d'oro a rilievo, niente frecce */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--code); box-shadow: inset 3px 0 0 var(--edge); }
+::-webkit-scrollbar-thumb { background: var(--gold); border: none; border-radius: 0; box-shadow: inset -3px -3px 0 var(--gold-dark), inset 3px 3px 0 var(--gold-light); }
+::-webkit-scrollbar-thumb:hover { background: var(--gold-light); }
+
+.chapter-title { font-size: 36px; font-weight: normal; line-height: 1; }
+/* Il numero romano col carattere a pixel normale: in gotico "III" si legge "333" */
+.chapter-title .num { font-family: var(--font-body); font-weight: 700; font-size: 30px; }
+.chapter-date { font-size: 14px; }
+
+.entry { margin: 0 0 16px; line-height: 1.45; }
+.who { font-size: 14px; margin-bottom: 2px; }
+.entry.you .text { color: var(--ink-soft); padding: 0 0 0 10px; background: none; border-radius: 0; box-shadow: inset 3px 0 0 var(--edge-light); }
+.entry.claude .text p { margin: 0 0 8px; }
+/* Il testo contiene il suo capolettera: con una risposta di una riga sola, quello che segue non gli gira intorno */
+.entry.claude .text { display: flow-root; }
+/* Il capolettera: una maiuscola a pixel in grassetto, in un riquadro d'oro a gradino; il testo le gira intorno. Solo
+   quando il primo paragrafo è lungo (classe long-start): su una risposta breve staccava la prima lettera */
+.entry.claude .text.long-start > p:first-child::first-letter {
+  float: left; font-weight: 700; font-size: 32px; line-height: 1; padding: 6px 8px 4px; margin: 4px 8px 0 0;
+  color: var(--initial-ink); background: var(--initial-bg);
+  box-shadow: inset 0 0 0 3px var(--gold), inset 0 0 0 6px var(--initial-bg);
+}
+.text code { font-size: 1.2em; line-height: 1; padding: 0 4px; border-radius: 0; }
+.text pre { padding: 8px 10px; font-size: 15px; border: none; box-shadow: inset 3px 0 0 var(--gold); }
+.text pre code { line-height: 1.25; font-size: 1.2em; }
+.text pre[data-lang]::before { top: 2px; }
+.text ul, .text ol { margin: 0 0 8px 20px; }
+.text h2, .text h3 { font-weight: normal; color: var(--gold); line-height: 1.1; }
+.text h2 { font-size: 30px; margin: 14px 0 6px; }
+.text h3 { font-size: 27px; margin: 12px 0 4px; }
+.text h4, .text h5 { font-weight: 700; margin: 10px 0 4px; }
+.text h4 { font-size: 17px; color: var(--gold); }
+.text h5 { font-size: 16px; color: var(--strong); }
+.text li { margin: 1px 0; }
+.text li.has-task { margin-left: -18px; }
+.text .task { width: 12px; height: 12px; border: none; border-radius: 0; box-shadow: inset 0 0 0 2px var(--ink-soft); }
+.text .task.done { background: var(--plus); box-shadow: inset 0 0 0 2px var(--ink-soft), inset 0 0 0 4px var(--code); }
+.text blockquote { margin: 0 0 8px; border: none; box-shadow: inset 3px 0 0 var(--gold-dark); }
+.text hr { border: none; height: 3px; margin: 12px 0; opacity: 0.6; background: repeating-linear-gradient(90deg, var(--ink-soft) 0 9px, transparent 9px 15px); }
+.text .table { margin: 0 0 10px; }
+.text table { font-size: 14px; }
+.text th, .text td { padding: 4px 10px; border: none; box-shadow: inset 0 -2px 0 var(--edge-light); }
+.text th { color: var(--gold); font-weight: 700; box-shadow: inset 0 -3px 0 var(--gold-dark); }
+.text tbody tr:nth-child(even) td { background: var(--code); }
+.text a { text-decoration: none; box-shadow: inset 0 -2px 0 var(--gold-dark); }
+.text a:hover { color: var(--strong); box-shadow: inset 0 -2px 0 var(--gold); }
+.text .link-off { text-decoration: none; box-shadow: inset 0 -2px 0 var(--edge-light); }
+
+.tool { font-size: 14px; margin: 2px 0; }
+/* Le icone a pixel 12×12, a ×2 come i disegni dei temi */
+.tool img { width: 24px; height: 24px; }
+.tool .what { font-family: inherit; font-size: inherit; }
+.footnote { font-size: 13px; }
+
+.change { margin: 2px 0 12px 32px; }
+.diff { border: none; border-radius: 0; overflow: visible; box-shadow: inset 3px 0 0 var(--edge-light); }
+.diff-note { padding: 5px 10px 0; }
+.diff-body { padding: 5px 0; }
+.dl { line-height: 1.1; }
+.dl.sep { border: none; box-shadow: 0 -1px 0 var(--edge-light); }
+.diff-more { padding: 2px 10px 6px; }
+.diff-more:hover { color: var(--strong); }
+
+.cmd-menu { padding: 4px 0; border: none; border-radius: 0; box-shadow: inset 0 0 0 3px var(--gold-dark), 0 4px 0 rgba(0, 0, 0, 0.35); }
+.cmd { padding: 3px 12px; border-radius: 0; }
+.cmd.active { box-shadow: inset 3px 0 0 var(--gold); }
+.cmd.custom .cmd-name::before { border-radius: 0; }
+.cmd-name { font-size: 19px; }
+.cmd-args { font-size: 17px; }
+.cmd-desc { font-size: 13px; }
+.cmd-empty { padding: 4px 12px; font-size: 13px; }
+.cmd-output { padding: 8px 12px; font-size: 18px; line-height: 1.15; border: none; border-radius: 0; box-shadow: inset 3px 0 0 var(--gold-dark); }
+
+.theme-picker-box { padding: 16px 20px 20px; border: none; box-shadow: inset 0 0 0 3px var(--gold-dark), 0 6px 0 rgba(0, 0, 0, 0.4); }
+.theme-picker-head { font-size: 27px; font-weight: normal; color: var(--gold); }
+.theme-card { border: none; box-shadow: inset 0 0 0 2px var(--edge-light); }
+.theme-card:hover { box-shadow: inset 0 0 0 2px var(--gold); }
+.theme-card.current { box-shadow: inset 0 0 0 3px var(--gold); }
+.theme-name { font-size: 16px; font-weight: normal; }
+.theme-desc { line-height: 1.35; }
+.theme-current { padding: 1px 6px; border-radius: 0; }
+
+.mode { padding: 2px 7px; border: none; border-radius: 0; box-shadow: inset 0 0 0 2px var(--edge-light); }
+.mode.active { box-shadow: inset -2px -2px 0 var(--btn-dark), inset 2px 2px 0 var(--btn-light); }
+
+.ask.plan .plan-body { padding: 8px 12px; line-height: 1.45; }
+.ask { padding: 10px 12px; border: none; box-shadow: inset 3px 3px 0 var(--gold), inset -3px -3px 0 var(--edge); }
+.ask .ask-title { font-weight: normal; }
+.ask .ask-desc { font-size: 14px; }
+.ask .ask-detail { font-size: 18px; padding: 4px 6px; margin-bottom: 8px; }
+.ask .ask-buttons { gap: 12px; margin: 4px 0 2px 3px; }
+.ask .ask-outcome { font-size: 14px; }
+
+.session-row { padding: 6px 8px; margin-bottom: 4px; box-shadow: inset 3px 0 0 var(--edge-light); }
+.session-row:hover { box-shadow: inset 3px 0 0 var(--gold); }
+.session-row.note:hover { box-shadow: inset 3px 0 0 var(--edge-light); }
+.session-row.current { background: none; }
+
+/* Le icone di ingrandisci e ripristina a pixel: bordo spesso in alto come le finestre a pixel, angoli vivi */
+body {
+  --icon-max: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M1 1h10v10H1zM3 4v5h6V4z' fill-rule='evenodd'/%3E%3C/svg%3E");
+  --icon-restore: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges' fill-rule='evenodd'%3E%3Cpath d='M1 4h7v7H1zM3 6v3h3V6z'/%3E%3Cpath d='M4 1h7v7H9V3H4z'/%3E%3C/svg%3E");
+}
+.ctl.max::before { width: 12px; height: 12px; }
+
+.folder-btn { border: none; border-radius: 0; box-shadow: inset 0 0 0 2px var(--edge-light); }
+.folder-btn.unset { box-shadow: inset -2px -2px 0 var(--btn-dark), inset 2px 2px 0 var(--btn-light); }
+.folder-menu { border: none; border-radius: 0; box-shadow: inset 0 0 0 3px var(--gold-dark), 0 4px 0 rgba(0, 0, 0, 0.35); padding: 8px; }
+.folder-item { border-radius: 0; }
+
+/* I pulsanti a gradino */
+.btn {
+  padding: 6px 12px; font-size: 16px;
+  box-shadow: inset -3px -3px 0 var(--btn-dark), inset 3px 3px 0 var(--btn-light), 0 0 0 3px var(--btn-ring);
+}
+.btn:active { box-shadow: inset 3px 3px 0 var(--btn-dark), inset -3px -3px 0 var(--btn-light), 0 0 0 3px var(--btn-ring); }
+.btn.small { font-size: 14px; padding: 3px 8px; }
+.btn.deny { box-shadow: inset -3px -3px 0 var(--deny-dark), inset 3px 3px 0 var(--deny-light), 0 0 0 3px var(--btn-ring); }
+.btn.deny:hover { background: var(--deny-bg); filter: brightness(1.1); }
+.ctl {
+  width: 24px; height: 24px; font-size: 16px;
+  box-shadow: inset -3px -3px 0 var(--ctl-dark), inset 3px 3px 0 var(--ctl-light);
+}
+.ctl:hover { color: var(--ctl-ink); }
