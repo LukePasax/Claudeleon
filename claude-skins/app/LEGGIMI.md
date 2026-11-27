@@ -33,6 +33,11 @@ npm 11 altrimenti non arriva.
 - **Come un'app:** la finestra sta nella barra delle applicazioni con l'icona del tema, e "–" la riduce a icona lì
   (non sparisce fra le icone nascoste). Non sta sopra le altre finestre, a meno di accendere "Sempre in primo
   piano" dal vassoio. Una domanda di permesso fa lampeggiare l'icona nella barra se la finestra è ridotta o dietro.
+- **Notifiche:** quando la finestra non è davanti (ridotta a icona o dietro ad altre), una notifica di Windows dice
+  che Claude ha finito (con l'inizio della risposta), che chiede un permesso, una scelta o l'approvazione di un piano,
+  o che si è fermato; nel titolo c'è il nome della conversazione. Un clic riporta davanti la finestra, e tornandoci le
+  notifiche aperte si chiudono. Si spengono dal vassoio, "Notifiche". Perché Windows le mostri, all'avvio l'app crea
+  (o aggiorna) il collegamento "Claude Skins" nel menu Start, con lo stesso identificativo dell'app.
 - **Scorciatoia:** `Ctrl+Alt+P` riporta davanti la finestra da qualunque programma, o la riduce a icona se è già
   davanti; lo stesso fa un clic sull'icona del vassoio.
 - **Tema:** dalla finestra ("Altre stanze" in fondo alla barra dello scrittoio,

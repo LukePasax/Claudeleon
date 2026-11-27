@@ -705,6 +705,18 @@ class ClaudeBridge extends EventEmitter {
     }))
   }
 
+  // Il titolo della conversazione in corso (per le notifiche): quello dato da Claude o dalla persona, altrimenti il
+  // riassunto o il primo messaggio
+  async currentTitle() {
+    const id = (this.live && this.live.sessionId) || this.session.getSession()
+    if (!id) return ''
+    try {
+      const { getSessionInfo } = await loadSdk()
+      const s = await getSessionInfo(id, this.sessionCwd ? { dir: this.sessionCwd } : {})
+      return s ? s.customTitle || s.summary || s.firstPrompt || '' : ''
+    } catch { return '' }
+  }
+
   // Le azioni sugli annali, come nel menu delle conversazioni dell'app desktop: rinomina (la riga custom-title nel
   // transcript), archivia o ripristina (un segno accanto al transcript: la sessione resta, si nasconde dall'elenco),
   // elimina (il transcript se ne va)

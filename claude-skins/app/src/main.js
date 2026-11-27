@@ -1,6 +1,6 @@
 // La finestra: trasparente, senza bordi, sempre in primo piano. La sua forma la decide il tema in uso; dove il tema
 // non disegna nulla i clic passano alle finestre sotto, e si trascina dalla parte che il tema indica (data-drag).
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, globalShortcut, shell, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, globalShortcut, shell, dialog, Notification } = require('electron')
 const fs = require('fs')
 const path = require('path')
 const { ClaudeBridge } = require('./claude-bridge')
@@ -159,7 +159,13 @@ function createWindow() {
   win.setIgnoreMouseEvents(true, { forward: true })
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'))
   // Tornata davanti, smette di lampeggiare; il menu del vassoio segue lo stato (Mostra / Riduci a icona)
-  win.on('focus', () => { win.flashFrame(false); refreshTray() })
+  // Tornata davanti: niente più lampeggio, e le notifiche ancora aperte non servono più
+  win.on('focus', () => {
+    win.flashFrame(false)
+    for (const n of shownNotes) n.close()
+    shownNotes.clear()
+    refreshTray()
+  })
   win.on('blur', () => { lastBlur = Date.now() })
   win.on('minimize', refreshTray)
   win.on('restore', refreshTray)
@@ -287,6 +293,7 @@ function trayMenu() {
     { label: 'Nuovo capitolo', click: () => send('chat:reset') },
     { label: 'Tema', submenu: themes.map((t) => ({ label: t.name, type: 'radio', checked: t.id === currentTheme().id, click: () => setTheme(t.id) })) },
     { label: 'Cartella di lavoro…', click: chooseWorkdir },
+    { label: 'Notifiche', type: 'checkbox', checked: config.notify !== false, click: (item) => { config.notify = item.checked; saveConfig() } },
     { label: 'Sempre in primo piano', type: 'checkbox', checked: config.onTop === true, click: (item) => setOnTop(item.checked) },
     { label: 'Riporta al centro', click: () => { const p = defaultPosition(); const [w, h] = win.getSize(); win.setBounds({ x: p.x, y: p.y, width: w, height: h }); config.position = p; saveConfig() } },
     { label: 'Dimensione iniziale', click: () => {
@@ -393,7 +400,7 @@ function registerIpc() {
       return { mediaType, data: fs.readFileSync(p).toString('base64') }
     } catch { return null }
   })
-  ipcMain.on('chat:stop', () => bridge.stop())
+  ipcMain.on('chat:stop', () => { replyText = ''; bridge.stop() })
   ipcMain.on('perm:answer', (_e, { id, allow, always, answers }) => bridge.answer(id, !!allow, !!always, answers))
   // Modello e ragionamento, ricordati per le prossime volte
   ipcMain.on('model:set', (_e, { model, effort, ultracode }) => {
@@ -441,6 +448,7 @@ function registerIpc() {
   })
   ipcMain.on('tray:icon', (_e, dataUrl) => {
     const img = nativeImage.createFromDataURL(dataUrl)
+    trayImage = img
     // La stessa icona del tema va anche sulla finestra: è quella della barra delle applicazioni
     if (process.platform !== 'darwin') win.setIcon(img)
     if (tray) { tray.setImage(img); return }
@@ -450,16 +458,29 @@ function registerIpc() {
     refreshTray()
   })
 
-  bridge.on('delta', (t) => send('claude:delta', t))
+  bridge.on('delta', (t) => { replyText += t; send('claude:delta', t) })
   bridge.on('tool', (t) => send('claude:tool', t))
   bridge.on('toolDone', (t) => send('claude:toolDone', t))
-  bridge.on('done', (r) => send('claude:done', r))
-  bridge.on('error', (m) => send('claude:error', m))
-  // Una domanda di permesso: se la finestra è ridotta a icona lampeggia nella barra, come le altre app
+  bridge.on('done', (r) => {
+    send('claude:done', r)
+    const text = plainSnippet(replyText)
+    replyText = ''
+    notify('Claude ha finito', text || 'La risposta è pronta.')
+  })
+  bridge.on('error', (m) => {
+    send('claude:error', m)
+    replyText = ''
+    notify('Claude si è fermato', plainSnippet(String(m || '')))
+  })
+  // Una domanda di permesso: se la finestra è ridotta a icona lampeggia nella barra, come le altre app, e arriva
+  // una notifica
   bridge.on('ask', (q) => {
     if (!win.isVisible()) win.show()
     if (win.isMinimized() || !win.isFocused()) win.flashFrame(true)
     send('perm:ask', q)
+    if (q.kind === 'plan') notify('Claude propone un piano', 'Da approvare per continuare.')
+    else if (q.kind === 'question') notify('Claude ti fa una domanda', (q.questions[0] && q.questions[0].question) || '')
+    else notify('Claude chiede il permesso', [q.title, q.detail].filter(Boolean).join(' · '))
   })
   bridge.on('askClosed', (q) => send('perm:closed', q))
   // Il modo cambia dalla finestra, dall'approvazione di un piano o da Claude Code stesso: si ricorda e si mostra
@@ -538,8 +559,56 @@ function fakeConversation(capture) {
   }, 2500)
 }
 
-// Il nome con cui Windows raggruppa la finestra nella barra delle applicazioni
-if (process.platform === 'win32') app.setAppUserModelId('Claude Skins')
+// Il nome con cui Windows raggruppa la finestra nella barra delle applicazioni e riconosce le sue notifiche
+const APP_ID = 'Claude Skins'
+if (process.platform === 'win32') app.setAppUserModelId(APP_ID)
+
+// Il collegamento nel menu Start: Windows mostra le notifiche di un'app non installata solo se ne esiste uno con lo
+// stesso AppUserModelId. Serve anche ad aprire Claude Skins dal menu Start. Si crea (o si aggiorna) all'avvio
+function ensureStartMenuShortcut() {
+  if (process.platform !== 'win32') return
+  try {
+    const link = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Claude Skins.lnk')
+    const want = { target: process.execPath, args: `"${app.getAppPath()}"`, appUserModelId: APP_ID, description: 'Claude Skins', cwd: app.getAppPath() }
+    let same = false
+    try {
+      const cur = shell.readShortcutLink(link)
+      same = cur.target === want.target && cur.args === want.args && cur.appUserModelId === APP_ID
+    } catch {}
+    if (!same) shell.writeShortcutLink(link, fs.existsSync(link) ? 'replace' : 'create', want)
+  } catch {}
+}
+
+// Le notifiche di Windows, quando la finestra non è davanti: Claude ha finito, chiede un permesso o una scelta, si è
+// fermato. Il titolo dice anche quale conversazione; un clic riporta davanti la finestra. Si spengono dal vassoio
+let trayImage = null
+let replyText = ''
+const shownNotes = new Set()
+function away() {
+  return !win || !win.isVisible() || win.isMinimized() || !win.isFocused()
+}
+// Il testo di una risposta in poche parole: senza markdown né blocchi di codice
+function plainSnippet(text) {
+  const s = String(text || '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^[#>\-*+\s]+/gm, '')
+    .replace(/[*_~]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return s.length > 180 ? `${s.slice(0, 179)}…` : s
+}
+async function notify(title, body) {
+  if (config.notify === false || !away() || !Notification.isSupported()) return
+  const name = await bridge.currentTitle().catch(() => '')
+  const short = name.length > 50 ? `${name.slice(0, 49)}…` : name
+  const n = new Notification({ title: short ? `${title} · ${short}` : title, body: body || '', icon: trayImage || undefined })
+  n.on('click', () => { bringBack(); n.close() })
+  n.on('close', () => shownNotes.delete(n))
+  shownNotes.add(n)
+  n.show()
+}
 
 app.whenReady().then(() => {
   loadConfig()
@@ -566,6 +635,7 @@ app.whenReady().then(() => {
   if (capture) bridge.send = () => {}
   registerIpc()
   createWindow()
+  if (!capture) ensureStartMenuShortcut()
   if (capture) {
     win.webContents.once('did-finish-load', () => setTimeout(() => fakeConversation(capture), 600))
     return
