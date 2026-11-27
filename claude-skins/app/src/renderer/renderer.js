@@ -1725,6 +1725,7 @@
       button(row('setWorkdir', st.workdir || t('setWorkdirNone')), 'setChange', () => set('workdir'))
       toggle(row('setWorktree', t('setWorktreeNote')), st.worktree, (v) => { worktreeOn = v; set('worktree', v); renderFolder() })
       select(row('setMode'), MODES.map(([m, key]) => [m, t(key)]), mode, (v) => { chooseMode(v); st.mode = v })
+      if (api.memoryFiles) button(row('setMemory', t('setMemoryNote')), 'setOpenPanel', () => { closeThemes(); openMemory() })
       if (api.permissions) button(row('setPermissions', t('setPermissionsNote')), 'setOpenPanel', () => { closeThemes(); openPermissions() })
       select(row('setModel'), [['', t('modelDefault')], ...models.filter((m) => m.value !== 'default').map((m) => [m.value, m.name])], model || '', (v) => {
         model = v || null
@@ -2272,6 +2273,8 @@
     }
     // /clear e /new: un nuovo capitolo, come il pulsante
     if (/^\/(clear|new)\s*$/i.test(text)) { input.value = ''; newChapter(); return }
+    // /memory: il pannello della memoria (quello di Claude Code apre un editor da terminale)
+    if (/^\/memory\s*$/i.test(text) && api.memoryFiles) { input.value = ''; openMemory(); return }
     if (notes.length) clearReviews()
     input.value = ''
     input.style.height = ''
@@ -2300,6 +2303,124 @@
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID()
     const h = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('')
     return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`
+  }
+
+  // ------------------------------------------------------------------ memoria
+
+  // I CLAUDE.md che Claude legge all'avvio di ogni conversazione: personale, del progetto, solo tuo nel progetto, e
+  // quelli delle cartelle sopra. Una scheda per file, un editor con l'anteprima del markdown; Ctrl+S salva. Le
+  // modifiche non salvate restano finché l'app è aperta (anche chiudendo il pannello)
+  const memDrafts = new Map()
+  let memCurrent = ''
+  async function openMemory() {
+    closeThemes()
+    closeFolderMenu()
+    const host = app.querySelector('[data-solid]') || app
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+    const panel = document.createElement('div')
+    panel.className = 'theme-picker mem-panel'
+    panel.innerHTML = '<div class="theme-picker-box settings-box"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="perm-tabs"></div><div class="mem-body"></div></div>'
+    label(panel.querySelector('.theme-picker-head span'), 'memTitle')
+    const close = panel.querySelector('.theme-picker-head button')
+    label(close, 'themesClose')
+    close.addEventListener('click', closeThemes)
+    panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    const tabs = panel.querySelector('.perm-tabs')
+    const body = panel.querySelector('.mem-body')
+    const conv = active && active.id
+    let files = []
+    try { files = ((await api.memoryFiles(conv)) || {}).files || [] } catch {}
+    const saved = new Map()
+    let note = null
+    let previewing = false
+    const nameOf = (f) => t(`memFile_${f.id}`, { x: f.dir || '' })
+    const show = async (file) => {
+      memCurrent = file
+      const f = files.find((x) => x.file === file) || files[0]
+      if (!f) return
+      if (!saved.has(f.file)) {
+        const r = await api.readMemory(conv, f.file).catch((err) => ({ ok: false, error: err.message }))
+        saved.set(f.file, r && r.ok ? r.text : null)
+        if (!r || !r.ok) note = { text: (r && r.error) || '?', error: true }
+      }
+      fill()
+    }
+    const fill = () => {
+      const f = files.find((x) => x.file === memCurrent) || files[0]
+      tabs.innerHTML = ''
+      for (const x of files) {
+        const b = document.createElement('button')
+        const dirty = memDrafts.has(x.file) && memDrafts.get(x.file) !== saved.get(x.file)
+        b.className = `perm-tab${x === f ? ' on' : ''}${x.exists ? '' : ' missing'}`
+        b.textContent = nameOf(x) + (dirty ? ' •' : '')
+        b.title = x.file
+        b.addEventListener('click', () => { note = null; show(x.file) })
+        tabs.appendChild(b)
+      }
+      body.innerHTML = ''
+      if (!f) return
+      if (note) {
+        const n = document.createElement('div')
+        n.className = `git-note${note.error ? ' error' : ''}`
+        n.textContent = note.text
+        body.appendChild(n)
+      }
+      const info = document.createElement('div')
+      info.className = 'folder-note perm-file'
+      info.textContent = t(`memNote_${f.id}`, { x: f.file }) + (f.exists ? '' : ` ${t('memNew')}`)
+      body.appendChild(info)
+      if (files.length === 1) { const n = document.createElement('div'); n.className = 'folder-note perm-file'; body.appendChild(label(n, 'memNoProject')) }
+      const orig = saved.get(f.file)
+      if (orig === null) return
+      const text = memDrafts.has(f.file) ? memDrafts.get(f.file) : orig
+      const area = document.createElement('textarea')
+      area.className = 'mem-text'
+      area.spellcheck = false
+      area.placeholder = t('memPlaceholder')
+      area.value = text
+      area.hidden = previewing
+      const view = document.createElement('div')
+      view.className = 'mem-view text'
+      view.hidden = !previewing
+      if (previewing) view.innerHTML = Markdown.render(text || '')
+      const row = document.createElement('div')
+      row.className = 'mem-row'
+      row.innerHTML = '<span class="mem-state"></span><span class="sp"></span>'
+      const state = row.querySelector('.mem-state')
+      const mkBtn = (key, fn, cls = 'deny') => { const b = document.createElement('button'); b.className = `btn small ${cls}`; label(b, key); b.addEventListener('click', fn); row.appendChild(b); return b }
+      const save = async () => {
+        const v = area.value
+        const r = await api.writeMemory(conv, f.file, v).catch((err) => ({ ok: false, error: err.message }))
+        if (r && r.ok) { saved.set(f.file, v); memDrafts.delete(f.file); f.exists = true; note = { text: t('memSaved') } } else note = { text: (r && r.error) || '?', error: true }
+        fill()
+      }
+      const revertB = mkBtn('memRevert', () => { memDrafts.delete(f.file); note = null; fill() })
+      mkBtn(previewing ? 'memEdit' : 'memPreview', () => { previewing = !previewing; fill() })
+      if (api.openMemory) mkBtn('memOpen', async () => { await api.openMemory(conv, f.file); f.exists = true })
+      const saveB = mkBtn('memSave', save, '')
+      const dirtyNow = () => area.value !== orig
+      const update = () => {
+        const d = dirtyNow()
+        if (d) memDrafts.set(f.file, area.value); else memDrafts.delete(f.file)
+        state.textContent = d ? t('memDirty') : ''
+        saveB.disabled = !d
+        revertB.disabled = !d
+        const tab = tabs.querySelector('.perm-tab.on')
+        if (tab) tab.textContent = nameOf(f) + (d ? ' •' : '')
+      }
+      area.addEventListener('input', update)
+      area.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (dirtyNow()) save(); return }
+        if (!e.ctrlKey && !e.metaKey) e.stopPropagation()
+        // Tab scrive un rientro invece di passare al pulsante dopo
+        if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); area.setRangeText('  ', area.selectionStart, area.selectionEnd, 'end'); update() }
+      })
+      body.append(area, view, row)
+      update()
+      if (!previewing) area.focus()
+    }
+    host.appendChild(panel)
+    await show(files.some((x) => x.file === memCurrent) ? memCurrent : ((files.find((x) => x.id === 'project') || files[0] || {}).file))
   }
 
   // ------------------------------------------------------------------ regole dei permessi
@@ -3757,6 +3878,7 @@
     themes: openThemes,
     settings: openSettings,
     preview: togglePreview,
+    memory: () => openMemory(),
     maximize: () => api.windowMode('max'),
     fullscreen: () => api.windowMode('full'),
     scene: () => { scene = scene === 'notte' ? 'giorno' : 'notte'; api.setScene(scene); paint(); hook('scene', scene) },
@@ -4011,6 +4133,12 @@
       project: { allow: ['Bash(npm run test:*)', 'Read(./docs/**)'], ask: ['Bash(git push:*)'], deny: [], dirs: [] },
       local: { allow: ['Edit(src/**)'], ask: [], deny: [], dirs: ['C:/Users/luca/Documenti/Mappe'] },
     }
+    // La memoria finta: personale e del progetto, quella locale non c'è ancora
+    const fakeMemory = new Map([
+      ['C:/Users/luca/.claude/CLAUDE.md', '# Le mie preferenze\n\n- Rispondi in italiano\n- Commenti nel codice in italiano\n- Prima di toccare più di tre file, chiedi\n'],
+      ['C:/Users/luca/MapEditor/CLAUDE.md', '# MapEditor\n\nEditor di mappe in C++17 con Qt 6.\n\n## Comandi\n\n- `cmake --build build` compila\n- `ctest --test-dir build` le prove\n\n## Regole\n\n- I fiumi si disegnano prima delle strade\n'],
+    ])
+    const fakeMemFiles = () => ({ cwd: 'C:/Users/luca/MapEditor', files: [['user', 'C:/Users/luca/.claude/CLAUDE.md'], ['project', 'C:/Users/luca/MapEditor/CLAUDE.md'], ['local', 'C:/Users/luca/MapEditor/CLAUDE.local.md'], ['parent', 'C:/Users/luca/CLAUDE.md']].filter(([id, f]) => id !== 'parent' || fakeMemory.has(f)).map(([id, file]) => ({ id, file, exists: fakeMemory.has(file), size: (fakeMemory.get(file) || '').length })) })
     const fakePermFiles = { user: 'C:/Users/luca/.claude/settings.json', project: 'C:/Users/luca/MapEditor/.claude/settings.json', local: 'C:/Users/luca/MapEditor/.claude/settings.local.json' }
     const fakeUpdate = { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/luca/Claude-desktop-skins', installed: true }
     const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '0.1.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claude Skins', shortcut: 'Ctrl+Alt+P', worktree: false }
@@ -4083,6 +4211,10 @@
         if (op.kind === 'move') { sc[op.list] = sc[op.list].filter((x) => x !== rule); sc[op.to].push(rule) }
         return { ok: true }
       },
+      memoryFiles: async () => fakeMemFiles(),
+      readMemory: async (_c, f) => ({ ok: true, text: fakeMemory.get(f) || '', exists: fakeMemory.has(f) }),
+      writeMemory: async (_c, f, text) => { fakeMemory.set(f, text); return { ok: true } },
+      openMemory: async () => true,
       capturePreview: async () => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
       gitStatus: async () => JSON.parse(JSON.stringify(fakeGit)),
       gitDiff: async (_c, f) => (f.endsWith('.cpp') ? { file: f, created: f.includes('Rivers'), hunks: [{ before: f.includes('Rivers') ? '' : 'void Draw(Map& map) {\n    DrawRoads(map);\n}\n', after: 'void Draw(Map& map) {\n    DrawRivers(map);\n    DrawRoads(map);\n}\n', line: 1 }] } : { file: f, deleted: true, hunks: [{ before: '# Vecchio\n', after: '', line: 1 }] }),

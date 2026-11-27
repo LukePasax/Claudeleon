@@ -265,6 +265,30 @@ for (const tema of TEMI) {
     assert.deepEqual(errors, [])
   })
 
+  test(`${tema}: memoria (CLAUDE.md), anche con /memory`, async () => {
+    await open(tema)
+    await page.fill('[data-part="input"]', '/memory')
+    await page.keyboard.press('Escape')
+    await page.focus('[data-part="input"]')
+    await page.keyboard.press('Enter')
+    await page.waitForSelector('.mem-panel .mem-text')
+    assert.match(await page.inputValue('.mem-text'), /# MapEditor/)
+    assert.equal(await convo('.entry.you'), 0)
+    await page.click('.mem-text')
+    await page.keyboard.press('Control+End')
+    await page.keyboard.type('- Le prove prima del commit')
+    assert.match(await page.textContent('.perm-tab.on'), /•/)
+    await page.keyboard.press('Control+s')
+    await page.waitForSelector('.mem-panel .git-note:has-text("Salvato")')
+    // La scheda che non c'è ancora, e l'anteprima
+    await page.click('.perm-tab:has-text("Solo tua qui")')
+    assert.equal(await page.inputValue('.mem-text'), '')
+    await page.click('.perm-tab:has-text("Progetto")')
+    await page.click('.mem-row .btn:has-text("Anteprima")')
+    assert.match(await page.textContent('.mem-view'), /Le prove prima del commit/)
+    assert.deepEqual(errors, [])
+  })
+
   test(`${tema}: impostazioni, estensioni, contesto, cambio di tema che tiene la conversazione`, async () => {
     await open(tema)
     await send('Ciao')

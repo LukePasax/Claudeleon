@@ -8,6 +8,7 @@ const { Updater } = require('./updater')
 const { listFiles, rankFiles } = require('./files')
 const gitOps = require('./git')
 const permissions = require('./permissions')
+const memory = require('./memory')
 const { plainSnippet } = require('./text')
 const { listThemes, DEFAULT_THEME } = require('./themes')
 
@@ -651,6 +652,20 @@ function registerIpc() {
     const r = permissions.change(cwdOf(conv), String(scope || ''), op)
     if (r.ok) for (const b of allBridges()) b.refreshSettings()
     return r
+  })
+  // La memoria (i CLAUDE.md): dopo una modifica le conversazioni la rileggono al prossimo messaggio
+  ipcMain.handle('memory:list', (_e, conv) => { try { return memory.list(cwdOf(conv)) } catch (err) { return { files: [], error: err.message } } })
+  ipcMain.handle('memory:read', (_e, conv, file) => memory.read(cwdOf(conv), String(file || '')))
+  ipcMain.handle('memory:write', (_e, conv, file, text) => {
+    const r = memory.write(cwdOf(conv), String(file || ''), text)
+    if (r.ok) for (const b of allBridges()) b.refreshSettings()
+    return r
+  })
+  ipcMain.handle('memory:open', async (_e, conv, file) => {
+    const f = String(file || '')
+    if (!memory.read(cwdOf(conv), f).ok) return false
+    if (!fs.existsSync(f)) memory.write(cwdOf(conv), f, '')
+    return !(await shell.openPath(f))
   })
   ipcMain.handle('git:wt-merge', gitCall((cwd) => gitOps.mergeWorktree(cwd)))
   ipcMain.handle('git:wt-remove', gitCall((cwd, force) => gitOps.removeWorktree(cwd, !!force)))

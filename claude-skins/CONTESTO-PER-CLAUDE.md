@@ -298,6 +298,14 @@ Nella pagina: `data-part="git"` (o dentro `data-part="folder"`), pannello `.git-
 conversazione, `refreshGit()` lo rilegge (cambio di cartella o di conversazione, fine risposta, focus della finestra).
 Prove: `test/unit/git.test.js` (un repo vero con un remoto nudo), e il pannello nelle prove della finestra.
 
+## Memoria
+
+`src/memory.js`: `list(cwd)` (user = `CLAUDE_CONFIG_DIR` o `~/.claude/CLAUDE.md`; project = `CLAUDE.md` o, se c'è solo
+quello, `.claude/CLAUDE.md`; local = `CLAUDE.local.md`; parent = i `CLAUDE.md` esistenti nelle cartelle sopra),
+`read`/`write` solo di quei file. IPC `memory:list/read/write/open`; dopo un salvataggio `refreshSettings()` come per
+i permessi. Pannello `.mem-panel` (schede `.perm-tab`, `.mem-text`, `.mem-view` con `Markdown.render`); `/memory`
+nella penna lo apre invece di mandarlo a Claude Code; `data-action="memory"`. Bozze in `memDrafts` (per file).
+
 ## Regole dei permessi
 
 `src/permissions.js`: `read(cwd)` dà i tre posti (user = `CLAUDE_CONFIG_DIR` o `~/.claude/settings.json`; project e

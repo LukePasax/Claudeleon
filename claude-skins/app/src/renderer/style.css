@@ -720,3 +720,14 @@ body.busy .entry .edit-btn { display: none; }
 .pl-add { display: flex; gap: 6px; margin-top: 6px; }
 .pl-add .perm-input { flex: 1; width: auto; max-width: none; }
 .perm-examples { padding: 10px 0 0; }
+
+/* Memoria (CLAUDE.md) */
+.mem-panel .settings-box { width: min(760px, calc(100% - 40px)); }
+.mem-body { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.perm-tab.missing { font-style: italic; }
+.mem-text { flex: 1; min-height: 260px; height: 46vh; resize: none; box-sizing: border-box; width: 100%; font-family: var(--font-code); font-size: var(--code-size); line-height: 1.5; color: var(--ink); background: var(--field, var(--code)); border: var(--line) solid var(--edge-light); border-radius: var(--radius-small); padding: 8px 10px; outline: none; user-select: text; tab-size: 2; }
+.mem-text:focus { border-color: var(--gold); }
+.mem-text[hidden], .mem-view[hidden] { display: none; }
+.mem-view { flex: 1; min-height: 260px; height: 46vh; overflow-y: auto; box-sizing: border-box; padding: 4px 12px; border: var(--line) solid var(--edge-light); border-radius: var(--radius-small); user-select: text; }
+.mem-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.mem-state { font-size: var(--small-size); color: var(--gold); }

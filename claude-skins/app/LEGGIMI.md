@@ -130,6 +130,13 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   stato, da quanto, quanti strumenti ha usato, l'ultimo e il riassunto finale, con "Ferma" e "Uscita" (il file con
   l'uscita). Mentre Claude lavora, "Manda in background" (o Ctrl+B) sposta in background il comando o il sotto-agente
   in corso, come nel terminale, e Claude va avanti. Con attività in corso la conversazione non si spegne da sola.
+- **Memoria (CLAUDE.md):** nelle impostazioni "Memoria (CLAUDE.md)", oppure scrivendo `/memory`, apre i file di
+  istruzioni che Claude legge all'avvio di ogni conversazione: personale (`~/.claude/CLAUDE.md`, per tutti i
+  progetti), del progetto (`CLAUDE.md` nella cartella, o `.claude/CLAUDE.md`), solo tuo nel progetto
+  (`CLAUDE.local.md`) e i `CLAUDE.md` delle cartelle sopra, se ci sono. Una scheda per file (in corsivo quelli che non
+  esistono ancora: nascono salvando), un editor con l'anteprima del markdown, Ctrl+S per salvare, "Apri nell'editor"
+  per il programma di sistema. Le modifiche non salvate restano finché l'app è aperta (un pallino sulla scheda). Le
+  conversazioni rileggono la memoria al prossimo messaggio.
 - **Regole dei permessi:** nelle impostazioni, "Regole dei permessi" apre il pannello con i tre posti di Claude Code:
   tutti i progetti (`~/.claude/settings.json`), questo progetto condiviso col repo (`.claude/settings.json`) e questo
   progetto solo per te (`.claude/settings.local.json`, dove finiscono anche le scelte "Sempre"). In ognuno le liste
