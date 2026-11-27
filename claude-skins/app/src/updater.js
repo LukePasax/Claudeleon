@@ -122,8 +122,9 @@ class Updater extends EventEmitter {
       this.set({ state: 'updating', step: 'build' })
       await this.run('npm', ['run', 'dist'], this.appDir)
       const dist = path.join(this.appDir, 'dist')
-      const setup = fs.readdirSync(dist).filter((f) => /^Claude Skins Setup .*\.exe$/.test(f))
-        .map((f) => ({ f, t: fs.statSync(path.join(dist, f)).mtimeMs })).sort((a, b) => b.t - a.t)[0]
+      // L'installer più recente (Claudeleon; prima si chiamava Claude Skins)
+      const setup = fs.readdirSync(dist).filter((f) => /^(Claudeleon|Claude Skins) Setup .*\.exe$/.test(f))
+        .map((f) => ({ f, t: fs.statSync(path.join(dist, f)).mtimeMs + (f.startsWith('Claudeleon') ? 1 : 0) })).sort((a, b) => b.t - a.t)[0]
       if (!setup) throw new Error('L\'installer nuovo non c\'è nella cartella dist.')
       this.set({ state: 'updating', step: 'install' })
       this.log('installo', setup.f)

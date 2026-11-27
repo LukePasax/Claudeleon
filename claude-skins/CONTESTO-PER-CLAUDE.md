@@ -1,7 +1,7 @@
-# Claude Skins — come è nata, per riprenderla ed espanderla
+# Claudeleon — come è nata, per riprenderla ed espanderla
 
 Questo documento è per Claude (Claude Code), che lo legge prima di lavorare sull'app nella cartella `app/`.
-L'app si chiamava **Pergamena** finché aveva un solo aspetto; con i temi è diventata **Claude Skins** (cartelle,
+L'app si chiamava **Pergamena** finché aveva un solo aspetto; con i temi è diventata **Claudeleon** (cartelle,
 finestra, pacchetto e configurazione), e "Pergamena" è rimasto il nome del tema del rotolo.
 Racconta cosa si voleva, quali strade sono state provate e perché sono state lasciate, com'è fatta l'app, cosa è stato
 verificato e cosa resta da fare. I sorgenti sono la fonte di verità; questo è la mappa.
@@ -49,6 +49,15 @@ laterale dell'app desktop), conversazione a destra.
    stato scritto da zero.
 
 ## Com'è fatta
+
+**Claude Skins diventa Claudeleon (novembre 2026).** Nome scelto dall'utente (Claude + camaleonte), sapendo che
+"Claude" dentro il nome è un piccolo rischio di marchio. Cambiati: nome, productName, installer (`Claudeleon Setup
+<versione>.exe`), collegamenti, titoli, scritte. Restano apposta: l'AppUserModelId `ClaudeSkins.App`/`.Dev` (per
+Windows è la stessa app), il formato dei temi `claude-skins-theme`, il protocollo `skins-theme`, la cartella del repo
+`claude-skins/` (l'aggiornamento della versione vecchia la cerca lì). `scripts/dist.js` lascia anche una copia
+`Claude Skins Setup <versione>.exe`, che è quella che l'aggiornatore della versione vecchia cerca; quello nuovo
+prende tutti e due i nomi. Al primo avvio `migrateOldData()` copia i dati da `appData/claude-skins` (o `Claude
+Skins`) alla cartella nuova, senza le cache di Chromium.
 
 **Verso la versione pubblica (novembre 2026).** L'utente vuole pubblicare il repo e fare le release su GitHub, per
 aggiornare più facilmente e passare l'app ai colleghi. Per questo i temi fatti finora (Terra di Mezzo / Casa Baggins,
@@ -125,7 +134,7 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
   quando attivarla). Spostamento e ridimensionamento seguiti dal processo principale col cursore a 60 Hz
   (`gesture:start/end`): con una finestra trasparente il trascinamento nativo (`-webkit-app-region`) e i bordi di
   ridimensionamento di Windows non sono affidabili. Vassoio, `Ctrl+Alt+P`, configurazione in
-  `%APPDATA%\Claude Skins\config.json`, modalità `--cattura` per gli screenshot di prova.
+  `%APPDATA%\Claudeleon\config.json`, modalità `--cattura` per gli screenshot di prova.
 - `src/claude-bridge.js` — il "messaggero": `query()` dell'Agent SDK con `cwd`, `pathToClaudeCodeExecutable` (la CLI
   installata, così valgono il suo login e la sua versione), `permissionMode: 'auto'`, `systemPrompt: { type:
   'preset', preset: 'claude_code', append: <tono da cronista> }`, `settings: { disableAllHooks: true }`,

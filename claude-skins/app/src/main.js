@@ -86,6 +86,27 @@ function watchStart() {
   }, 20000)
 }
 
+// L'app si chiamava Claude Skins: la prima volta che parte come Claudeleon, i suoi dati (configurazione, temi
+// importati, registri, elenchi in cache) passano dalla cartella di allora a quella nuova. Le cache di Chromium no
+const CHROMIUM_DIRS = new Set(['Cache', 'Code Cache', 'GPUCache', 'DawnCache', 'DawnGraphiteCache', 'DawnWebGPUCache', 'Crashpad', 'blob_storage', 'Shared Dictionary', 'Service Worker', 'Partitions', 'logs', 'SingletonLock', 'SingletonCookie', 'SingletonSocket', 'lockfile'])
+function migrateOldData() {
+  try {
+    const now = app.getPath('userData')
+    if (fs.existsSync(path.join(now, 'config.json'))) return
+    for (const name of ['claude-skins', 'Claude Skins']) {
+      const old = path.join(app.getPath('appData'), name)
+      if (path.resolve(old) === path.resolve(now) || !fs.existsSync(path.join(old, 'config.json'))) continue
+      fs.mkdirSync(now, { recursive: true })
+      for (const entry of fs.readdirSync(old)) {
+        if (CHROMIUM_DIRS.has(entry)) continue
+        try { fs.cpSync(path.join(old, entry), path.join(now, entry), { recursive: true, errorOnExist: false, force: false }) } catch {}
+      }
+      logError(`dati ripresi da ${old}`)
+      return
+    }
+  } catch {}
+}
+
 function loadConfig() {
   configFile = path.join(app.getPath('userData'), 'config.json')
   try {
@@ -257,7 +278,7 @@ function createWindow() {
     skipTaskbar: false,
     minimizable: true,
     backgroundColor: '#00000000',
-    title: 'Claude Skins',
+    title: 'Claudeleon',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -622,7 +643,7 @@ function registerIpc() {
       if (!b) return { ok: false, error: 'Tema sconosciuto' }
       const name = (b.kind === 'colors' ? b.spec.name : b.manifest.name) || String(id)
       const safe = name.replace(/[<>:"/\\|?*\x00-\x1f]+/g, ' ').trim().slice(0, 60) || 'tema'
-      const r = await dialog.showSaveDialog(win, { title: 'Esporta il tema', defaultPath: path.join(app.getPath('documents'), `${safe}.skin`), filters: [{ name: 'Tema di Claude Skins', extensions: ['skin'] }] })
+      const r = await dialog.showSaveDialog(win, { title: 'Esporta il tema', defaultPath: path.join(app.getPath('documents'), `${safe}.skin`), filters: [{ name: 'Tema di Claudeleon', extensions: ['skin'] }] })
       if (r.canceled || !r.filePath) return { ok: false, canceled: true }
       fs.writeFileSync(r.filePath, JSON.stringify(b))
       return { ok: true, file: r.filePath }
@@ -634,19 +655,19 @@ function registerIpc() {
   // c'è già chiede se sostituirlo. Restituisce come caricarlo nella pagina
   ipcMain.handle('theme:import', async () => {
     try {
-      const pick = await dialog.showOpenDialog(win, { title: 'Importa un tema', properties: ['openFile'], filters: [{ name: 'Tema di Claude Skins', extensions: ['skin', 'json'] }] })
+      const pick = await dialog.showOpenDialog(win, { title: 'Importa un tema', properties: ['openFile'], filters: [{ name: 'Tema di Claudeleon', extensions: ['skin', 'json'] }] })
       if (pick.canceled || !pick.filePaths[0]) return { ok: false, canceled: true }
       const file = pick.filePaths[0]
       if (fs.statSync(file).size > 40 * 1024 * 1024) return { ok: false, error: 'Il file è troppo grande' }
       let b
-      try { b = JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return { ok: false, error: 'Il file non è un tema di Claude Skins' } }
+      try { b = JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return { ok: false, error: 'Il file non è un tema di Claudeleon' } }
       const c = checkBundle(b)
       if (!c.ok) return c
       if (c.kind === 'code') {
         const ok = await dialog.showMessageBox(win, {
           type: 'warning', buttons: ['Installa', 'Annulla'], defaultId: 1, cancelId: 1, noLink: true,
           title: 'Installare il tema?', message: `Installare il tema «${c.name}»?`,
-          detail: 'Questo tema contiene codice che girerà nella finestra di Claude Skins (può leggere le conversazioni e mandare messaggi a Claude). Installalo solo se viene da qualcuno di cui ti fidi.',
+          detail: 'Questo tema contiene codice che girerà nella finestra di Claudeleon (può leggere le conversazioni e mandare messaggi a Claude). Installalo solo se viene da qualcuno di cui ti fidi.',
         })
         if (ok.response !== 0) return { ok: false, canceled: true }
       }
@@ -916,7 +937,7 @@ function registerIpc() {
     trayImage = img
     if (tray) { tray.setImage(img); return }
     tray = new Tray(img)
-    tray.setToolTip('Claude Skins')
+    tray.setToolTip('Claudeleon')
     tray.on('click', toggleVisible)
     refreshTray()
   })
@@ -1059,10 +1080,12 @@ function fakeConversation(capture) {
 // teneva in memoria; con un nome nuovo ricomincia da capo
 // La versione lanciata dal repo (electron.exe) ne ha un altro: con lo stesso, Windows mescolava le due e mostrava
 // l'icona di electron.exe anche per l'app installata
+// Gli identificativi restano quelli di quando l'app si chiamava Claude Skins: per Windows è la stessa app (notifiche,
+// gruppo nella barra delle applicazioni), anche dopo il cambio di nome
 const APP_ID = app.isPackaged ? 'ClaudeSkins.App' : 'ClaudeSkins.Dev'
 if (process.platform === 'win32') app.setAppUserModelId(APP_ID)
 
-// Le icone. Quella dell'app (menu Start, barra delle applicazioni, eseguibile, installer) è di Claude Skins e non
+// Le icone. Quella dell'app (menu Start, barra delle applicazioni, eseguibile, installer) è di Claudeleon e non
 // cambia col tema: build/icon.ico, che nell'app installata sta nell'eseguibile. Quella del tema va solo sulla finestra
 // (Alt+Tab) e nel vassoio
 function appIconFile() {
@@ -1084,28 +1107,33 @@ function setAppIcon(dataUrl) {
       appIconPath: appIconFile(),
       appIconIndex: 0,
       relaunchCommand: app.isPackaged ? `"${process.execPath}"` : `"${process.execPath}" "${app.getAppPath()}"`,
-      relaunchDisplayName: 'Claude Skins',
+      relaunchDisplayName: 'Claudeleon',
     })
     iconLog('setAppDetails fatto, appId', APP_ID, 'icona', appIconFile())
   } catch (err) { iconLog('errore:', err && err.message) }
 }
 
 // Il collegamento nel menu Start: Windows mostra le notifiche di un'app non installata solo se ne esiste uno con lo
-// stesso AppUserModelId. Serve anche ad aprire Claude Skins dal menu Start. Ha l'icona dell'app, così Windows non le
+// stesso AppUserModelId. Serve anche ad aprire Claudeleon dal menu Start. Ha l'icona dell'app, così Windows non le
 // lega mai quella di Electron
 function ensureStartMenuShortcut() {
   // L'app installata ha già il suo collegamento, fatto dall'installer con lo stesso AppUserModelId (appId); e la
   // versione dal repo non ne fa un secondo se l'app è installata (nella cartella di partenza dell'installer)
   if (app.isPackaged) return
   const local = process.env.LOCALAPPDATA || ''
-  if (local && ['claude-skins', 'Claude Skins'].some((d) => fs.existsSync(path.join(local, 'Programs', d, 'Claude Skins.exe')))) {
+  // (anche col nome di prima, Claude Skins)
+  const dirs = ['claudeleon', 'Claudeleon', 'claude-skins', 'Claude Skins']
+  if (local && dirs.some((d) => ['Claudeleon.exe', 'Claude Skins.exe'].some((exe) => fs.existsSync(path.join(local, 'Programs', d, exe))))) {
     iconLog('app installata: nessun collegamento dalla versione del repo')
     return
   }
   if (process.platform !== 'win32' || !fs.existsSync(appIconFile())) return
   try {
-    const link = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Claude Skins.lnk')
-    const want = { target: process.execPath, args: `"${app.getAppPath()}"`, appUserModelId: APP_ID, description: 'Claude Skins', cwd: app.getAppPath(), icon: appIconFile(), iconIndex: 0 }
+    const menu = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs')
+    // Il collegamento della versione dal repo col nome di prima se ne va (solo se è suo: punta a electron.exe)
+    try { const old = path.join(menu, 'Claude Skins.lnk'); if (/electron\.exe$/i.test(shell.readShortcutLink(old).target || '')) fs.unlinkSync(old) } catch {}
+    const link = path.join(menu, 'Claudeleon.lnk')
+    const want = { target: process.execPath, args: `"${app.getAppPath()}"`, appUserModelId: APP_ID, description: 'Claudeleon', cwd: app.getAppPath(), icon: appIconFile(), iconIndex: 0 }
     let same = false
     try {
       const cur = shell.readShortcutLink(link)
@@ -1164,11 +1192,12 @@ process.on('uncaughtException', (err) => { logError('errore nel processo princip
 
 app.whenReady().then(() => {
   serveThemes()
+  migrateOldData()
   loadConfig()
   const capture = captureArgs()
   if (capture) {
     // Le prove non toccano la configurazione vera
-    configFile = path.join(app.getPath('temp'), 'claude-skins-prova.json')
+    configFile = path.join(app.getPath('temp'), 'claudeleon-prova.json')
     config = { workdir: config.workdir, position: { x: 20, y: 20 }, sizes: {}, sessionId: null, scene: capture.scene, chapter: 3, theme: capture.theme || config.theme, permissionMode: 'auto' }
   }
   themes = allThemes()
@@ -1215,7 +1244,7 @@ app.whenReady().then(() => {
       send('update:state', s)
       if (s.state === 'available' && s.count !== updateNotified && config.notify !== false && Notification.isSupported()) {
         updateNotified = s.count
-        const n = new Notification({ title: 'Claude Skins: aggiornamento disponibile', body: s.commits && s.commits[0] ? `${s.count} novità, fra cui: ${s.commits[0]}` : `${s.count} novità`, icon: trayImage || undefined })
+        const n = new Notification({ title: 'Claudeleon: aggiornamento disponibile', body: s.commits && s.commits[0] ? `${s.count} novità, fra cui: ${s.commits[0]}` : `${s.count} novità`, icon: trayImage || undefined })
         n.on('click', () => { bringBack(); send('settings:open') })
         n.show()
       }

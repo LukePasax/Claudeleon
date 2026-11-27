@@ -1,5 +1,5 @@
 @echo off
-rem Le prove automatiche di Claude Skins: prima la logica (ponte, file, aggiornamento), poi la finestra (la pagina
+rem Le prove automatiche di Claudeleon: prima la logica (ponte, file, aggiornamento), poi la finestra (la pagina
 rem vera con l'API finta, dentro Electron, per ogni tema). Alla fine dice quante sono passate.
 setlocal
 set "APP=%~dp0"
