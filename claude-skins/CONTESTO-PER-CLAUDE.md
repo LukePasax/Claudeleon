@@ -211,6 +211,13 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
 - **Gli strumenti propri dell'app desktop** (browser integrato, avvio di altre sessioni, pannelli) dal rotolo non ci
   sono: Claude ha quelli di base di Claude Code, più i server MCP e i plugin della configurazione dell'utente.
 
+- **Più conversazioni:** nel processo principale `convs` (id → `{ bridge, sessionId, cwd }`), un `ClaudeBridge` per
+  conversazione creato da `makeConv` e collegato da `wireConv`, che manda gli eventi con l'id come terzo argomento di
+  `webContents.send`; il `bridge` di servizio fa solo comandi, modelli e annali. Le chiamate della pagina portano
+  l'id (`send`, `stop`, `answer`), `conv:active` dice quella in vista. Nella pagina ogni conversazione ha un `.convo`
+  nel log e il suo stato; le variabili globali (reply, tools, busy, todos, context, asks...) sono quelle di `cur`, e
+  `run(c, fn)` le scambia per un evento di un'altra conversazione, con `quiet` che spegne pulsanti, riquadri e agganci.
+  I `requestAnimationFrame` si legano alla conversazione con `run`. `switchTo` cambia quella in vista.
 - **Conversazione accesa:** `send()` non lancia più un `query()` per messaggio. `ensureLive()` tiene un `query()` con
   il prompt come flusso (`Inbox`, una coda che resta aperta) e `pump()` legge tutto, turno dopo turno (`handle()`); il
   turno si chiude col `result`. Si riaccende se cambiano sessione, cartella o tono (la chiave `key`); ragionamento e

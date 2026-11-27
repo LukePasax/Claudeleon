@@ -432,3 +432,15 @@ body[data-perm-mode="bypassPermissions"] .mode-btn, body[data-perm-mode="acceptE
 .thinking.open .thinking-body { display: block; }
 .thinking.live .thinking-body { max-height: 140px; overflow-y: auto; }
 .thinking-body p { margin: 0 0 6px; }
+
+/* Negli annali, le conversazioni aperte che non sono in vista: un punto che pulsa mentre lavorano, uno acceso se
+   aspettano una risposta (permesso, domanda, piano), uno pieno se hanno una risposta nuova da leggere */
+.session-row.running::after, .session-row.attention::after, .session-row.unread::after {
+  content: ''; position: absolute; right: 10px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: var(--gold);
+}
+.session-row.running::after { animation: thinking-pulse 1.2s ease-in-out infinite; }
+.session-row.attention::after { background: var(--red); }
+.session-row.unread::after { opacity: 0.8; }
+.session-row.running:hover::after, .session-row.attention:hover::after, .session-row.unread:hover::after { display: none; }
+.session-row.unread .title { font-weight: 600; }
+.convo[hidden] { display: none; }

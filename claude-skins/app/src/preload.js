@@ -1,7 +1,8 @@
 // Il ponte fra la pagina e il processo principale: solo queste funzioni, niente accesso diretto a Node
 const { contextBridge, ipcRenderer, webUtils } = require('electron')
 
-const listen = (channel) => (cb) => ipcRenderer.on(channel, (_e, payload) => cb(payload))
+// Gli eventi portano anche l'id della conversazione a cui appartengono (assente: quella in vista)
+const listen = (channel) => (cb) => ipcRenderer.on(channel, (_e, payload, conv) => cb(payload, conv))
 
 contextBridge.exposeInMainWorld('skins', {
   info: () => ipcRenderer.invoke('app:info'),
@@ -19,18 +20,22 @@ contextBridge.exposeInMainWorld('skins', {
   setMode: (mode) => ipcRenderer.send('mode:set', mode),
   openLink: (url) => ipcRenderer.send('link:open', url),
   newChapter: () => ipcRenderer.invoke('chapter:new'),
-  send: (msg) => ipcRenderer.send('chat:send', msg),
+  send: (msg, conv) => ipcRenderer.send('chat:send', msg, conv),
+  // La conversazione in vista (le altre continuano a lavorare)
+  setActive: (conv) => ipcRenderer.send('conv:active', conv),
+  onConvSession: listen('conv:session'),
+  onConvShow: listen('conv:show'),
   // Gli allegati: il percorso sul disco di un file trascinato o incollato (vuoto se non ne ha), la scelta dal disco,
   // la lettura di un'immagine
   pathForFile: (file) => { try { return webUtils.getPathForFile(file) || '' } catch { return '' } },
   chooseFiles: () => ipcRenderer.invoke('files:choose'),
   readImage: (p) => ipcRenderer.invoke('file:image', p),
-  stop: () => ipcRenderer.send('chat:stop'),
+  stop: (conv) => ipcRenderer.send('chat:stop', conv),
   setTrayIcon: (dataUrl) => ipcRenderer.send('tray:icon', dataUrl),
   renameSession: (id, title, cwd) => ipcRenderer.invoke('session:rename', id, title, cwd),
   archiveSession: (id, cwd, on) => ipcRenderer.invoke('session:archive', id, cwd, on),
   deleteSession: (id, cwd, title) => ipcRenderer.invoke('session:delete', id, cwd, title),
-  answer: (id, allow, always, answers) => ipcRenderer.send('perm:answer', { id, allow, always, answers }),
+  answer: (id, allow, always, answers, conv) => ipcRenderer.send('perm:answer', { id, allow, always, answers, conv }),
   // Modello e ragionamento
   models: () => ipcRenderer.invoke('models:get'),
   setModel: (model, effort, ultracode) => ipcRenderer.send('model:set', { model, effort, ultracode }),

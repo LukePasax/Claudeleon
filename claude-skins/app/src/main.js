@@ -17,7 +17,15 @@ if (!app.requestSingleInstanceLock()) {
 
 let win = null
 let tray = null
+// Il ponte di servizio: elenco dei comandi e dei modelli, annali (elenco, rinomina, archivia, elimina). Le
+// conversazioni hanno ciascuna il proprio (vedi makeConv)
 let bridge = null
+// Le conversazioni aperte in questa sessione dell'app: un capitolo nuovo o una cronaca aperta, ognuna col suo
+// ClaudeBridge e quindi il suo Claude Code acceso; possono lavorare insieme. activeConv è quella in vista
+const convs = new Map()
+let activeConv = null
+let nextConv = 1
+let captureMode = false
 let configFile = null
 // workdir: la cartella in cui lavora Claude Code e di cui si elencano le cronache; vuota, la cartella utente
 // theme: l'id del tema in uso (una cartella di src/renderer/themes); sizes: la misura scelta per ogni tema, perché un
@@ -98,7 +106,7 @@ function setTheme(id) {
   if (!themes.some((t) => t.id === id)) return
   config.theme = id
   saveConfig()
-  bridge.persona = currentTheme().persona
+  for (const b of allBridges()) b.persona = currentTheme().persona
   // La finestra prende la misura del nuovo tema, attorno allo stesso centro e dentro lo schermo (se è ingrandita
   // resta ingrandita: cambia la misura a cui tornerà)
   if (winMode !== 'normal') {
@@ -123,8 +131,48 @@ function setTheme(id) {
   refreshTray()
 }
 
-function send(channel, payload) {
-  if (win && !win.isDestroyed()) win.webContents.send(channel, payload)
+// Alla pagina; conv dice di quale conversazione è un evento (senza: vale per quella in vista)
+function send(channel, payload, conv) {
+  if (win && !win.isDestroyed()) win.webContents.send(channel, payload, conv)
+}
+
+// Una conversazione nuova, vuota o per una sessione da riprendere: il suo ponte prende le impostazioni comuni
+// (cartella, tono del tema, modo, modello, ragionamento) e i suoi eventi vanno alla pagina con il suo id
+function makeConv(sessionId, cwd) {
+  const c = { id: `c${nextConv++}`, sessionId: sessionId || null, cwd: cwd || null, replyText: '' }
+  c.bridge = new ClaudeBridge({
+    getSession: () => c.sessionId,
+    setSession: (id, dir) => {
+      const fresh = c.sessionId !== id
+      c.sessionId = id
+      c.cwd = dir || null
+      if (activeConv === c.id) { config.sessionId = id; config.sessionCwd = c.cwd; saveConfig() }
+      if (fresh) send('conv:session', { id, cwd: c.cwd }, c.id)
+    },
+  }, config.workdir, currentTheme().persona, config.permissionMode)
+  const b = c.bridge
+  b.entrypoint = config.entrypoint || 'cli'
+  b.setModel(config.model || null)
+  b.ultracode = !!config.ultracode
+  b.setEffort(config.effort || null)
+  b.sessionCwd = c.cwd
+  if (captureMode) b.send = () => {}
+  wireConv(c)
+  convs.set(c.id, c)
+  return c
+}
+function convOf(id) {
+  return convs.get(id) || convs.get(activeConv)
+}
+function allBridges() {
+  return [...convs.values()].map((c) => c.bridge)
+}
+// Le conversazioni ferme da tempo, non in vista e senza un Claude Code acceso si lasciano andare (la pagina tiene la
+// sua copia; riaprendole dagli annali si riprendono)
+function dropConv(c) {
+  c.bridge.cancel()
+  c.bridge.removeAllListeners()
+  convs.delete(c.id)
 }
 
 function createWindow() {
@@ -311,7 +359,7 @@ function trayMenu() {
 
 // La cartella in cui nascono le conversazioni nuove (quelle riprese restano nella loro)
 async function chooseWorkdir() {
-  const r = await dialog.showOpenDialog(win, { title: 'Cartella di lavoro di Claude', defaultPath: bridge.workdir, properties: ['openDirectory'] })
+  const r = await dialog.showOpenDialog(win, { title: 'Cartella di lavoro di Claude', defaultPath: config.workdir || app.getPath('home'), properties: ['openDirectory'] })
   if (r.canceled || !r.filePaths[0]) return null
   return setWorkdir(r.filePaths[0])
 }
@@ -319,10 +367,13 @@ async function chooseWorkdir() {
 function setWorkdir(dir) {
   if (!dir || !fs.existsSync(dir)) return null
   config.workdir = dir
-  bridge.workdir = dir.replace(/\\/g, '/')
+  const w = dir.replace(/\\/g, '/')
+  // Vale per le conversazioni che non sono ancora cominciate (quelle cominciate restano nella loro cartella)
+  bridge.workdir = w
+  for (const c of convs.values()) if (!c.sessionId) c.bridge.workdir = w
   saveConfig()
-  send('workdir:changed', bridge.workdir)
-  return bridge.workdir
+  send('workdir:changed', w)
+  return w
 }
 
 // Con una finestra grande come l'app desktop, stare sempre sopra le altre può dare fastidio: si sceglie dal vassoio
@@ -356,17 +407,28 @@ function registerIpc() {
     theme: currentTheme().id,
     themes: themes.map((t) => t.id),
     workdir: bridge.workdir,
+    conv: activeConv,
+    sessionId: config.sessionId || null,
     // Se la cartella l'ha scelta la persona (altrimenti è la cartella utente, e al primo messaggio la si chiede)
     workdirChosen: !!config.workdir,
     sessionCwd: config.sessionId ? (config.sessionCwd || bridge.workdir) : null,
-    mode: bridge.mode,
+    mode: config.permissionMode || bridge.mode,
   }))
   ipcMain.on('theme:set', (_e, id) => setTheme(String(id)))
   // La cartella delle conversazioni nuove, dalla finestra: dal dialogo di sistema o da una cartella recente
   ipcMain.handle('workdir:choose', () => chooseWorkdir())
   ipcMain.handle('workdir:set', (_e, dir) => setWorkdir(String(dir || '')))
   // Il modo dei permessi, scelto dalla finestra; il messaggero lo applica anche alla risposta in corso
-  ipcMain.on('mode:set', (_e, mode) => bridge.setMode(String(mode)))
+  ipcMain.on('mode:set', (_e, mode) => { for (const b of allBridges()) b.setMode(String(mode)) })
+  // La conversazione in vista: si ricorda la sua sessione, per riprenderla al prossimo avvio
+  ipcMain.on('conv:active', (_e, id) => {
+    const c = convs.get(id)
+    if (!c) return
+    activeConv = c.id
+    config.sessionId = c.sessionId
+    config.sessionCwd = c.cwd
+    saveConfig()
+  })
   // Un link di una risposta: nel browser di sistema, e solo se è http, https o mailto
   ipcMain.on('link:open', (_e, url) => {
     const u = String(url || '')
@@ -374,22 +436,23 @@ function registerIpc() {
   })
   ipcMain.on('scene:set', (_e, scene) => { config.scene = scene === 'giorno' ? 'giorno' : 'notte'; saveConfig() })
   // Un capitolo per conversazione: il numero cresce, la sessione di Claude Code ricomincia
+  // Un capitolo nuovo è una conversazione nuova: quelle di prima restano accese e continuano a lavorare
   ipcMain.handle('chapter:new', () => {
-    bridge.cancel()
-    send('claude:context', null)
-    bridge.resetTodos()
+    // Una conversazione ancora vuota non serve più: si lascia andare
+    for (const c of [...convs.values()]) if (!c.sessionId && !(c.bridge.live && c.bridge.live.turn.open)) dropConv(c)
+    const c = makeConv(null, null)
+    activeConv = c.id
     config.chapter += 1
     config.sessionId = null
     config.sessionCwd = null
-    bridge.sessionCwd = null
     saveConfig()
-    return config.chapter
+    return { chapter: config.chapter, conv: c.id }
   })
   // Il messaggio: testo, o { text, images, files } con gli allegati
-  ipcMain.on('chat:send', (_e, msg) => bridge.send(msg && typeof msg === 'object' ? msg : String(msg || '')))
+  ipcMain.on('chat:send', (_e, msg, conv) => { const c = convOf(conv); if (c) c.bridge.send(msg && typeof msg === 'object' ? msg : String(msg || '')) })
   // Il pulsante "allega": file e immagini dal disco
   ipcMain.handle('files:choose', async () => {
-    const r = await dialog.showOpenDialog(win, { title: 'Allega file o immagini', defaultPath: bridge.sessionCwd || bridge.workdir, properties: ['openFile', 'multiSelections'] })
+    const r = await dialog.showOpenDialog(win, { title: 'Allega file o immagini', defaultPath: (convOf(activeConv) && convOf(activeConv).cwd) || bridge.workdir, properties: ['openFile', 'multiSelections'] })
     return r.canceled ? [] : r.filePaths
   })
   // Un'immagine dal disco, per mandarla a Claude come immagine e non come percorso
@@ -401,16 +464,18 @@ function registerIpc() {
       return { mediaType, data: fs.readFileSync(p).toString('base64') }
     } catch { return null }
   })
-  ipcMain.on('chat:stop', () => { replyText = ''; bridge.stop() })
-  ipcMain.on('perm:answer', (_e, { id, allow, always, answers }) => bridge.answer(id, !!allow, !!always, answers))
+  ipcMain.on('chat:stop', (_e, conv) => { const c = convOf(conv); if (c) { c.replyText = ''; c.bridge.stop() } })
+  ipcMain.on('perm:answer', (_e, { id, allow, always, answers, conv }) => { const c = convOf(conv); if (c) c.bridge.answer(id, !!allow, !!always, answers) })
   // Modello e ragionamento, ricordati per le prossime volte
   ipcMain.on('model:set', (_e, { model, effort, ultracode }) => {
     config.model = model || null
     config.effort = effort || null
     config.ultracode = !!ultracode
-    bridge.setModel(config.model)
-    bridge.ultracode = config.ultracode
-    bridge.setEffort(config.effort)
+    for (const b of [bridge, ...allBridges()]) {
+      b.setModel(config.model)
+      b.ultracode = config.ultracode
+      b.setEffort(config.effort)
+    }
     saveConfig()
   })
   ipcMain.handle('models:get', () => {
@@ -434,19 +499,25 @@ function registerIpc() {
     })
     if (r.response !== 0) return { deleted: false }
     const wasCurrent = config.sessionId === id
+    // La conversazione aperta su quella sessione si spegne e se ne va
+    for (const c of [...convs.values()]) if (c.sessionId === id) dropConv(c)
     await bridge.remove(id, cwd)
-    if (wasCurrent) { config.sessionId = null; config.sessionCwd = null; bridge.sessionCwd = null; saveConfig() }
+    if (wasCurrent) { config.sessionId = null; config.sessionCwd = null; saveConfig() }
     return { deleted: true, wasCurrent }
   })
   // Apre una sessione di Claude Code, anche dell'app desktop: i messaggi dopo continuano quella, nella sua cartella
+  // Se una conversazione su quella sessione è già aperta (magari sta lavorando) si torna a lei; altrimenti se ne apre
+  // una nuova. Le altre restano come sono
   ipcMain.handle('session:open', async (_e, id, cwd) => {
-    bridge.cancel()
-    send('claude:context', null)
+    let c = [...convs.values()].find((x) => x.sessionId === id)
+    const existing = !!c
+    if (!c) c = makeConv(id, cwd || null)
+    activeConv = c.id
     config.sessionId = id
-    config.sessionCwd = cwd || null
-    bridge.sessionCwd = config.sessionCwd
+    config.sessionCwd = c.cwd
     saveConfig()
-    return bridge.history(id, config.sessionCwd)
+    const history = await c.bridge.history(id, c.cwd)
+    return { conv: c.id, existing, history }
   })
   ipcMain.on('tray:icon', (_e, dataUrl) => {
     const img = nativeImage.createFromDataURL(dataUrl)
@@ -460,35 +531,7 @@ function registerIpc() {
     refreshTray()
   })
 
-  bridge.on('delta', (t) => { replyText += t; send('claude:delta', t) })
-  bridge.on('tool', (t) => send('claude:tool', t))
-  bridge.on('thinkingStart', () => send('claude:thinkingStart'))
-  bridge.on('thinking', (t) => send('claude:thinking', t))
-  bridge.on('thinkingEnd', () => send('claude:thinkingEnd'))
-  bridge.on('toolDone', (t) => send('claude:toolDone', t))
-  bridge.on('done', (r) => {
-    send('claude:done', r)
-    const text = plainSnippet(replyText)
-    replyText = ''
-    notify('Claude ha finito', text || 'La risposta è pronta.')
-  })
-  bridge.on('error', (m) => {
-    send('claude:error', m)
-    replyText = ''
-    notify('Claude si è fermato', plainSnippet(String(m || '')))
-  })
-  // Una domanda di permesso: se la finestra è ridotta a icona lampeggia nella barra, come le altre app, e arriva
-  // una notifica
-  bridge.on('ask', (q) => {
-    if (!win.isVisible()) win.show()
-    if (win.isMinimized() || !win.isFocused()) win.flashFrame(true)
-    send('perm:ask', q)
-    if (q.kind === 'plan') notify('Claude propone un piano', 'Da approvare per continuare.')
-    else if (q.kind === 'question') notify('Claude ti fa una domanda', (q.questions[0] && q.questions[0].question) || '')
-    else notify('Claude chiede il permesso', [q.title, q.detail].filter(Boolean).join(' · '))
-  })
-  bridge.on('askClosed', (q) => send('perm:closed', q))
-  // Il modo cambia dalla finestra, dall'approvazione di un piano o da Claude Code stesso: si ricorda e si mostra
+  // Il ponte di servizio: i comandi, i modelli
   // I comandi con /: si ricordano su disco, così ci sono subito al prossimo avvio
   bridge.on('commands', (list) => {
     try { fs.writeFileSync(path.join(app.getPath('userData'), 'commands.json'), JSON.stringify(list)) } catch {}
@@ -500,16 +543,59 @@ function registerIpc() {
     try { fs.writeFileSync(path.join(app.getPath('userData'), 'models.json'), JSON.stringify(list)) } catch {}
     send('models:list', list)
   })
-  bridge.on('todos', (list) => send('claude:todos', list))
-  bridge.on('context', (c) => send('claude:context', c))
+}
+
+// Gli eventi di una conversazione vanno alla pagina col suo id. Le notifiche dicono quale conversazione: arrivano
+// se la finestra non è davanti, o se la conversazione non è quella in vista
+function wireConv(c) {
+  const b = c.bridge
+  const fwd = (ev, channel) => b.on(ev, (x) => send(channel, x, c.id))
+  b.on('delta', (t) => { c.replyText += t; send('claude:delta', t, c.id) })
+  fwd('tool', 'claude:tool')
+  fwd('thinkingStart', 'claude:thinkingStart')
+  fwd('thinking', 'claude:thinking')
+  fwd('thinkingEnd', 'claude:thinkingEnd')
+  fwd('toolDone', 'claude:toolDone')
+  b.on('done', (r) => {
+    send('claude:done', r, c.id)
+    const text = plainSnippet(c.replyText)
+    c.replyText = ''
+    notify('Claude ha finito', text || 'La risposta è pronta.', c)
+  })
+  b.on('error', (m) => {
+    send('claude:error', m, c.id)
+    c.replyText = ''
+    notify('Claude si è fermato', plainSnippet(String(m || '')), c)
+  })
+  // Una domanda di permesso: se la finestra è ridotta a icona lampeggia nella barra, come le altre app, e arriva
+  // una notifica
+  b.on('ask', (q) => {
+    if (!win.isVisible()) win.show()
+    if (win.isMinimized() || !win.isFocused()) win.flashFrame(true)
+    send('perm:ask', q, c.id)
+    if (q.kind === 'plan') notify('Claude propone un piano', 'Da approvare per continuare.', c)
+    else if (q.kind === 'question') notify('Claude ti fa una domanda', (q.questions[0] && q.questions[0].question) || '', c)
+    else notify('Claude chiede il permesso', [q.title, q.detail].filter(Boolean).join(' · '), c)
+  })
+  fwd('askClosed', 'perm:closed')
+  fwd('todos', 'claude:todos')
+  fwd('context', 'claude:context')
   // Claude riprende a lavorare da sé (un messaggio entrato mentre il turno finiva)
-  bridge.on('busy', (on) => send('claude:busy', on))
-  bridge.on('commandOutput', (text) => send('claude:commandOutput', text))
-  bridge.on('toolSummary', (x) => send('claude:toolSummary', x))
-  bridge.on('compacted', (c) => send('claude:compacted', c))
-  bridge.on('title', (x) => send('claude:title', x))
-  bridge.on('status', (st) => send('claude:status', st))
-  bridge.on('mode', (mode) => { config.permissionMode = mode; saveConfig(); send('mode:changed', mode) })
+  fwd('busy', 'claude:busy')
+  fwd('commandOutput', 'claude:commandOutput')
+  fwd('toolSummary', 'claude:toolSummary')
+  fwd('compacted', 'claude:compacted')
+  fwd('status', 'claude:status')
+  // Il titolo dato da Claude e i comandi della conversazione valgono per tutta la finestra
+  b.on('title', (x) => send('claude:title', x))
+  b.on('commands', (list) => send('commands:list', list))
+  // Il modo cambia dalla finestra, dall'approvazione di un piano o da Claude Code stesso: si ricorda e si mostra
+  b.on('mode', (mode) => {
+    config.permissionMode = mode
+    saveConfig()
+    for (const o of allBridges()) if (o !== b) o.mode = mode
+    send('mode:changed', mode)
+  })
 }
 
 app.on('second-instance', () => {
@@ -588,7 +674,6 @@ function ensureStartMenuShortcut() {
 // Le notifiche di Windows, quando la finestra non è davanti: Claude ha finito, chiede un permesso o una scelta, si è
 // fermato. Il titolo dice anche quale conversazione; un clic riporta davanti la finestra. Si spengono dal vassoio
 let trayImage = null
-let replyText = ''
 const shownNotes = new Set()
 function away() {
   return !win || !win.isVisible() || win.isMinimized() || !win.isFocused()
@@ -605,12 +690,14 @@ function plainSnippet(text) {
     .trim()
   return s.length > 180 ? `${s.slice(0, 179)}…` : s
 }
-async function notify(title, body) {
-  if (config.notify === false || !away() || !Notification.isSupported()) return
-  const name = await bridge.currentTitle().catch(() => '')
+async function notify(title, body, c) {
+  if (config.notify === false || !Notification.isSupported()) return
+  if (!away() && (!c || c.id === activeConv)) return
+  const name = c ? await c.bridge.currentTitle().catch(() => '') : ''
   const short = name.length > 50 ? `${name.slice(0, 49)}…` : name
   const n = new Notification({ title: short ? `${title} · ${short}` : title, body: body || '', icon: trayImage || undefined })
-  n.on('click', () => { bringBack(); n.close() })
+  // Un clic riporta davanti la finestra, sulla conversazione della notifica
+  n.on('click', () => { bringBack(); if (c && convs.has(c.id)) send('conv:show', null, c.id); n.close() })
   n.on('close', () => shownNotes.delete(n))
   shownNotes.add(n)
   n.show()
@@ -635,11 +722,10 @@ app.whenReady().then(() => {
   // config.json, ad esempio "claude-desktop"
   bridge.entrypoint = config.entrypoint || 'cli'
   bridge.setModel(config.model || null)
-  bridge.ultracode = !!config.ultracode
-  bridge.setEffort(config.effort || null)
-  bridge.sessionCwd = config.sessionCwd || null
-  if (capture) bridge.send = () => {}
+  captureMode = !!capture
   registerIpc()
+  // La prima conversazione: quella dell'ultima volta, se c'era
+  activeConv = makeConv(config.sessionId || null, config.sessionCwd || null).id
   createWindow()
   if (!capture) ensureStartMenuShortcut()
   if (capture) {
@@ -653,7 +739,7 @@ app.whenReady().then(() => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll()
-  if (bridge) bridge.cancel()
+  for (const c of convs.values()) c.bridge.cancel()
 })
 
 app.on('window-all-closed', () => app.quit())

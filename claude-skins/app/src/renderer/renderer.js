@@ -4,7 +4,12 @@
 // delegati al documento, così un cambio di tema sostituisce tutto l'HTML senza perdere la conversazione.
 // Senza Electron (aperta in un browser) la chat risponde con un'eco finta, per guardare la grafica.
 (function () {
-  const api = window.skins || fakeApi()
+  // Gli eventi di una conversazione arrivano con il suo id: passano da dispatch, che li applica alla conversazione
+  // giusta anche se non è quella in vista (vedi "conversazioni")
+  const base = window.skins || fakeApi()
+  const api = Object.assign({}, base)
+  const CONV_EVENTS = ['onDelta', 'onTool', 'onToolDone', 'onDone', 'onError', 'onAsk', 'onAskClosed', 'onCommandOutput', 'onToolSummary', 'onCompacted', 'onStatus', 'onTodos', 'onBusy', 'onContext', 'onThinkingStart', 'onThinking', 'onThinkingEnd']
+  for (const n of CONV_EVENTS) if (base[n]) api[n] = (fn) => base[n]((payload, id) => dispatch(id, n, () => fn(payload)))
   const app = document.getElementById('app')
   const t = Theming.t
   const MONTHS = Theming.MONTHS
@@ -22,7 +27,109 @@
   // Il modo dei permessi
   let mode = 'auto'
   const MODES = [['auto', 'modeAuto'], ['default', 'modeDefault'], ['acceptEdits', 'modeAcceptEdits'], ['plan', 'modePlan']]
-  const tools = new Map()
+  let tools = new Map()
+
+  // ------------------------------------------------------------------ conversazioni
+
+  // Più conversazioni insieme, come nell'app desktop: ognuna ha il suo Claude Code acceso (nel processo principale) e
+  // qui il suo stato e il suo contenitore nel log (.convo; si vede solo quello della conversazione in vista). Le
+  // variabili della conversazione (reply, tools, busy, todos, context...) contengono quella "di turno" (cur), di
+  // solito quella in vista (active). Un evento di un'altra le scambia per il tempo che serve (run); intanto quiet
+  // zittisce tutto quello che si vede fuori dal log: pulsanti, attività, contesto, cartella, titolo, agganci del tema
+  const convs = new Map()
+  let active = null
+  let cur = null
+  let quiet = false
+  function logEl() {
+    return (cur && cur.el) || part('log')
+  }
+  function newConv(id) {
+    const el = document.createElement('div')
+    el.className = 'convo'
+    el.dataset.conv = id
+    el.hidden = true
+    if (part('log')) part('log').appendChild(el)
+    const c = {
+      id, el, reply: null, pending: false, tools: new Map(), busy: false, thinking: null, todos: [], todosOpen: true,
+      context: null, currentSession: null, convoDir: workdir, chapter, asks: new Map(), stick: true,
+      sessionId: null, unread: false, attention: false,
+    }
+    convs.set(id, c)
+    return c
+  }
+  function save(c) {
+    if (c) Object.assign(c, { reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick })
+  }
+  function load(c) {
+    ;({ reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick } = c)
+  }
+  function run(c, fn) {
+    if (!c || c === cur) return fn()
+    const prev = cur
+    save(prev)
+    load(c)
+    cur = c
+    quiet = c !== active
+    try {
+      return fn()
+    } finally {
+      save(c)
+      if (prev) load(prev)
+      cur = prev
+      quiet = !!prev && prev !== active
+    }
+  }
+  // Un evento dal processo principale: alla sua conversazione. Una che non è in vista segna negli annali che ha una
+  // domanda aperta o una risposta nuova
+  function dispatch(id, name, fn) {
+    const c = (id && convs.get(id)) || active
+    if (!c) return
+    run(c, fn)
+    if (c === active) return
+    if (name === 'onDone' || name === 'onError') c.unread = true
+    if (name === 'onAsk') c.attention = true
+    if (name === 'onAskClosed' || name === 'onDone') c.attention = false
+    if (/^on(Done|Error|Ask|AskClosed|Busy|Delta)$/.test(name)) markCurrentSession()
+  }
+  const isBusy = (c) => (c === cur ? busy : c.busy)
+  // Passa a un'altra conversazione: la sua pagina, i suoi pulsanti, le sue attività, il suo contesto
+  function switchTo(c) {
+    if (!c || c === active) return
+    closeMenu()
+    save(cur)
+    if (active) active.el.hidden = true
+    active = c
+    cur = c
+    quiet = false
+    load(c)
+    c.el.hidden = false
+    c.unread = false
+    c.attention = false
+    if (api.setActive) api.setActive(c.id)
+    const b = busy
+    busy = !b
+    setBusy(b)
+    renderTodos()
+    renderContext()
+    renderFolder()
+    renderChapterHead()
+    markCurrentSession()
+    scrollDown(true)
+    hook('chapter')
+  }
+  // Le conversazioni rimaste vuote (nessun messaggio, nessuna sessione) se ne vanno quando se ne apre un'altra
+  function pruneEmpty() {
+    for (const c of [...convs.values()]) {
+      if (c === active || c.sessionId || isBusy(c) || c.el.querySelector('.entry.you')) continue
+      c.el.remove()
+      convs.delete(c.id)
+    }
+  }
+  function dropConv(c) {
+    if (!c || c === active) return
+    c.el.remove()
+    convs.delete(c.id)
+  }
 
   function craftOf(tool) {
     if (/^(Read|NotebookRead)$/.test(tool)) return 'leggere'
@@ -70,7 +177,7 @@
   }
   function scrollDown(force) {
     const l = part('log')
-    if (!l) return
+    if (!l || quiet) return
     if (force) stick = true
     if (stick) toBottom(l)
   }
@@ -104,12 +211,12 @@
     const d = document.createElement('div')
     d.className = `item ${cls}`
     d.innerHTML = html
-    part('log').appendChild(d)
+    logEl().appendChild(d)
     scrollDown()
     return d
   }
   function clearLog() {
-    for (const el of all('[data-part="log"] > .item')) el.remove()
+    for (const el of [...logEl().children]) if (el.classList.contains('item')) el.remove()
     tools.clear()
   }
 
@@ -216,6 +323,7 @@
     }
   }
   function hook(name, ...args) {
+    if (quiet) return
     Theming.hook(name, hookContext(), ...args)
   }
 
@@ -328,6 +436,7 @@
   const baseName = (p) => String(p || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() || String(p || '')
 
   function renderFolder() {
+    if (quiet) return
     for (const box of all('[data-part="folder"]')) {
       let b = box.querySelector('.folder-btn')
       if (!b) {
@@ -365,6 +474,7 @@
     return box
   }
   function renderTodos() {
+    if (quiet) return
     const box = todosBox()
     if (!box) return
     box.hidden = !todos.length
@@ -409,6 +519,7 @@
   let context = null
   const kTok = (n) => n >= 1000 ? `${(n / 1000).toFixed(n >= 100000 ? 0 : 1).replace('.', ',')}k` : String(n)
   function renderContext() {
+    if (quiet) return
     for (const box of all('[data-part="context"]')) {
       let b = box.querySelector('.context-btn')
       if (!b) {
@@ -573,7 +684,7 @@
   if (api.onModels) api.onModels((list) => { models = list || []; renderModel() })
 
   function chapterHasMessages() {
-    return all('[data-part="log"] .entry.you').length > 0
+    return logEl().querySelectorAll('.entry.you').length > 0
   }
 
   function closeFolderMenu() {
@@ -858,14 +969,14 @@
   // Monta il tema: il suo HTML prende il posto del precedente, la conversazione, la bozza e lo stato passano al nuovo
   async function mount(id) {
     closeMenu()
-    const items = [...all('[data-part="log"] > .item')]
+    const convEls = [...convs.values()].map((c) => c.el)
     const draft = part('input') ? part('input').value : ''
     if (app.children.length) hook('unmount')
     const theme = await Theming.use(id)
     app.innerHTML = theme.layout || '<div data-solid style="background:#000;color:#fff;padding:20px">Questo tema non ha un layout.</div>'
     addEdges()
     const log = part('log')
-    if (log) for (const it of items) log.appendChild(it)
+    if (log) for (const el of convEls) log.appendChild(el)
     watchLog()
     if (part('input')) part('input').value = draft
     setBusy(busy)
@@ -975,6 +1086,7 @@
   function setBusy(on) {
     const changed = busy !== on
     busy = on
+    if (quiet) return
     for (const el of all('[data-action="send"]')) el.hidden = on
     for (const el of all('[data-action="stop"]')) el.hidden = !on
     for (const el of all('[data-part="hint"]')) el.textContent = t(on ? 'busyHint' : 'hint')
@@ -1012,7 +1124,7 @@
     fillYou(you, text, images.map((a) => a.url), files)
     renderFolder()
     setBusy(true)
-    api.send(sent.length ? { text, images: images.map((a) => ({ mediaType: a.mediaType, data: a.data })), files } : text)
+    api.send(sent.length ? { text, images: images.map((a) => ({ mediaType: a.mediaType, data: a.data })), files } : text, active && active.id)
   }
 
   // Una domanda della persona nel log, con le miniature delle immagini e le etichette dei file. I file stanno anche
@@ -1203,7 +1315,7 @@
   }
   function renderThinking() {
     thinkingFrame = 0
-    if (!thinking) return
+    if (!thinking || !thinking.isConnected) return
     const body = thinking.querySelector('.thinking-body')
     body.innerHTML = markdown(thinking.raw)
     body.scrollTop = body.scrollHeight
@@ -1230,7 +1342,7 @@
     api.onThinking((text) => {
       if (!thinking) startThinking()
       thinking.raw += text
-      if (!thinkingFrame) thinkingFrame = requestAnimationFrame(renderThinking)
+      if (!thinkingFrame) { const c = cur; thinkingFrame = requestAnimationFrame(() => run(c, renderThinking)) }
     })
     api.onThinkingEnd(endThinking)
   }
@@ -1241,7 +1353,7 @@
     // Una risposta che comincia dopo un ragionamento non parte con righe vuote
     if (!r.raw) d = d.replace(/^\s+/, '')
     r.raw += d
-    if (!pending) { pending = true; requestAnimationFrame(renderReply) }
+    if (!pending) { pending = true; const c = cur; requestAnimationFrame(() => run(c, renderReply)) }
   })
   api.onTool(({ id, name, summary, change, intent }) => {
     renderReply()
@@ -1298,7 +1410,7 @@
   // La frase che riassume un gruppo di azioni (come nell'app desktop): le loro righe, con le differenze, vanno dentro
   // un gruppo chiuso sotto quella frase; un clic lo apre. Nel titolo, il conto delle righe cambiate
   api.onToolSummary(({ summary, ids }) => {
-    const rows = (ids || []).map((id) => tools.get(id)).filter((r) => r && r.isConnected && r.parentElement === part('log'))
+    const rows = (ids || []).map((id) => tools.get(id)).filter((r) => r && r.isConnected && r.parentElement === logEl())
     if (!rows.length || !summary) return
     const group = document.createElement('div')
     group.className = 'item tool-group'
@@ -1342,17 +1454,15 @@
     setBusy(false)
   })
 
+  // Un capitolo nuovo è una conversazione nuova: quella di prima resta dov'è (e continua a lavorare, se lavora)
   async function newChapter() {
-    const n = await api.newChapter()
-    clearLog()
-    reply = null
-    currentSession = null
-    setBusy(false)
-    setChapter(n)
-    markCurrentSession()
-    convoDir = workdir
-    renderFolder()
-    hook('chapter')
+    const r = await api.newChapter()
+    const n = r && typeof r === 'object' ? r.chapter : r
+    const c = newConv((r && r.conv) || `local${Date.now()}`)
+    c.chapter = n || chapter + 1
+    c.convoDir = workdir
+    switchTo(c)
+    pruneEmpty()
     if (part('input')) part('input').focus()
   }
 
@@ -1362,6 +1472,7 @@
     renderChapterHead()
   }
   function renderChapterHead() {
+    if (quiet) return
     const title = part('chapter-title')
     const date = part('chapter-date')
     if (currentSession) {
@@ -1382,7 +1493,7 @@
 
   // ------------------------------------------------------------------ permessi
 
-  const asks = new Map()
+  let asks = new Map()
 
   api.onAsk((q) => {
     renderReply()
@@ -1390,6 +1501,7 @@
     hook('ask', q)
     if (q.kind === 'plan') return askPlan(q)
     if (q.kind === 'question') return askQuestions(q)
+    const owner = cur && cur.id
     const { id, title, description, detail, change, canAlways } = q
     const card = add('ask', '<div class="ask-title"></div><div class="ask-desc"></div><div class="ask-detail"></div><div class="ask-buttons"></div>')
     card.querySelector('.ask-title').textContent = title
@@ -1406,7 +1518,7 @@
       label(b, key)
       b.className = `btn small ${cls}`
       b.addEventListener('click', () => {
-        api.answer(id, allow, always)
+        api.answer(id, allow, always, undefined, owner)
         closeAsk(buttons, outcome)
         asks.delete(id)
       })
@@ -1421,6 +1533,7 @@
   // La fine del modo piano: il piano proposto, da approvare (Claude procede, nel modo di prima) o no (continua a
   // pianificare)
   function askPlan({ id, plan }) {
+    const owner = cur && cur.id
     const card = add('ask plan', '<div class="ask-title"></div><div class="text plan-body"></div><div class="ask-buttons"></div>')
     label(card.querySelector('.ask-title'), 'planTitle')
     const body = card.querySelector('.plan-body')
@@ -1432,7 +1545,7 @@
       label(b, key)
       b.className = `btn small ${cls}`
       b.addEventListener('click', () => {
-        api.answer(id, allow, false)
+        api.answer(id, allow, false, undefined, owner)
         closeAsk(buttons, outcome)
         asks.delete(id)
       })
@@ -1447,6 +1560,7 @@
   // scelta singola basta un clic; altrimenti "Rispondi" quando tutte hanno una risposta. Le risposte tornano a Claude
   // come { domanda: risposta } (le scelte multiple separate da virgole)
   function askQuestions({ id, questions }) {
+    const owner = cur && cur.id
     const card = add('ask question', '')
     const state = questions.map(() => ({ picked: new Set(), other: '' }))
     const quick = questions.length === 1 && !questions[0].multiSelect
@@ -1462,7 +1576,7 @@
     const finish = (allow) => {
       if (!asks.has(id)) return
       const a = allow ? answers() : null
-      api.answer(id, allow, false, a)
+      api.answer(id, allow, false, a, owner)
       for (const el of card.querySelectorAll('button, input')) el.disabled = true
       closeAsk(buttons, allow ? 'qAnswered' : 'qSkipped')
       asks.delete(id)
@@ -1696,7 +1810,9 @@
     item('sessionDelete', async () => {
       const r = await api.deleteSession(s.id, s.cwd || null, s.title)
       if (!r || !r.deleted) return
-      if (r.wasCurrent || (currentSession && currentSession.id === s.id)) await newChapter()
+      const owner = [...convs.values()].find((c) => c.sessionId === s.id)
+      if (r.wasCurrent || (owner && owner === active)) await newChapter()
+      if (owner) dropConv(owner)
       refreshSessions()
     }, 'danger')
     placeMenu(menu, anchor)
@@ -1737,8 +1853,18 @@
     input.addEventListener('click', (e) => e.stopPropagation())
   }
 
+  // Negli annali: quella in vista, quelle che lavorano, quelle con una domanda aperta o una risposta da leggere
   function markCurrentSession() {
-    for (const row of all('.session-row[data-id]')) row.classList.toggle('current', !!currentSession && row.dataset.id === currentSession.id)
+    const bySession = new Map()
+    for (const c of convs.values()) if (c.sessionId) bySession.set(c.sessionId, c)
+    const here = active && (active.sessionId || (currentSession && currentSession.id))
+    for (const row of all('.session-row[data-id]')) {
+      const c = bySession.get(row.dataset.id)
+      row.classList.toggle('current', !!here && row.dataset.id === here)
+      row.classList.toggle('running', !!c && c !== active && isBusy(c))
+      row.classList.toggle('attention', !!c && c !== active && c.attention)
+      row.classList.toggle('unread', !!c && c !== active && c.unread && !c.attention)
+    }
   }
 
   function showSessions() {
@@ -1753,21 +1879,43 @@
     refreshSessions()
   }
 
+  // Aprire una cronaca: se è già aperta (magari sta lavorando) si torna a lei; altrimenti diventa una conversazione
+  // nuova, con le sue pagine ricopiate. Le altre restano come sono
   async function openSession(s) {
     if (!sessionsPinned() && part('sessions')) part('sessions').hidden = true
-    // Aprire una cronaca ferma la risposta in corso (lo fa anche il processo principale)
-    if (busy) setBusy(false)
-    clearLog()
-    reply = null
-    currentSession = s
-    stick = true
-    convoDir = s.cwd || workdir
-    renderFolder()
-    renderChapterHead()
-    markCurrentSession()
+    const open = [...convs.values()].find((c) => c.sessionId === s.id)
+    if (open) { switchTo(open); return }
+    const c = newConv(`local${Date.now()}`)
+    c.sessionId = s.id
+    c.currentSession = s
+    c.convoDir = s.cwd || workdir
+    switchTo(c)
     const loading = labelled('footnote', 'copying')
+    let r
     try {
-      const history = await api.openSession(s.id, s.cwd || null)
+      r = await api.openSession(s.id, s.cwd || null)
+    } catch (err) {
+      run(c, () => { loading.remove(); add('error', esc(String(err.message || err))) })
+      return
+    }
+    const history = Array.isArray(r) ? r : (r && r.history) || []
+    const realId = Array.isArray(r) ? c.id : r.conv
+    // L'id vero della conversazione, dal processo principale
+    if (realId && realId !== c.id) {
+      const other = convs.get(realId)
+      if (other && other !== c) { if (active === c) switchTo(other); dropConv(c); return }
+      convs.delete(c.id)
+      c.id = realId
+      c.el.dataset.conv = realId
+      convs.set(realId, c)
+      if (active === c && api.setActive) api.setActive(c.id)
+    }
+    pruneEmpty()
+    run(c, () => fillHistory(c, history, loading))
+  }
+
+  function fillHistory(c, history, loading) {
+    try {
       loading.remove()
       // Delle cronache lunghe bastano gli ultimi 40 messaggi, con le azioni che stanno in mezzo
       let from = 0
@@ -1791,9 +1939,10 @@
         }
       }
       // Le differenze delle cronache restano chiuse: si aprono con un clic sulla riga dell'azione
-      for (const el of all('[data-part="log"] > .item.change')) el.hidden = true
+      for (const el of logEl().querySelectorAll(':scope > .item.change')) el.hidden = true
       hook('chapter')
       labelled('footnote', 'continueHere')
+      scrollDown(true)
     } catch (err) {
       loading.remove()
       add('error', esc(String(err.message || err)))
@@ -1805,7 +1954,7 @@
 
   const actions = {
     send: sendMessage,
-    stop: () => { endThinking(); api.stop(); labelled('error', 'stopped'); reply = null; setBusy(false) },
+    stop: () => { endThinking(); api.stop(active && active.id); labelled('error', 'stopped'); reply = null; setBusy(false) },
     hide: () => api.hide(),
     attach: async () => addPaths(await api.chooseFiles()),
     quit: () => api.quit(),
@@ -1840,6 +1989,16 @@
   document.addEventListener('keyup', (e) => { if (e.target.matches('[data-part="input"]') && /^(ArrowLeft|ArrowRight|Home|End)$/.test(e.key)) updateMenu() })
   document.addEventListener('focusout', (e) => { if (e.target.matches('[data-part="input"]')) setTimeout(closeMenu, 100) })
   api.onReset(newChapter)
+  // Una conversazione nuova ha ricevuto la sua sessione: compare negli annali
+  if (api.onConvSession) api.onConvSession((x, id) => {
+    const c = convs.get(id)
+    if (!c || !x) return
+    c.sessionId = x.id
+    if (sessionsPinned()) refreshSessions()
+    else markCurrentSession()
+  })
+  // Un clic su una notifica: la sua conversazione
+  if (api.onConvShow) api.onConvShow((_x, id) => switchTo(convs.get(id)))
   // Il tema scelto dal vassoio: si rimonta sul posto, la conversazione resta
   api.onTheme((id) => mount(id))
 
@@ -1895,6 +2054,15 @@
     mode = info.mode || 'auto'
     workdirChosen = info.workdirChosen !== false
     convoDir = info.sessionCwd || info.workdir || ''
+    // La prima conversazione: quella dell'ultima volta, se c'era
+    const first = newConv(info.conv || 'c1')
+    first.chapter = chapter
+    first.convoDir = convoDir
+    first.sessionId = info.sessionId || null
+    first.el.hidden = false
+    active = first
+    cur = first
+    load(first)
     api.windowState().then(setWindowState).catch(() => {})
     // I comandi della cache; l'elenco aggiornato arriva poi da onCommands
     api.commands().then((list) => { if (!commands.length) commands = list || [] }).catch(() => {})
@@ -1967,7 +2135,8 @@
   function fakeApi() {
     const handlers = {}
     const on = (name) => (cb) => { handlers[name] = cb }
-    const fire = (name, v, ms) => setTimeout(() => handlers[name] && handlers[name](v), ms)
+    const fire = (name, v, ms, conv) => setTimeout(() => handlers[name] && handlers[name](v, conv), ms)
+    const fireAll = fire
     let n = 1
     let fakeWin = 'normal'
     // Dalla console dell'anteprima: anteprima.tema('moderno'), anteprima.permesso(), anteprima.piano(),
@@ -2033,7 +2202,9 @@
         { role: 'output', text: 'Sessione corrente\n  Token in ingresso   12.408\n  Costo stimato       0,21 $' },
       ],
       onAsk: on('onAsk'), onAskClosed: on('onAskClosed'),
-      newChapter: async () => ++n,
+      newChapter: async () => ({ chapter: ++n, conv: `f${n}` }),
+      setActive() {},
+      onConvSession: on('onConvSession'), onConvShow: on('onConvShow'),
       pathForFile: (f) => `C:/Workspace/${f.name}`,
       chooseFiles: async () => ['C:/Workspace/MapEditor/docs/specifiche.pdf', 'C:/Workspace/MapEditor/src/MapView.cpp'],
       readImage: async () => null,
@@ -2046,7 +2217,13 @@
       setModel() {},
       onModels: on('onModels'), onTodos: on('onTodos'), onContext: on('onContext'),
       onThinkingStart: on('onThinkingStart'), onThinking: on('onThinking'), onThinkingEnd: on('onThinkingEnd'),
-      send(msg) {
+      send(msg, conv) {
+        const fire = (n, v, ms) => fireAll(n, v, ms, conv)
+        // Una conversazione nuova riceve la sua sessione e compare negli annali
+        if (conv && !fakeSessions.some((x) => x.conv === conv)) {
+          fakeSessions.unshift({ id: `fs-${conv}`, conv, title: (typeof msg === 'string' ? msg : msg.text || 'Allegati').slice(0, 40), lastModified: Date.now(), cwd: 'C:/Workspace' })
+          fire('onConvSession', { id: `fs-${conv}`, cwd: 'C:/Workspace' }, 30)
+        }
         const text = typeof msg === 'string' ? msg : msg.text || '(allegati)'
         if (text.startsWith('/')) {
           // I comandi finti: uno locale con la sua uscita, gli altri come una risposta

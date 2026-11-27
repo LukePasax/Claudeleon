@@ -118,6 +118,12 @@ npm 11 altrimenti non arriva.
   cartella, tema, modo dei permessi, sempre in primo piano; `entrypoint` (come si presentano le sessioni a Claude
   Code, normalmente `cli`: così compaiono nel `/resume` del terminale e negli elenchi delle altre app). Al primo
   avvio riprende quella di `pergamena-app`.
+- **Più conversazioni insieme:** come nell'app desktop. "Nuovo capitolo" apre una conversazione nuova senza fermare
+  quella di prima, che continua a lavorare; dagli annali si passa da una all'altra, e quelle aperte restano come le
+  si era lasciate (anche a metà risposta). Negli annali un punto segna quelle che non sono in vista: pulsa mentre
+  lavorano, è rosso se aspettano un permesso o una risposta, pieno (col titolo in grassetto) se hanno una risposta
+  nuova. Le notifiche arrivano anche per una conversazione che non è in vista, e un clic porta a lei. Le
+  conversazioni rimaste vuote se ne vanno da sole.
 - **Un solo Claude Code per conversazione:** resta acceso dal primo messaggio finché la conversazione cambia (capitolo
   nuovo, cronaca aperta), si esce dall'app o resta ferma 30 minuti; poi il messaggio dopo lo riaccende riprendendo la
   sessione. Le risposte partono prima, e si può scrivere mentre Claude lavora: il messaggio entra nel turno in corso,
