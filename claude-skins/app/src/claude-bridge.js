@@ -522,7 +522,10 @@ class ClaudeBridge extends EventEmitter {
       if (msg.subtype === 'init' && Array.isArray(msg.terminal_slash_commands)) this.terminalOnly = new Set(msg.terminal_slash_commands)
       else if (msg.subtype === 'commands_changed') this.setCommands(msg.commands)
       else if (msg.subtype === 'local_command_output') { turn.sawOutput = true; this.emit('commandOutput', plainOutput(msg.content)) }
-      else if (msg.subtype === 'compact_boundary') this.emit('compacted', { pre: msg.compact_metadata?.pre_tokens || 0, post: msg.compact_metadata?.post_tokens || 0 })
+      else if (msg.subtype === 'compact_boundary') {
+        this.emit('compacted', { pre: msg.compact_metadata?.pre_tokens || 0, post: msg.compact_metadata?.post_tokens || 0 })
+        this.refreshContext(live)
+      }
       else if (msg.subtype === 'status') this.emit('status', msg.status || null)
     }
     // La frase che riassume le azioni appena fatte
@@ -568,11 +571,27 @@ class ClaudeBridge extends EventEmitter {
         if (!turn.wroteText && !turn.sawOutput && msg.result) this.emit('commandOutput', plainOutput(msg.result))
         this.emit('done', { durationMs: msg.duration_ms || 0 })
       }
+      this.refreshContext(live)
       // Una conversazione ferma da molto si spegne (gli hook di fine sessione partono allora); il prossimo messaggio la
       // riaccende riprendendo la sessione
       clearTimeout(live.idle)
       live.idle = setTimeout(() => { if (this.live === live && !live.turn.open) this.closeLive() }, IDLE_CLOSE_MS)
     }
+  }
+
+  // Quanto è pieno il contesto: chiesto a Claude Code a fine turno (dal conto dell'ultima risposta, senza chiamate in
+  // più). { percentage, used, max, categories: [{ id, name, tokens, kind }] }
+  refreshContext(live) {
+    if (!live || live.ended || !live.query.getContextUsage) return
+    live.query.getContextUsage({ detail: 'summary' }).then((u) => {
+      if (this.live !== live || !u) return
+      this.emit('context', {
+        percentage: Math.round(u.percentage || 0),
+        used: u.totalTokens || 0,
+        max: u.rawMaxTokens || u.maxTokens || 0,
+        categories: (u.categories || []).filter((c) => c.tokens > 0).map((c) => ({ id: c.id || '', name: c.name, tokens: c.tokens, kind: c.kind || (c.isDeferred ? 'deferred' : 'used') })),
+      })
+    }).catch(() => {})
   }
 
   // Ferma la risposta in corso: le domande aperte si chiudono e Claude Code interrompe il turno, ma resta acceso

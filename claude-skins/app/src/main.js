@@ -376,6 +376,7 @@ function registerIpc() {
   // Un capitolo per conversazione: il numero cresce, la sessione di Claude Code ricomincia
   ipcMain.handle('chapter:new', () => {
     bridge.cancel()
+    send('claude:context', null)
     bridge.resetTodos()
     config.chapter += 1
     config.sessionId = null
@@ -440,6 +441,7 @@ function registerIpc() {
   // Apre una sessione di Claude Code, anche dell'app desktop: i messaggi dopo continuano quella, nella sua cartella
   ipcMain.handle('session:open', async (_e, id, cwd) => {
     bridge.cancel()
+    send('claude:context', null)
     config.sessionId = id
     config.sessionCwd = cwd || null
     bridge.sessionCwd = config.sessionCwd
@@ -496,6 +498,7 @@ function registerIpc() {
     send('models:list', list)
   })
   bridge.on('todos', (list) => send('claude:todos', list))
+  bridge.on('context', (c) => send('claude:context', c))
   // Claude riprende a lavorare da sé (un messaggio entrato mentre il turno finiva)
   bridge.on('busy', (on) => send('claude:busy', on))
   bridge.on('commandOutput', (text) => send('claude:commandOutput', text))

@@ -402,6 +402,87 @@
     renderTodos()
   })
 
+  // ------------------------------------------------------------------ contesto
+
+  // Quanto è pieno il contesto: un anello (in data-part="context") che si riempie, più acceso oltre l'80%; un clic
+  // apre il dettaglio per categoria e "Compatta ora" (/compact)
+  let context = null
+  const kTok = (n) => n >= 1000 ? `${(n / 1000).toFixed(n >= 100000 ? 0 : 1).replace('.', ',')}k` : String(n)
+  function renderContext() {
+    for (const box of all('[data-part="context"]')) {
+      let b = box.querySelector('.context-btn')
+      if (!b) {
+        b = document.createElement('button')
+        b.className = 'context-btn'
+        b.innerHTML = '<svg viewBox="0 0 20 20"><circle class="track" cx="10" cy="10" r="7.5"/><circle class="fill" cx="10" cy="10" r="7.5"/></svg>'
+        b.addEventListener('click', () => openContextMenu(b))
+        box.appendChild(b)
+      }
+      const p = context ? Math.max(0, Math.min(100, context.percentage)) : 0
+      const C = 2 * Math.PI * 7.5
+      b.querySelector('.fill').style.strokeDasharray = `${(C * p) / 100} ${C}`
+      b.classList.toggle('empty', !context)
+      b.classList.toggle('warn', !!context && p >= 80)
+      b.title = context ? t('contextTip', { p, used: kTok(context.used), max: kTok(context.max) }) : t('contextNone')
+    }
+  }
+  function openContextMenu(anchor) {
+    closeFolderMenu()
+    const menu = document.createElement('div')
+    menu.className = 'folder-menu context-menu'
+    const head = document.createElement('div')
+    head.className = 'folder-head'
+    if (!context) {
+      menu.appendChild(label(head, 'contextEmpty'))
+      placeMenu(menu, anchor)
+      return
+    }
+    menu.appendChild(label(head, 'contextTitle', { p: context.percentage }))
+    const of = document.createElement('div')
+    of.className = 'folder-note'
+    menu.appendChild(label(of, 'contextOf', { used: kTok(context.used), max: kTok(context.max) }))
+    // La barra: una fetta per categoria usata, il resto libero
+    const bar = document.createElement('div')
+    bar.className = 'context-bar'
+    const used = context.categories.filter((c) => c.kind === 'used')
+    used.forEach((c, k) => {
+      const seg = document.createElement('span')
+      seg.style.width = `${Math.max(0.5, (c.tokens / Math.max(1, context.max)) * 100)}%`
+      seg.style.opacity = String(1 - (k % 4) * 0.18)
+      seg.title = `${c.name}: ${kTok(c.tokens)}`
+      bar.appendChild(seg)
+    })
+    menu.appendChild(bar)
+    const list = document.createElement('div')
+    list.className = 'context-list'
+    for (const c of context.categories.filter((x) => x.kind !== 'deferred')) {
+      const row = document.createElement('div')
+      row.className = `context-row ${c.kind}`
+      row.innerHTML = '<span class="cr-name"></span><span class="cr-tokens"></span>'
+      // Il nome della categoria in italiano se la si conosce, altrimenti quello di Claude Code
+      const key = `ctx_${c.id}`
+      row.children[0].textContent = c.id && t(key) !== key ? t(key) : c.name
+      row.children[1].textContent = kTok(c.tokens)
+      list.appendChild(row)
+    }
+    menu.appendChild(list)
+    const note = document.createElement('div')
+    note.className = 'folder-note'
+    menu.appendChild(label(note, 'contextNote'))
+    const compact = document.createElement('div')
+    compact.className = 'folder-item other'
+    menu.appendChild(label(compact, 'contextCompact'))
+    compact.addEventListener('click', () => {
+      closeFolderMenu()
+      const input = part('input')
+      if (!input) return
+      input.value = '/compact'
+      sendMessage()
+    })
+    placeMenu(menu, anchor)
+  }
+  if (api.onContext) api.onContext((c) => { context = c; renderContext() })
+
   // ------------------------------------------------------------------ modello e ragionamento
 
   // Il pulsante del modello (in data-part="model"): il nome del modello scelto e il ragionamento; un clic apre il
@@ -570,7 +651,7 @@
   }
 
   document.addEventListener('mousedown', (e) => {
-    if (document.querySelector('.folder-menu') && !e.target.closest('.folder-menu, .folder-btn, .model-btn, .mode-btn, .session-more')) closeFolderMenu()
+    if (document.querySelector('.folder-menu') && !e.target.closest('.folder-menu, .folder-btn, .model-btn, .mode-btn, .session-more, .context-btn')) closeFolderMenu()
   }, true)
 
   // ------------------------------------------------------------------ comandi con /
@@ -794,6 +875,7 @@
     renderAttachments()
     renderTodos()
     renderModel()
+    renderContext()
     renderChapterHead()
     paint()
     scrollDown(true)
@@ -1842,6 +1924,11 @@
         { question: 'Dove disegno i fiumi rispetto alle strade?', header: 'Ordine', multiSelect: false, options: [{ label: 'Sotto le strade', description: 'Le strade passano sopra i fiumi, come ponti' }, { label: 'Sopra le strade', description: 'I fiumi coprono le strade dove si incrociano' }] },
         { question: 'Quali elementi aggiungo anche?', header: 'Extra', multiSelect: true, options: [{ label: 'Guadi', description: 'Dove un sentiero attraversa un fiume' }, { label: 'Ponti', description: 'Sulle strade principali' }, { label: 'Laghi', description: 'Alle sorgenti' }] },
       ] }, 0),
+      contesto: (p = 64) => fire('onContext', { percentage: p, used: Math.round(200000 * p / 100), max: 200000, categories: [
+        { id: 'system_prompt', name: 'System prompt', tokens: 3100, kind: 'used' }, { id: 'system_tools', name: 'System tools', tokens: 14200, kind: 'used' },
+        { id: 'memory_files', name: 'Memory files', tokens: 2400, kind: 'used' }, { id: 'messages', name: 'Messages', tokens: Math.max(0, Math.round(200000 * p / 100) - 19700), kind: 'used' },
+        { id: 'autocompact_buffer', name: 'Autocompact buffer', tokens: 33000, kind: 'buffer' }, { id: 'free_space', name: 'Free space', tokens: Math.max(0, 200000 - Math.round(200000 * p / 100) - 33000), kind: 'free' },
+      ] }, 0),
       attivita: () => {
         const list = [{ id: '1', content: 'Leggere MapView.cpp', activeForm: 'Legge MapView.cpp', status: 'completed' }, { id: '2', content: 'Aggiungere DrawRivers()', activeForm: 'Aggiunge DrawRivers()', status: 'in_progress' }, { id: '3', content: 'Compilare e provare la mappa', activeForm: 'Compila e prova la mappa', status: 'pending' }]
         fire('onTodos', list, 0)
@@ -1899,7 +1986,7 @@
         { value: 'haiku', name: 'Haiku', description: 'Il più rapido, per le risposte brevi', efforts: [] },
       ], model: null, effort: null }),
       setModel() {},
-      onModels: on('onModels'), onTodos: on('onTodos'),
+      onModels: on('onModels'), onTodos: on('onTodos'), onContext: on('onContext'),
       send(msg) {
         const text = typeof msg === 'string' ? msg : msg.text || '(allegati)'
         if (text.startsWith('/')) {

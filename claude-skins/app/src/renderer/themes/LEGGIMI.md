@@ -79,6 +79,7 @@ c'è.
 | `data-part="input"` | La `textarea` dove si scrive. Invio spedisce, Maiusc+Invio va a capo |
 | `data-part="input"` (menu) | Scrivendo `/` il motore apre il menu dei comandi (`.cmd-menu`, righe `.cmd`) sopra la penna, dentro il suo contenitore: il tema può ridisegnarlo nel suo CSS |
 | `data-part="todos"` | Il riquadro delle attività di Claude (`.todos`, testata `.todos-head`, righe `.todo.pending/.in_progress/.completed`). Se manca, il motore lo crea subito prima del contenitore della penna |
+| `data-part="context"` | L'anello del contesto (`.context-btn`, `.warn` oltre l'80%), che apre il dettaglio (`.folder-menu.context-menu`) |
 | `data-part="model"` | Il pulsante del modello e del ragionamento (`.model-btn`), che apre il menu (`.folder-menu.model-menu`) |
 | `data-part="attachments"` | La striscia degli allegati (`.attachment.image`, `.attachment.file`, ognuno con `.attachment-remove`). Se manca, il motore la crea subito prima della `textarea`, nel suo contenitore |
 | `data-part="folder"` | La cartella della conversazione: il motore ci mette un pulsante (`.folder-btn`) che apre il menu delle cartelle (`.folder-menu`) |

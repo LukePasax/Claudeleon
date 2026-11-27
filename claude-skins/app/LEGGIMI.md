@@ -55,6 +55,11 @@ npm 11 altrimenti non arriva.
   mette a disposizione (letto all'avvio, poi ricordato), i livelli di ragionamento coi nomi dell'app desktop (Low,
   Medium, High, Extra, Max) e l'interruttore **Ultracode** (orchestrazione dinamica dei flussi di lavoro). Valgono
   subito, anche a conversazione accesa, e si ricordano (`model`, `effort`, `ultracode` in config.json). I modi dei permessi stanno in un menu a tendina, come nell'app desktop.
+- **Contesto:** accanto a "Spedisci" un anello dice quanto è pieno il contesto della conversazione (rosso oltre
+  l'80%); passandoci sopra la percentuale e i token, con un clic il dettaglio per categoria (prompt di sistema,
+  strumenti, memoria, conversazione, riserva, spazio libero) e "Compatta ora" (`/compact`). Si aggiorna a fine di
+  ogni risposta e dopo una compattazione (`getContextUsage` dell'SDK); per una cronaca appena riaperta arriva dopo la
+  prima risposta.
 - **Allegati:** immagini e file, come nell'app desktop. Si incolla uno screenshot (Ctrl+V) o dei file copiati in
   Esplora file, si trascinano file sulla finestra, o si sceglie col pulsante "+" accanto ai modi. Sopra la penna
   compaiono come miniature ed etichette, ciascuna con la sua ×. Le immagini partono come immagini (rimpicciolite oltre

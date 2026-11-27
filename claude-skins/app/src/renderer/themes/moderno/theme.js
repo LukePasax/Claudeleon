@@ -103,6 +103,7 @@
             <div class="folder" data-part="folder"></div>
             <div class="model" data-part="model"></div>
             <span class="activity"><span class="dot"></span><span class="activity-text"></span></span>
+            <div class="context" data-part="context"></div>
             <button class="btn send" data-action="send" data-s="send"></button>
             <button class="btn deny stop" data-action="stop" data-s="stop" hidden></button>
           </div>
