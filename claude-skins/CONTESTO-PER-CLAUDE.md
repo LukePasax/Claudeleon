@@ -298,6 +298,21 @@ Nella pagina: `data-part="git"` (o dentro `data-part="folder"`), pannello `.git-
 conversazione, `refreshGit()` lo rilegge (cambio di cartella o di conversazione, fine risposta, focus della finestra).
 Prove: `test/unit/git.test.js` (un repo vero con un remoto nudo), e il pannello nelle prove della finestra.
 
+## Avvio sicuro
+
+main.js: `safeStart` ({ reason, theme, themeName, error }) e `fallBack(reason)` (config.theme torna a
+`DEFAULT_THEME`, se non lo era già: niente giri a vuoto). Motivi: `config` (JSON rovinato, copiato in
+`config.rotto.json`), `crash` (`config.startAttempts` arriva a 3: due avvii senza `app:ready`), `timeout` (20 s dal
+caricamento senza `app:ready`, o `unresponsive` all'avvio: si ricarica), `crash` anche da `render-process-gone`
+prima di `app:ready` (dopo: si ricarica e basta, `gone`), `error` (la pagina manda `theme:failed` se `mount()` lancia
+o il layout non ha `data-part="log"`/`"input"`, e intanto monta il primo tema della lista), `manual`
+(`--avvio-sicuro`). La pagina chiede `safe:get` dopo il primo mount riuscito (e manda `app:ready`), riceve
+`safe:state`; l'avviso `.update-banner.safe-banner` prende il posto di quello degli aggiornamenti finché non si chiude
+(`safe:dismiss`) o si riprova (`safe:retry` → `setTheme`). `logError()` scrive `userData/errori.log` (mezzo mega, poi
+`.vecchio`); la pagina manda i suoi errori (`error`, `unhandledrejection`) con `log:error`; `uncaughtException` del
+processo principale va lì. Provato nell'app vera con un tema rotto messo apposta, config rovinata, `--avvio-sicuro`
+e `startAttempts` = 2.
+
 ## Editor dei temi
 
 Un tema dell'editor è `{ id, name, description, colors (9), font, textSize, radius }`; `kits/moderno.js` ha

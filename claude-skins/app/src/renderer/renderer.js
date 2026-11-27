@@ -12,6 +12,9 @@
   for (const n of CONV_EVENTS) if (base[n]) api[n] = (fn) => base[n]((payload, id) => dispatch(id, n, () => fn(payload)))
   const app = document.getElementById('app')
   const t = Theming.t
+  // Gli errori della pagina finiscono in errori.log (cartella dei dati), per capire cosa non va
+  window.addEventListener('error', (e) => { if (api.logError) api.logError(`${e.message} (${(e.filename || '').split('/').pop()}:${e.lineno})${e.error && e.error.stack ? `\n${e.error.stack}` : ''}`) })
+  window.addEventListener('unhandledrejection', (e) => { if (api.logError) api.logError(`promessa: ${(e.reason && e.reason.stack) || e.reason}`) })
   const MONTHS = Theming.MONTHS
   const part = (name) => app.querySelector(`[data-part="${name}"]`)
   const all = (sel) => app.querySelectorAll(sel)
@@ -1973,8 +1976,30 @@
     if (u.state === 'updating') return t(`updStep_${u.step || 'pull'}`)
     return `${t('updError')}: ${u.error || '?'}`
   }
+  // L'avviso dell'avvio sicuro, al posto di quello degli aggiornamenti finché non lo si chiude
+  let safeInfo = null
+  function showSafe(info) {
+    safeInfo = info && info.reason ? info : null
+    renderUpdateBanner()
+  }
+  if (api.onSafeState) api.onSafeState(showSafe)
+  function renderSafeBanner() {
+    const host = app.querySelector('[data-solid]') || app
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+    const b = document.createElement('div')
+    b.className = 'update-banner safe-banner'
+    b.innerHTML = '<span class="ub-icon"></span><span class="ub-text"></span>'
+    b.querySelector('.ub-text').textContent = t(`safe_${safeInfo.reason}`, { x: safeInfo.themeName || safeInfo.theme || '', err: safeInfo.error || '?' })
+    const btn = (key, fn, cls, vars) => { const x = document.createElement('button'); x.className = `btn small ${cls || ''}`; label(x, key, vars); x.addEventListener('click', fn); b.appendChild(x) }
+    const close = () => { safeInfo = null; if (api.dismissSafe) api.dismissSafe(); renderUpdateBanner() }
+    if (safeInfo.theme && api.retrySafeTheme) btn('safeRetry', () => { safeInfo = null; api.retrySafeTheme(); renderUpdateBanner() }, '', { x: safeInfo.themeName || safeInfo.theme })
+    if (api.openErrorLog) btn('safeLog', () => api.openErrorLog(), 'deny')
+    btn('safeOk', close, 'deny')
+    host.appendChild(b)
+  }
   function renderUpdateBanner() {
     for (const el of document.querySelectorAll('.update-banner')) el.remove()
+    if (safeInfo) return renderSafeBanner()
     const u = updateState
     if (!u) return
     const show = u.state === 'updating' || (u.state === 'available' && !u.dirty && bannerDismissed !== u.count) || (u.state === 'error' && u.step === null)
@@ -2126,7 +2151,23 @@
   // ------------------------------------------------------------------ il layout del tema
 
   // Monta il tema: il suo HTML prende il posto del precedente, la conversazione, la bozza e lo stato passano al nuovo
+  // Monta un tema; se non ci riesce (un errore, o un layout senza conversazione o casella) torna a quello di
+  // partenza e lo dice al processo principale, che lo ricorda e mostra l'avviso dell'avvio sicuro
   async function mount(id) {
+    try {
+      await mountTheme(id)
+      if (!part('log') || !part('input')) throw new Error('il layout non ha la conversazione o la casella (data-part="log" e "input")')
+    } catch (err) {
+      const failed = Theming.current.id || id
+      console.error(`Tema ${failed} non montato:`, err)
+      if (api.logError) api.logError(`tema ${failed}: ${(err && err.stack) || err}`)
+      const fallback = (Theming.list()[0] || {}).id
+      if (!fallback || fallback === failed) return
+      if (api.themeFailed) api.themeFailed(failed, (err && err.message) || String(err))
+      await mountTheme(fallback)
+    }
+  }
+  async function mountTheme(id) {
     closeMenu()
     const convEls = [...convs.values()].map((c) => c.el)
     const draft = part('input') ? part('input').value : ''
@@ -4237,6 +4278,9 @@
     for (const spec of info.userThemes || []) Theming.register(window.SkinsKits.moderno.fromColors(spec))
     await mount(info.theme)
     if (part('input')) part('input').focus()
+    // La pagina è partita: l'avvio sicuro non serve
+    if (api.ready) api.ready()
+    if (api.safeState) api.safeState().then(showSafe).catch(() => {})
   })
 
   // ------------------------------------------------------------------ anteprima senza Electron
@@ -4314,6 +4358,8 @@
     window.anteprima = {
       tema: (id) => fire('onTheme', id, 0),
       // Una risposta di Claude con il testo dato, come se arrivasse adesso
+      // L'avviso dell'avvio sicuro, come dopo un tema che non partiva
+      avvioSicuro: () => fireAll('onSafeState', { reason: 'error', theme: 'dream', themeName: 'Dream', error: 'il layout non ha la casella' }, 0),
       risposta: (text) => { fire('onDelta', String(text), 0); fire('onDone', { durationMs: 1000 }, 10) },
       piano: () => fire('onAsk', { id: Date.now(), kind: 'plan', plan: '## Fiumi sulla mappa\n\n1. Aggiungere `DrawRivers()` in **MapView.cpp**, prima delle strade\n2. Leggere i fiumi dal file della mappa in `MapLoader`\n3. Un interruttore `m_showRivers` nel menu Vista\n\nNessun file cambia finché non approvi.' }, 0),
       domande: () => fire('onAsk', { id: Date.now(), kind: 'question', questions: [
@@ -4442,6 +4488,8 @@
       writeMemory: async (_c, f, text) => { fakeMemory.set(f, text); return { ok: true } },
       openMemory: async () => true,
       dictate: async () => true,
+      retrySafeTheme: () => fireAll('onTheme', 'dream', 0),
+      dismissSafe() {},
       saveTheme: async (spec) => { const id = spec.id || String(spec.name || 'tema').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'tema'; return { ok: true, spec: Object.assign(window.SkinsKits.moderno.normalizeSpec(spec), { id }) } },
       deleteTheme: async () => true,
       capturePreview: async () => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
@@ -4469,7 +4517,7 @@
       onUpdate: on('onUpdate'),
       stopTask: async () => true,
       backgroundNow: async () => true,
-      onTasks: on('onTasks'), onWorktree: on('onWorktree'),
+      onTasks: on('onTasks'), onWorktree: on('onWorktree'), onSafeState: on('onSafeState'),
       settings: async () => fakeSettings,
       setSetting: async (k, v) => { if (k in fakeSettings) fakeSettings[k] = v; return fakeSettings },
       suggestFiles: async (q) => ['src/', 'src/MapView.cpp', 'src/MapView.h', 'src/MapLoader.cpp', 'src/RouteFinder.h', 'docs/', 'docs/specifiche.pdf', 'README.md', 'CMakeLists.txt'].filter((f) => f.toLowerCase().includes(q.toLowerCase())).slice(0, 15),

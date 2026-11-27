@@ -344,6 +344,19 @@ for (const tema of TEMI) {
     assert.deepEqual(errors, [])
   })
 
+  test(`${tema}: avviso dell'avvio sicuro, con "Riprova"`, async () => {
+    await open(tema)
+    await page.evaluate(() => anteprima.avvioSicuro())
+    await page.waitForSelector('.safe-banner')
+    assert.match(await page.textContent('.safe-banner'), /Dream.*errore/)
+    assert.equal(await page.$$eval('.update-banner', (b) => b.length), 1)
+    await page.click('.safe-banner .btn:has-text("Riprova")')
+    await page.waitForFunction(() => Theming.current.id === 'dream' && !document.querySelector('.safe-banner'))
+    // Chiuso l'avviso, torna quello degli aggiornamenti
+    await page.waitForSelector('.update-banner:not(.safe-banner)')
+    assert.deepEqual(errors, [])
+  })
+
   test(`${tema}: impostazioni, estensioni, contesto, cambio di tema che tiene la conversazione`, async () => {
     await open(tema)
     await send('Ciao')

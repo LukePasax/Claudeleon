@@ -176,6 +176,16 @@
     reviewMany: '{n} commenti pronti per Claude',
     reviewSend: 'Manda a Claude',
     reviewClear: 'Togli tutti',
+    // Avvio sicuro
+    safe_config: 'La configurazione era rovinata: l\'app è ripartita da capo (la vecchia è in config.rotto.json).',
+    safe_crash: 'Avvio sicuro: le ultime volte l\'app non partiva col tema «{x}», ora usa quello di partenza.',
+    safe_timeout: 'Il tema «{x}» non finiva di caricarsi: ora usi quello di partenza.',
+    safe_error: 'Il tema «{x}» ha dato un errore ({err}): ora usi quello di partenza.',
+    safe_manual: 'Avvio sicuro: ora usi il tema di partenza; «Riprova» torna a quello di prima.',
+    safe_gone: 'La finestra si era bloccata ed è ripartita. Le conversazioni sono negli annali.',
+    safeRetry: 'Riprova «{x}»',
+    safeLog: 'Errori',
+    safeOk: 'Va bene',
     // Memoria (CLAUDE.md)
     setMemory: 'Memoria (CLAUDE.md)',
     setMemoryNote: 'Le istruzioni che Claude legge in ogni conversazione: le tue e quelle del progetto (anche con /memory)',

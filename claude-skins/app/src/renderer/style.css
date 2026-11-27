@@ -762,3 +762,8 @@ body.busy .entry .edit-btn { display: none; }
 .te-range { width: 92px; accent-color: var(--gold); }
 .te-note { padding: 12px 0 4px; }
 .te-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px 14px; border-top: 1px solid var(--edge-light); }
+
+/* L'avviso dell'avvio sicuro (al posto di quello degli aggiornamenti): il testo va a capo */
+.safe-banner { max-width: min(680px, calc(100% - 40px)); }
+.safe-banner .ub-text { white-space: normal; line-height: 1.35; }
+.safe-banner .ub-icon { background: var(--minus); }

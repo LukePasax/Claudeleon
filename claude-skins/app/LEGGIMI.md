@@ -130,6 +130,13 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   stato, da quanto, quanti strumenti ha usato, l'ultimo e il riassunto finale, con "Ferma" e "Uscita" (il file con
   l'uscita). Mentre Claude lavora, "Manda in background" (o Ctrl+B) sposta in background il comando o il sotto-agente
   in corso, come nel terminale, e Claude va avanti. Con attività in corso la conversazione non si spegne da sola.
+- **Avvio sicuro:** se un tema impedisce all'app di partire, la finestra torna al tema di partenza (Casa Baggins) e
+  un avviso spiega cosa è successo, con "Riprova «tema»", "Errori" (apre `errori.log`) e "Va bene". Succede quando un
+  tema dà errore mentre si monta o non ha la conversazione e la casella, quando la pagina non finisce di partire
+  entro 20 secondi o si chiude da sola all'avvio, e dopo due avvii di fila andati male. Se `config.json` è rovinato
+  l'app riparte da capo e lo mette da parte in `config.rotto.json`. Si può chiedere anche a mano, lanciando l'app con
+  `--avvio-sicuro` (per esempio in un collegamento). Gli errori della pagina e del processo principale finiscono in
+  `errori.log`, nella cartella dei dati (Impostazioni → "Apri la cartella dei dati").
 - **Editor dei temi:** nel selettore dei temi, "Crea un tema" apre un pannello a destra: nome, descrizione, "Parti
   da" (i colori di un altro tema moderno), nove colori (sfondo, barra laterale, casella e menu, testo, testo tenue,
   accento, testo sull'accento — automatico finché non lo cambi —, bordi, i tuoi messaggi), carattere, dimensione del

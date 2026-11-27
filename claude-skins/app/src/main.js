@@ -47,11 +47,54 @@ let themes = []
 // Il trascinamento o il ridimensionamento in corso: il processo principale segue il cursore
 let gesture = null
 
+// ------------------------------------------------------------------ avvio sicuro
+
+// Se un tema (o la configurazione) impedisce all'app di partire, la finestra torna al tema di partenza e lo dice
+// (safeStart, mostrato dalla pagina come un avviso con "Riprova"). I casi: config.json rovinato; due avvii di fila
+// in cui la pagina non è arrivata a dire "pronta" (app:ready); la pagina che non finisce di partire entro 20 secondi
+// o che si chiude da sola prima; un tema che dà errore mentre si monta (lo segnala la pagina); --avvio-sicuro sulla
+// riga di comando. Gli errori finiscono anche in errori.log, nella cartella dei dati
+let safeStart = null
+let pageReady = false
+let readyTimer = null
+function logError(...parts) {
+  try {
+    const f = path.join(app.getPath('userData'), 'errori.log')
+    // Non più di mezzo mega: oltre, si ricomincia
+    if (fs.existsSync(f) && fs.statSync(f).size > 512 * 1024) fs.renameSync(f, f + '.vecchio')
+    fs.appendFileSync(f, `${new Date().toISOString()} ${parts.map((x) => String(x)).join(' ')}\n`)
+  } catch {}
+}
+// Si torna al tema di partenza, ricordando quale non partiva
+function fallBack(reason, error) {
+  const bad = config.theme && config.theme !== DEFAULT_THEME ? config.theme : null
+  logError(`avvio sicuro (${reason})`, bad || '', error || '')
+  if (!bad) return false
+  safeStart = { reason, theme: bad, themeName: (themes.find((t) => t.id === bad) || {}).name || bad, error: error || '' }
+  config.theme = DEFAULT_THEME
+  saveConfig()
+  return true
+}
+function watchStart() {
+  pageReady = false
+  clearTimeout(readyTimer)
+  readyTimer = setTimeout(() => {
+    if (pageReady || !win || win.isDestroyed()) return
+    if (fallBack('timeout')) win.reload()
+  }, 20000)
+}
+
 function loadConfig() {
   configFile = path.join(app.getPath('userData'), 'config.json')
   try {
     Object.assign(config, JSON.parse(fs.readFileSync(configFile, 'utf8')))
-  } catch {
+  } catch (err) {
+    // Un file che c'è ma non si legge: si mette da parte (config.rotto.json) e si riparte, dicendolo
+    if (fs.existsSync(configFile)) {
+      try { fs.copyFileSync(configFile, path.join(app.getPath('userData'), 'config.rotto.json')) } catch {}
+      safeStart = { reason: 'config', error: err.message }
+      logError('config.json non leggibile', err.message)
+    }
     // Primo avvio o file non valido: si riprende la configurazione di quando l'app si chiamava Pergamena, se c'è
     // (cartella di lavoro, scena, tema, capitolo, conversazione, modo); posizione e misura no, sono cambiate
     try {
@@ -224,6 +267,15 @@ function createWindow() {
   // Finché il mouse non è sopra una parte disegnata del tema, i clic attraversano la finestra (lo segnala la pagina)
   win.setIgnoreMouseEvents(true, { forward: true })
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'))
+  // La pagina deve dire "pronta" entro 20 secondi; se si chiude da sola prima, si riparte col tema di partenza
+  watchStart()
+  win.webContents.on('render-process-gone', (_e, details) => {
+    logError('pagina chiusa', details && details.reason)
+    if (!pageReady) fallBack('crash', details && details.reason)
+    else safeStart = safeStart || { reason: 'gone', error: details && details.reason }
+    if (!win.isDestroyed()) { watchStart(); win.reload() }
+  })
+  win.on('unresponsive', () => { logError('pagina bloccata', pageReady ? 'dopo l\'avvio' : 'all\'avvio'); if (!pageReady && fallBack('timeout')) { watchStart(); win.webContents.forcefullyCrashRenderer() } })
   // Tornata davanti, smette di lampeggiare; il menu del vassoio segue lo stato (Mostra / Riduci a icona)
   // Tornata davanti: niente più lampeggio, e le notifiche ancora aperte non servono più
   win.on('focus', () => {
@@ -529,6 +581,25 @@ function registerIpc() {
     mode: config.permissionMode || bridge.mode,
   }))
   ipcMain.on('theme:set', (_e, id) => setTheme(String(id)))
+  // L'avvio sicuro: la pagina è partita; un tema non si è montato; l'avviso letto o "Riprova"; gli errori della pagina
+  ipcMain.on('app:ready', () => {
+    pageReady = true
+    clearTimeout(readyTimer)
+    if (config.startAttempts) { config.startAttempts = 0; saveConfig() }
+  })
+  ipcMain.on('theme:failed', (_e, id, message) => {
+    logError('tema non montato', id, message)
+    if (String(id) === config.theme && fallBack('error', String(message || ''))) send('safe:state', safeStart)
+  })
+  ipcMain.handle('safe:get', () => safeStart)
+  ipcMain.on('safe:dismiss', () => { safeStart = null })
+  ipcMain.on('safe:retry', () => {
+    const id = safeStart && safeStart.theme
+    safeStart = null
+    if (id && themes.some((t) => t.id === id)) setTheme(id)
+  })
+  ipcMain.on('log:error', (_e, text) => logError('pagina:', String(text || '').slice(0, 2000)))
+  ipcMain.on('log:open', () => { const f = path.join(app.getPath('userData'), 'errori.log'); if (fs.existsSync(f)) shell.openPath(f); else shell.openPath(app.getPath('userData')) })
   // L'editor dei temi: salva (nuovo o modificato) e lo mette in uso; elimina (e se era in uso, torna a quello di
   // partenza)
   ipcMain.handle('theme:save', (_e, spec) => {
@@ -1018,6 +1089,8 @@ async function notify(title, body, c) {
   n.show()
 }
 
+process.on('uncaughtException', (err) => { logError('errore nel processo principale:', err && err.stack || err); console.error(err) })
+
 app.whenReady().then(() => {
   loadConfig()
   const capture = captureArgs()
@@ -1027,6 +1100,15 @@ app.whenReady().then(() => {
     config = { workdir: config.workdir, position: { x: 20, y: 20 }, sizes: {}, sessionId: null, scene: capture.scene, chapter: 3, theme: capture.theme || config.theme, permissionMode: 'auto' }
   }
   themes = allThemes()
+  // Avvio sicuro: chiesto, o dopo due avvii di fila andati male
+  if (!capture) {
+    const attempts = (Number(config.startAttempts) || 0) + 1
+    if (process.argv.includes('--avvio-sicuro')) {
+      if (!fallBack('manual')) safeStart = safeStart || { reason: 'manual' }
+    } else if (attempts >= 3) fallBack('crash')
+    config.startAttempts = safeStart ? 1 : attempts
+    saveConfig()
+  }
   if (capture && capture.size) config.sizes[currentTheme().id] = capture.size
   if (!config.chapter) { config.chapter = 1; saveConfig() }
   bridge = new ClaudeBridge({
