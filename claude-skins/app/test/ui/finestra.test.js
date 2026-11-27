@@ -145,6 +145,27 @@ for (const tema of TEMI) {
     assert.deepEqual(errors, [])
   })
 
+  test(`${tema}: git, dal branch al commit`, async () => {
+    await open(tema)
+    await page.waitForSelector('.git-btn:not([hidden])')
+    assert.match(await page.textContent('.git-btn'), /fiumi.*3.*↑1/s)
+    await page.click('.git-btn')
+    await page.waitForSelector('.git-panel .file-row')
+    assert.equal(await page.$$eval('.git-panel .file-row', (r) => r.length), 3)
+    await page.click('.git-panel .file-row .fr-head')
+    await page.waitForSelector('.git-panel .fr-diffs .diff')
+    await page.fill('.git-panel .git-msg', 'I fiumi prima delle strade')
+    await page.click('.git-panel .git-btns .btn:first-child')
+    await page.waitForFunction(() => !document.querySelector('.git-panel .file-row'))
+    assert.match(await page.textContent('.git-btn'), /↑2/)
+    // Un branch nuovo
+    await page.click('.git-panel .git-branch .btn')
+    await page.fill('.git-panel .git-input', 'sentieri-nuovi')
+    await page.keyboard.press('Enter')
+    await page.waitForFunction(() => /sentieri-nuovi/.test(document.querySelector('.git-btn').textContent))
+    assert.deepEqual(errors, [])
+  })
+
   test(`${tema}: impostazioni, estensioni, contesto, cambio di tema che tiene la conversazione`, async () => {
     await open(tema)
     await send('Ciao')

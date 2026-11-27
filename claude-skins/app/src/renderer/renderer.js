@@ -121,6 +121,8 @@
     renderChanged()
     renderTasks()
     renderFolder()
+    renderGit()
+    refreshGit()
     renderChapterHead()
     renderGhost()
     markCurrentSession()
@@ -500,6 +502,8 @@
       b.textContent = unset ? t('folderPick') : baseName(convoDir || workdir)
       b.title = unset ? t('folderPick') : (convoDir || workdir)
     }
+    // Un'altra cartella: un altro repo (o nessuno)
+    if (active && active.gitDir !== (convoDir || workdir)) refreshGit()
   }
 
   // ------------------------------------------------------------------ attività
@@ -1296,6 +1300,276 @@
     const tick = setInterval(() => { if (!panel.isConnected) clearInterval(tick); else if (bgTasks.some((x) => x.status === 'running')) panel.fill() }, 1000)
   }
 
+  // ------------------------------------------------------------------ git
+
+  // Git nella cartella della conversazione, come nell'app desktop: un pulsante col branch (in data-part="git", o
+  // accanto alla cartella se il tema non lo mette), con il conto dei file modificati e dei commit da mandare. Apre il
+  // pannello con il branch (cambiarlo, crearne uno), le modifiche rispetto all'ultimo commit con le differenze, il
+  // commit di tutto, il push e la pull request (con gh, o la pagina del sito nel browser). Per commit e pull request
+  // si può anche chiedere a Claude, che scrive messaggio, titolo e descrizione guardando le differenze
+  let gitSeq = 0
+  async function refreshGit() {
+    const c = active
+    if (!c || !api.gitStatus) return
+    const seq = ++gitSeq
+    c.gitDir = convoDir || workdir
+    let st = null
+    try { st = await api.gitStatus(c.id) } catch {}
+    if (seq !== gitSeq) return
+    c.git = st && st.repo ? st : null
+    if (c === active) {
+      renderGit()
+      const panel = document.querySelector('.git-panel')
+      if (panel && panel.fill) panel.fill()
+    }
+  }
+  function gitBoxes() {
+    const own = all('[data-part="git"]')
+    return own.length ? own : all('[data-part="folder"]')
+  }
+  function renderGit() {
+    if (quiet) return
+    const st = active && active.git
+    for (const box of gitBoxes()) {
+      let b = box.querySelector('.git-btn')
+      if (!b) {
+        b = document.createElement('button')
+        b.className = 'git-btn'
+        b.addEventListener('click', openGit)
+        box.appendChild(b)
+      }
+      b.hidden = !st
+      if (!st) continue
+      b.innerHTML = '<span class="gb-icon">⎇</span><span class="gb-name"></span><span class="gb-n"></span><span class="gb-up"></span>'
+      b.querySelector('.gb-name').textContent = st.detached ? 'HEAD' : st.branch
+      b.querySelector('.gb-n').textContent = st.files.length ? `· ${st.files.length}` : ''
+      b.querySelector('.gb-up').textContent = st.ahead ? `↑${st.ahead}` : ''
+      b.classList.toggle('dirty', st.files.length > 0)
+      b.title = t('gitTip', { branch: st.detached ? 'HEAD' : st.branch })
+    }
+  }
+  window.addEventListener('focus', () => refreshGit())
+
+  function askClaude(key, vars) {
+    closeThemes()
+    const input = part('input')
+    if (!input) return
+    input.value = t(key, vars)
+    sendMessage()
+  }
+
+  function openGit() {
+    closeThemes()
+    closeFolderMenu()
+    const c = active
+    if (!c || !c.git) return
+    const host = app.querySelector('[data-solid]') || app
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+    const panel = document.createElement('div')
+    panel.className = 'theme-picker git-panel'
+    panel.innerHTML = '<div class="theme-picker-box settings-box"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="settings-body"></div></div>'
+    const close = panel.querySelector('.theme-picker-head button')
+    label(close, 'themesClose')
+    close.addEventListener('click', closeThemes)
+    panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    const body = panel.querySelector('.settings-body')
+    const conv = c.id
+    // Quello che resta fra un ridisegno e l'altro: il messaggio scritto, i file aperti, l'esito dell'ultima azione
+    let message = ''
+    let note = null
+    let working = false
+    let newBranch = false
+    let branchList = null
+    let pr
+    const openFiles = new Set()
+    const btn = (key, fn, cls = 'deny', vars) => {
+      const b = document.createElement('button')
+      b.className = `btn small ${cls}`
+      label(b, key, vars)
+      b.disabled = working
+      b.addEventListener('click', fn)
+      return b
+    }
+    const section = (key, vars) => { const h = document.createElement('div'); h.className = 'set-section'; body.appendChild(label(h, key, vars)) }
+    const row = (labelText, noteText) => {
+      const r = document.createElement('div')
+      r.className = 'set-row'
+      r.innerHTML = '<div class="set-text"><div class="set-label"></div><div class="set-note"></div></div><div class="set-control"></div>'
+      r.querySelector('.set-label').textContent = labelText
+      if (noteText) r.querySelector('.set-note').textContent = noteText
+      else r.querySelector('.set-note').remove()
+      body.appendChild(r)
+      return r.querySelector('.set-control')
+    }
+    // Un'azione: i pulsanti si spengono finché lavora, poi lo stato si rilegge e l'esito resta in cima
+    async function act(fn) {
+      working = true
+      note = { text: t('gitWorking') }
+      panel.fill()
+      let r = null
+      try { r = await fn() } catch (err) { r = { ok: false, error: err.message } }
+      working = false
+      if (r && r.ok === false && r.error) note = { text: r.error, error: true, compare: r.compare }
+      else if (r && r.noGh) { note = { text: t('gitNoGh'), compare: r.compare }; if (r.compare) api.openLink(r.compare) }
+      else note = { text: t('gitDone'), url: r && r.url }
+      if (r && r.url) api.openLink(r.url)
+      pr = undefined
+      branchList = null
+      await refreshGit()
+      if (!document.contains(panel)) return
+      panel.fill()
+      return r
+    }
+    panel.fill = () => {
+      const st = c.git
+      if (!st) { closeThemes(); return }
+      const ta = body.querySelector('.git-msg')
+      if (ta) message = ta.value
+      body.innerHTML = ''
+      label(panel.querySelector('.theme-picker-head span'), 'gitTitle', { x: baseName(st.root) })
+      if (note) {
+        const n = document.createElement('div')
+        n.className = `git-note${note.error ? ' error' : ''}`
+        n.textContent = note.text
+        if (note.compare) n.appendChild(btn('gitCompareBtn', () => api.openLink(note.compare)))
+        if (note.url) { const a = btn('gitOpenBtn', () => api.openLink(note.url)); n.appendChild(a) }
+        body.appendChild(n)
+      }
+
+      // Il branch
+      section('gitBranchSection')
+      const branchName = st.detached ? t('gitDetached') : st.branch
+      const upNote = st.noCommits ? t('gitNoCommits') : st.upstream ? t('gitUpstream', { ahead: st.ahead, behind: st.behind, up: st.upstream }) : st.remote ? t('gitNoUpstream') : t('gitNoRemote')
+      const bc = row(branchName, upNote)
+      bc.classList.add('git-branch')
+      if (newBranch) {
+        const input = document.createElement('input')
+        input.className = 'git-input'
+        input.placeholder = t('gitNewBranchPh')
+        input.spellcheck = false
+        const create = () => { const name = input.value.trim(); if (!name) return; newBranch = false; act(() => api.gitCheckout(conv, name, true)) }
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') create(); if (e.key === 'Escape') { e.stopPropagation(); newBranch = false; panel.fill() } })
+        bc.append(input, btn('gitCreate', create, ''), btn('gitCancel', () => { newBranch = false; panel.fill() }))
+        setTimeout(() => input.focus(), 0)
+      } else {
+        const sel = document.createElement('select')
+        sel.className = 'git-select'
+        sel.title = t('gitSwitch')
+        sel.disabled = working
+        const names = branchList || [st.branch]
+        for (const n of names.includes(st.branch) || st.detached ? names : [st.branch, ...names]) {
+          const o = document.createElement('option')
+          o.value = n
+          o.textContent = n
+          if (n === st.branch && !st.detached) o.selected = true
+          sel.appendChild(o)
+        }
+        sel.addEventListener('change', () => act(() => api.gitCheckout(conv, sel.value, false)))
+        bc.append(sel, btn('gitNewBranch', () => { newBranch = true; panel.fill() }))
+        if (!branchList) api.gitBranches(conv).then((list) => { if (Array.isArray(list) && list.length && !branchList) { branchList = list; panel.fill() } }).catch(() => {})
+      }
+
+      // Le modifiche
+      section('gitChangesSection', { n: st.totals.files, plus: st.totals.added, minus: st.totals.removed })
+      if (!st.files.length) {
+        const n = document.createElement('div')
+        n.className = 'folder-note'
+        label(n, 'gitClean')
+        if (st.last) n.textContent += ' ' + t('gitLast', { x: `${st.last.hash} ${st.last.subject}` })
+        body.appendChild(n)
+      }
+      const root = String(st.root || '').replace(/\\/g, '/')
+      for (const f of st.files) {
+        const r = document.createElement('div')
+        r.className = 'file-row'
+        r.innerHTML = '<div class="fr-head"><span class="caret"></span><span class="git-st"></span><span class="fr-name"></span><span class="fr-dir"></span><span class="fr-counts"><span class="plus"></span> <span class="minus"></span></span><span class="fr-actions"></span></div><div class="fr-diffs" hidden></div>'
+        const parts = f.path.split('/')
+        r.querySelector('.fr-name').textContent = parts.pop()
+        r.querySelector('.fr-dir').textContent = parts.join('/')
+        const badge = r.querySelector('.git-st')
+        badge.textContent = f.status === '?' ? 'N' : f.status
+        badge.classList.add(`s-${f.status === '?' ? 'N' : f.status}`)
+        badge.title = t(`gitStatus_${f.status}`)
+        if (f.binary) r.querySelector('.fr-counts').remove()
+        else { r.querySelector('.plus').textContent = `+${f.added}`; r.querySelector('.minus').textContent = `−${f.removed}` }
+        r.title = f.path
+        const abs = `${root}/${f.path}`
+        if (api.openFile && f.status !== 'D') {
+          const b = btn('filesOpen', async (e) => { e.stopPropagation(); if (!(await api.openFile(abs, conv))) { label(b, 'filesMissing'); b.disabled = true } })
+          b.disabled = false
+          r.querySelector('.fr-actions').appendChild(b)
+        }
+        const diffs = r.querySelector('.fr-diffs')
+        const show = async () => {
+          if (!diffs.children.length) {
+            const ch = await api.gitDiff(conv, f.path).catch(() => null)
+            diffs.innerHTML = ''
+            if (ch && ch.hunks) diffs.appendChild(changeView(ch).box)
+          }
+          diffs.hidden = false
+          r.classList.add('open')
+        }
+        if (openFiles.has(f.path)) show()
+        r.querySelector('.fr-head').addEventListener('click', () => {
+          if (diffs.hidden) { openFiles.add(f.path); show() } else { openFiles.delete(f.path); diffs.hidden = true; r.classList.remove('open') }
+        })
+        body.appendChild(r)
+      }
+
+      // Il commit
+      if (st.files.length) {
+        section('gitCommitSection')
+        const box = document.createElement('div')
+        box.className = 'git-commit'
+        const ta = document.createElement('textarea')
+        ta.className = 'git-msg'
+        ta.rows = 2
+        ta.spellcheck = false
+        ta.placeholder = t('gitCommitPh')
+        ta.value = message
+        ta.disabled = working
+        const btns = document.createElement('div')
+        btns.className = 'git-btns'
+        const commit = (andPush) => { const m = ta.value.trim(); if (!m) { ta.focus(); return } ; message = ''; ta.value = ''; act(() => api.gitCommit(conv, m, andPush)) }
+        ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commit(false) } })
+        btns.append(btn('gitCommitBtn', () => commit(false), ''))
+        if (st.remote) btns.append(btn('gitCommitPushBtn', () => commit(true)))
+        btns.append(btn('gitAskCommitBtn', () => askClaude('gitAskCommit')))
+        box.append(ta, btns)
+        body.appendChild(box)
+      }
+
+      // Push e pull request
+      if (st.remote && st.last && !st.detached) {
+        section('gitPublishSection')
+        if (!st.upstream || st.ahead) {
+          const ctl = row(t('gitPushBtn'), st.upstream ? t('gitPushNote', { n: st.ahead, up: st.upstream }) : t('gitPushFirst', { branch: st.branch, remote: 'origin' }))
+          ctl.appendChild(btn('gitPushBtn', () => act(() => api.gitPush(conv)), ''))
+        }
+        if (st.base && st.branch === st.base) {
+          const n = document.createElement('div')
+          n.className = 'folder-note'
+          body.appendChild(label(n, 'gitOnBase', { base: st.base }))
+        } else if (pr && pr.number) {
+          const state = `${t(`gitPrState_${pr.state}`) || pr.state}${pr.isDraft ? ` · ${t('gitPrDraft')}` : ''}`
+          const ctl = row(t('gitPrOpen', { n: pr.number, state }), pr.title)
+          ctl.appendChild(btn('gitOpenBtn', () => api.openLink(pr.url)))
+        } else {
+          const ctl = row(t('gitPrBtn'), t('gitPrNote', { base: st.base || 'main' }))
+          ctl.append(btn('gitPrBtn', () => act(() => api.gitPr(conv, {})), ''), btn('gitAskPrBtn', () => askClaude('gitAskPr', { branch: st.branch, base: st.base || 'main' })))
+        }
+        // La pull request già aperta di questo branch, se gh la conosce
+        if (pr === undefined && st.gh && st.branch !== st.base) {
+          pr = null
+          api.gitPrInfo(conv).then((info) => { if (info && info.number) { pr = info; if (document.contains(panel)) panel.fill() } }).catch(() => {})
+        }
+      }
+    }
+    panel.fill()
+    host.appendChild(panel)
+    refreshGit()
+  }
+
   // ------------------------------------------------------------------ impostazioni
 
   // Il pannello delle impostazioni, sopra il layout come il selettore dei temi: aspetto, finestra, notifiche,
@@ -1643,6 +1917,8 @@
     if (change.then) notes.push('diffThen')
     if (change.hunks.some((h) => h.all)) notes.push('diffAll')
     if (change.tooBig) notes.push('diffTooBig')
+    if (change.binary) notes.push('gitBinary')
+    if (change.deleted) notes.push('gitDeleted')
     for (const key of notes) {
       const n = document.createElement('div')
       n.className = 'diff-note'
@@ -2321,6 +2597,8 @@
     hook('done', { durationMs })
     reply = null
     setBusy(false)
+    // Claude può aver cambiato file, fatto commit o cambiato branch
+    if (cur === active) refreshGit()
     // Una conversazione nuova compare negli annali
     if (sessionsPinned()) refreshSessions()
   })
@@ -3220,6 +3498,20 @@
       permesso: () => fire('onAsk', { id: Date.now(), title: 'Claude vuole modificare un file', description: '', detail: 'src/MapView.cpp', canAlways: true }, 0),
     }
     const day = 86400000
+    // Un repo finto per il pannello di git
+    const fakeGit = {
+      repo: true, root: 'C:/Users/luca/MapEditor', branch: 'fiumi', upstream: 'origin/fiumi', ahead: 1, behind: 0, detached: false, noCommits: false,
+      files: [
+        { path: 'src/MapView.cpp', status: 'M', added: 2, removed: 1 },
+        { path: 'src/Rivers.cpp', status: '?', added: 48, removed: 0 },
+        { path: 'docs/vecchio.md', status: 'D', added: 0, removed: 12 },
+      ],
+      remote: 'git@github.com:luca/MapEditor.git', web: 'https://github.com/luca/MapEditor', base: 'main', last: { hash: 'a1b2c3d', subject: 'Le strade sopra i sentieri' },
+      compare: 'https://github.com/luca/MapEditor/compare/main...fiumi?expand=1', gh: true,
+    }
+    const gitTotals = () => { fakeGit.totals = fakeGit.files.reduce((t, f) => ({ files: t.files + 1, added: t.added + f.added, removed: t.removed + f.removed }), { files: 0, added: 0, removed: 0 }) }
+    gitTotals()
+    const fakeBranches = ['fiumi', 'main', 'sentieri']
     const fakeUpdate = { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/luca/Claude-desktop-skins', installed: true }
     const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '0.1.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claude Skins', shortcut: 'Ctrl+Alt+P' }
     const fakeSessions = [
@@ -3281,6 +3573,14 @@
       onModels: on('onModels'), onTodos: on('onTodos'), onContext: on('onContext'),
       onThinkingStart: on('onThinkingStart'), onSuggestion: on('onSuggestion'), onThinking: on('onThinking'), onThinkingEnd: on('onThinkingEnd'),
       openFile: async () => true,
+      gitStatus: async () => JSON.parse(JSON.stringify(fakeGit)),
+      gitDiff: async (_c, f) => (f.endsWith('.cpp') ? { file: f, created: f.includes('Rivers'), hunks: [{ before: f.includes('Rivers') ? '' : 'void Draw(Map& map) {\n    DrawRoads(map);\n}\n', after: 'void Draw(Map& map) {\n    DrawRivers(map);\n    DrawRoads(map);\n}\n', line: 1 }] } : { file: f, deleted: true, hunks: [{ before: '# Vecchio\n', after: '', line: 1 }] }),
+      gitBranches: async () => fakeBranches.slice(),
+      gitCheckout: async (_c, name, create) => { if (create) fakeBranches.unshift(name); fakeGit.branch = name; fakeGit.upstream = create ? '' : `origin/${name}`; return { ok: true } },
+      gitCommit: async (_c, m, andPush) => { fakeGit.files = []; gitTotals(); fakeGit.last = { hash: 'e4f5a6b', subject: m }; fakeGit.ahead = andPush ? 0 : fakeGit.ahead + 1; return { ok: true } },
+      gitPush: async () => { fakeGit.ahead = 0; fakeGit.upstream = `origin/${fakeGit.branch}`; return { ok: true } },
+      gitPrInfo: async () => null,
+      gitPr: async () => ({ ok: true, url: 'https://github.com/luca/MapEditor/pull/7' }),
       revealFile: async () => false,
       extensions: async () => ({ ok: true, mcp: [
         { name: 'github', status: 'connected', scope: 'user', source: 'user', tools: 48, error: '' },

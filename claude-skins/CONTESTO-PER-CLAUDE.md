@@ -284,6 +284,20 @@ torna com'era con `git checkout`), `npm run dist`, e l'installer in `dist` lanci
 pull e `app.relaunch()`. Il processo principale controlla 30 s dopo l'avvio e ogni 6 ore (`config.autoUpdate`),
 notifica una volta per numero di novità; la pagina mostra un avviso (`.update-banner`) e la sezione nelle impostazioni.
 
+## Git
+
+`src/git.js` (processo principale, IPC `git:*` con l'id della conversazione: la cartella è quella della
+conversazione) chiama il git del sistema con `GIT_TERMINAL_PROMPT=0` (le credenziali le chiede Git Credential Manager
+con la sua finestra) e `LC_ALL=C` (la testata di `git status` si legge in inglese). Stato da `git status
+--porcelain=v1 -b -z --untracked-files=all --no-renames` più `git diff --numstat -z HEAD` (l'albero vuoto se non ci
+sono commit); i file nuovi si contano a mano. Le differenze di un file sono "HEAD:file" contro il disco, nel formato
+del riepilogo dei file toccati (`changeView`). Commit = `git add -A` + `git commit -m`; push con `-u origin HEAD` la
+prima volta; pull request con `gh pr create --fill --base <principale> --head <branch>` dopo il push, altrimenti la
+pagina di confronto (GitHub, GitLab, Bitbucket). Il branch principale viene da `origin/HEAD`, poi main/master.
+Nella pagina: `data-part="git"` (o dentro `data-part="folder"`), pannello `.git-panel`; `c.git` è lo stato della
+conversazione, `refreshGit()` lo rilegge (cambio di cartella o di conversazione, fine risposta, focus della finestra).
+Prove: `test/unit/git.test.js` (un repo vero con un remoto nudo), e il pannello nelle prove della finestra.
+
 ## Prossimi passi possibili
 
 0. **Temi.**

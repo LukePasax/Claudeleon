@@ -597,3 +597,26 @@ body.busy .entry .edit-btn { display: none; }
 .tb-spin { display: none; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid currentColor; border-right-color: transparent; animation: w-spin 0.9s linear infinite; }
 .tasks-btn.running .tb-spin { display: inline-block; }
 .task-row .set-note { white-space: pre-line; }
+
+/* Git: il pulsante col branch e il suo pannello */
+.git-btn { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font: inherit; font-size: var(--small-size); color: var(--ink-soft); background: none; border: var(--line) solid var(--edge-light); border-radius: 20px; padding: 2px 9px; white-space: nowrap; max-width: 200px; }
+.git-btn:hover { color: var(--ink); border-color: var(--ink-soft); }
+.git-btn .gb-icon { font-size: 1.05em; line-height: 1; }
+.git-btn .gb-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.git-btn .gb-n, .git-btn .gb-up { flex: none; }
+.git-btn .gb-n:empty, .git-btn .gb-up:empty { display: none; }
+.git-btn.dirty .gb-n { color: var(--ink); }
+[data-part="folder"] .git-btn { margin-left: 6px; }
+.git-note { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; padding: 7px 10px; font-size: var(--small-size); line-height: 1.4; color: var(--ink); background: var(--code); border-radius: var(--radius-small); white-space: pre-wrap; user-select: text; }
+.git-note.error { color: var(--minus); }
+.git-branch { flex-wrap: wrap; justify-content: flex-end; }
+.git-select, .git-input { font: inherit; font-size: 14px; color: var(--ink); background: var(--field); border: var(--line) solid var(--edge-light); border-radius: var(--radius-small); padding: 3px 6px; max-width: 220px; outline: none; user-select: text; }
+.git-input { width: 180px; font-family: var(--font-code); font-size: var(--code-size); }
+.git-input:focus, .git-msg:focus { border-color: var(--gold); }
+.git-st { flex: none; width: 16px; text-align: center; font-family: var(--font-code); font-size: 11px; font-weight: 600; border-radius: 3px; color: var(--ink-soft); }
+.git-st.s-M { color: var(--gold); }
+.git-st.s-A, .git-st.s-N { color: var(--plus); }
+.git-st.s-D, .git-st.s-U { color: var(--minus); }
+.git-commit { display: flex; flex-direction: column; gap: 6px; }
+.git-msg { display: block; width: 100%; box-sizing: border-box; min-height: 48px; resize: vertical; font: inherit; font-size: 14px; color: var(--ink); background: var(--field); border: var(--line) solid var(--edge-light); border-radius: var(--radius-small); padding: 6px 8px; outline: none; user-select: text; }
+.git-btns { display: flex; gap: 6px; flex-wrap: wrap; }

@@ -6,6 +6,7 @@ const path = require('path')
 const { ClaudeBridge, DEFAULT_CLAUDE, loadContextMax, savedContextMax } = require('./claude-bridge')
 const { Updater } = require('./updater')
 const { listFiles, rankFiles } = require('./files')
+const gitOps = require('./git')
 const { plainSnippet } = require('./text')
 const { listThemes, DEFAULT_THEME } = require('./themes')
 
@@ -585,6 +586,17 @@ function registerIpc() {
   }
   ipcMain.handle('file:open', async (_e, p, conv) => { const f = fileIn(p, conv); return fs.existsSync(f) ? (await shell.openPath(f)) || true : false })
   ipcMain.handle('file:reveal', (_e, p, conv) => { const f = fileIn(p, conv); if (!fs.existsSync(f)) return false; shell.showItemInFolder(f); return true })
+  // Git nella cartella della conversazione: stato, differenze, branch, commit, push, pull request
+  const cwdOf = (conv) => { const c = convOf(conv); return (c && (c.cwd || c.bridge.workdir)) || config.workdir || app.getPath('home') }
+  const gitCall = (fn) => async (_e, conv, ...args) => { try { return await fn(cwdOf(conv), ...args) } catch (err) { return { ok: false, error: err.message } } }
+  ipcMain.handle('git:status', gitCall((cwd) => gitOps.status(cwd)))
+  ipcMain.handle('git:diff', gitCall((cwd, file) => gitOps.diff(cwd, String(file || ''))))
+  ipcMain.handle('git:branches', gitCall((cwd) => gitOps.branches(cwd)))
+  ipcMain.handle('git:checkout', gitCall((cwd, name, create) => gitOps.checkout(cwd, String(name || ''), !!create)))
+  ipcMain.handle('git:commit', gitCall((cwd, message, andPush) => gitOps.commit(cwd, String(message || ''), !!andPush)))
+  ipcMain.handle('git:push', gitCall((cwd) => gitOps.push(cwd)))
+  ipcMain.handle('git:pr-info', gitCall((cwd) => gitOps.prInfo(cwd)))
+  ipcMain.handle('git:pr', gitCall((cwd, opts) => gitOps.createPr(cwd, opts && typeof opts === 'object' ? opts : {})))
   // I file da citare con @, nella cartella della conversazione
   ipcMain.handle('files:suggest', async (_e, query, conv) => {
     const c = convOf(conv)

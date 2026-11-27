@@ -221,6 +221,7 @@
             <button class="attach-btn" data-action="attach" data-s-title="attachTip">+</button>
             <div class="modes" data-part="modes" data-style="menu"></div>
             <div class="folder" data-part="folder"></div>
+            <div class="git" data-part="git"></div>
             <div class="model" data-part="model"></div>
             <span class="sp"></span>
             <div class="tasks" data-part="tasks"></div>

@@ -130,6 +130,15 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   stato, da quanto, quanti strumenti ha usato, l'ultimo e il riassunto finale, con "Ferma" e "Uscita" (il file con
   l'uscita). Mentre Claude lavora, "Manda in background" (o Ctrl+B) sposta in background il comando o il sotto-agente
   in corso, come nel terminale, e Claude va avanti. Con attività in corso la conversazione non si spegne da sola.
+- **Git:** se la cartella della conversazione è un repo, accanto alla cartella compare il branch (con il numero di
+  file modificati e "↑N" per i commit non ancora mandati). Un clic apre il pannello: cambiare branch o crearne uno
+  nuovo; le modifiche rispetto all'ultimo commit, file per file con le differenze; il commit di tutto (Ctrl+Invio nel
+  messaggio), anche con il push subito dopo; il push (la prima volta collega il branch a origin) e la pull request
+  verso il branch principale, con titolo e descrizione presi dai commit. La pull request si crea col comando `gh`
+  (GitHub CLI) se è installato e collegato; senza, il branch viene pubblicato e si apre la pagina del sito per
+  crearla. "Lo scrive Claude" e "La scrive Claude" chiedono invece a Claude, nella conversazione, di fare il commit o
+  la pull request scrivendo lui messaggio, titolo e descrizione. Lo stato si rilegge a fine risposta, cambiando
+  conversazione e tornando alla finestra.
 - **File modificati:** quando Claude modifica dei file, accanto al contesto compare "N file +a −r". Un clic apre
   l'elenco dei file della conversazione, con le righe aggiunte e tolte e un segno per quelli nuovi; un clic su un file
   mostra tutte le sue modifiche, e "Apri" e "Cartella" lo aprono col programma di sistema o in Esplora file. Vale per
