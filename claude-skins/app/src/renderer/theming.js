@@ -72,6 +72,7 @@
     updAutoNote: 'All\'avvio e ogni 6 ore guarda se il repo da cui è installata ha novità (git fetch).',
     updStep_pull: 'Scarico le novità dal repo…',
     updStep_deps: 'Installo le dipendenze…',
+    updStep_test: 'Faccio le prove automatiche…',
     updStep_build: 'Creo l\'installer nuovo, qualche minuto…',
     updStep_install: 'Installo e riapro Claude Skins…',
     updStep_restart: 'Riavvio Claude Skins…',

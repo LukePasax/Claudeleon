@@ -997,4 +997,8 @@ function savedContextMax() {
   return Object.fromEntries(contextMax)
 }
 
-module.exports = { ClaudeBridge, MODES, intent, DEFAULT_CLAUDE: CLAUDE, loadContextMax, savedContextMax }
+module.exports = {
+  ClaudeBridge, MODES, intent, DEFAULT_CLAUDE: CLAUDE, loadContextMax, savedContextMax,
+  // Per le prove (test/unit)
+  _internals: { applyTodo, settleTodo, withFiles, imagesOf, guessContextMax, Inbox },
+}

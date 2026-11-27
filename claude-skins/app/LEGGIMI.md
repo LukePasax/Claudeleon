@@ -208,7 +208,13 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
 - **Titolo della conversazione:** l'app dà a Claude lo strumento `set_session_title` con lo stesso nome dell'app
   desktop (`mcp__ccd_session_mgmt__set_session_title`, server MCP in-process); scrive la riga `custom-title` nel
   transcript con `renameSession` dell'SDK, senza chiedere il permesso, e le cronache si ricaricano.
-- **Prove:** `node_modules\electron\dist\electron.exe . --cattura <file.png> [notte|giorno] [chat|cronache]
+- **Prove automatiche:** doppio clic su `prove.cmd` (qui o nella cartella principale), o `npm run test:all`.
+  `npm test` sono le prove della logica (ponte con un Claude Code finto e sessioni scritte su disco, file per @,
+  aggiornamento con repo git creati al volo: `test/unit`, col test runner di Node), un paio di secondi;
+  `npm run test:ui` quelle della finestra (la pagina vera con l'API finta veloce, `?veloce`, dentro Electron, guidata da
+  playwright-core, per ogni tema: `test/ui`), una ventina di secondi. L'aggiornamento automatico lancia `npm test`
+  prima di creare l'installer e si ferma se una prova non passa.
+- **Prove a mano:** `node_modules\electron\dist\electron.exe . --cattura <file.png> [notte|giorno] [chat|cronache]
   [LxA] [--tema <id>]` (senza LxA, la misura del tema) disegna una conversazione finta (con una domanda di permesso) o l'elenco delle cronache, salva
   uno screenshot della finestra ed esce, senza chiamare Claude. Per guardare un tema senza Electron basta aprire
   `src/renderer/index.html?tema=<id>` nel browser.

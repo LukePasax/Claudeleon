@@ -3090,7 +3090,9 @@
   function fakeApi() {
     const handlers = {}
     const on = (name) => (cb) => { handlers[name] = cb }
-    const fire = (name, v, ms, conv) => setTimeout(() => handlers[name] && handlers[name](v, conv), ms)
+    // ?veloce nell'indirizzo: tutto venti volte più svelto (le prove automatiche)
+    const speed = new URLSearchParams(location.search).has('veloce') ? 0.05 : 1
+    const fire = (name, v, ms, conv) => setTimeout(() => handlers[name] && handlers[name](v, conv), ms * speed)
     const fireAll = fire
     let n = 1
     let fakeWin = 'normal'

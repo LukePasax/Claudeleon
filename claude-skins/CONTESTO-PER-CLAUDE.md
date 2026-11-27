@@ -259,6 +259,18 @@ quello installato. `crea-installer.cmd` (app e radice) fa `npm install` se serve
 costruzione per Windows chiede Wine (rcedit per l'icona dell'eseguibile); `npm run pack -- --linux dir` dà la cartella
 per provarla con `--cattura`. L'installer non è firmato (SmartScreen).
 
+## Prove automatiche
+
+`test/unit/*.test.js` (node:test): `test/aiuti.js` crea una casa finta per Claude Code (HOME, USERPROFILE e
+CLAUDE_CONFIG_DIR prima di caricare l'SDK; la cartella del progetto si chiama come la fa l'SDK, ogni carattere non
+alfanumerico del cwd diventa -) e carica il ponte con `query()` sostituita da un Claude Code finto
+(`bridgeWithFakeQuery`, che riscrive la riga di `loadSdk`: se cambia, la prova lo dice). Il ponte espone
+`_internals` per le prove. `test/ui/finestra.test.js`: playwright-core `_electron` lancia
+`test/ui/finestra-di-prova.js`, una finestra senza preload sulla pagina vera, quindi con `fakeApi` e `?veloce`
+(tempi ×0,05); un `goto` per prova, tre temi. Sotto Linux serve xvfb (`xvfb-run -a npm run test:ui`). Una prova che
+fallisce deve spegnere le conversazioni accese (`after`), altrimenti il processo non finisce. `listFiles`/`rankFiles`
+stanno in `src/files.js`, `plainSnippet` in `src/text.js`.
+
 ## Aggiornamento
 
 Dal repo sul PC, non da release (il repo è privato: niente token). `scripts/dist.js` (`npm run dist`) passa a

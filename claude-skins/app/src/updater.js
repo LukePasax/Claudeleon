@@ -1,7 +1,7 @@
 // L'aggiornamento dal repo sul PC. L'app installata sa da quale clone è nata e a quale commit (skinsRepo, skinsCommit
 // nel suo package.json, scritti da scripts/dist.js); quella lanciata dal repo lo trova da sé. Controllare: git fetch,
 // poi quante novità ha il branch remoto e se il repo è più avanti dell'app installata. Aggiornare: git pull
-// --ff-only, npm install se sono cambiate le dipendenze, e per l'app installata un installer nuovo lanciato in
+// --ff-only, npm install se sono cambiate le dipendenze, e per l'app installata le prove (npm test) e un installer nuovo lanciato in
 // silenzio (/S --force-run: si installa sopra e riapre l'app); per quella dal repo basta riavviarsi.
 const { execFile, spawn } = require('child_process')
 const fs = require('fs')
@@ -116,6 +116,9 @@ class Updater extends EventEmitter {
         this.app.exit(0)
         return
       }
+      // Prima di reinstallare, le prove della logica: se una fallisce l'app installata resta com'è
+      this.set({ state: 'updating', step: 'test' })
+      await this.run('npm', ['test'], this.appDir).catch((err) => { throw new Error(`Le prove automatiche non passano, l'aggiornamento si ferma: ${err.message}`) })
       this.set({ state: 'updating', step: 'build' })
       await this.run('npm', ['run', 'dist'], this.appDir)
       const dist = path.join(this.appDir, 'dist')
