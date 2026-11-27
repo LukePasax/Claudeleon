@@ -58,7 +58,7 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   (non sparisce fra le icone nascoste). Non sta sopra le altre finestre, a meno di accendere "Sempre in primo
   piano" dal vassoio. Una domanda di permesso fa lampeggiare l'icona nella barra se la finestra è ridotta o dietro.
 - **Scorciatoie:** Ctrl+N nuova conversazione, Ctrl+K cerca negli annali, Ctrl+F cerca nella conversazione (una barra
-  in alto: le corrispondenze si evidenziano, Invio e Maiusc+Invio avanti e indietro, Esc chiude), Ctrl+Maiusc+P anteprima, Ctrl+Maiusc+C
+  in alto: le corrispondenze si evidenziano, Invio e Maiusc+Invio avanti e indietro, Esc chiude), Ctrl+Maiusc+C
   copia l'ultima risposta, Ctrl+Maiusc+P anteprima, Ctrl+B manda in background quello che Claude sta facendo, Ctrl+, impostazioni, Esc ferma Claude, F11 schermo intero. L'elenco è anche nelle
   impostazioni.
 - **Impostazioni:** l'ingranaggio in fondo alla barra laterale (Terra di Mezzo) o "Impostazioni" in fondo alla barra (Metrios e
