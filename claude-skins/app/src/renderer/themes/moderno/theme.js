@@ -49,7 +49,7 @@
       themes: 'Temi',
       themesTitle: 'Temi',
       modesLabel: '',
-      hideTip: 'Nascondi',
+      hideTip: 'Riduci a icona',
       quitTip: 'Chiudi',
       gripTip: 'Ridimensiona',
     },

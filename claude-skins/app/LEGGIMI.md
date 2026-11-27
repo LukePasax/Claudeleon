@@ -1,6 +1,6 @@
 # Claude Skins
 
-Claude in una finestra a temi, grande come l'app desktop e (se si vuole) sempre in primo piano. Forma e
+Claude in una finestra a temi, grande come l'app desktop, che si usa come un'app normale. Forma e
 aspetto vengono dal tema. Quello di partenza è **Terra di Mezzo**: lo scrittoio di Casa Baggins ad acquerello,
 con la struttura dell'app desktop (annali a sinistra sotto la finestra tonda, conversazione sul foglio, candela
 accanto alla penna). C'è anche **Moderno**, pulito come un'app di oggi. Altri temi si
@@ -28,10 +28,13 @@ npm 11 altrimenti non arriva.
   maniglia a gradini in basso a destra allarga e allunga. Posizione e dimensione restano, e la dimensione è
   ricordata per tema. Dal vassoio: "Riporta al centro" e "Dimensione iniziale".
 - **Bordi e ingrandimento:** la finestra si ridimensiona da tutti i lati e gli angoli, come una finestra normale. Il
-  pulsante accanto a "nascondi" (o il doppio clic sulla testata) la ingrandisce all'area di lavoro; F11 la porta a
+  pulsante accanto a "riduci a icona" (o il doppio clic sulla testata) la ingrandisce all'area di lavoro; F11 la porta a
   tutto schermo; di nuovo, si ripristina. Spostarla da ingrandita la riporta alla sua misura.
-- **Sempre in primo piano:** dal vassoio si può spegnere, ora che la finestra è grande.
-- **Scorciatoia:** `Ctrl+Alt+P` mostra o nasconde la finestra da qualunque programma; c'è anche l'icona nel vassoio.
+- **Come un'app:** la finestra sta nella barra delle applicazioni con l'icona del tema, e "–" la riduce a icona lì
+  (non sparisce fra le icone nascoste). Non sta sopra le altre finestre, a meno di accendere "Sempre in primo
+  piano" dal vassoio. Una domanda di permesso fa lampeggiare l'icona nella barra se la finestra è ridotta o dietro.
+- **Scorciatoia:** `Ctrl+Alt+P` riporta davanti la finestra da qualunque programma, o la riduce a icona se è già
+  davanti; lo stesso fa un clic sull'icona del vassoio.
 - **Tema:** dalla finestra ("Altre stanze" in fondo alla barra dello scrittoio,
   "Temi" in fondo alla barra laterale di Moderno), con
   un'anteprima di ogni tema, oppure dal vassoio, **Tema**. Cambia sul posto (forma della finestra compresa) senza perdere la conversazione;

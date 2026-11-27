@@ -141,7 +141,10 @@ function createWindow() {
     maximizable: false,
     fullscreenable: false,
     hasShadow: false,
-    alwaysOnTop: config.onTop !== false,
+    // Come un'app normale: nella barra delle applicazioni, non sopra le altre finestre (si accende dal vassoio)
+    alwaysOnTop: config.onTop === true,
+    skipTaskbar: false,
+    minimizable: true,
     backgroundColor: '#00000000',
     title: 'Claude Skins',
     webPreferences: {
@@ -151,10 +154,15 @@ function createWindow() {
       sandbox: true,
     },
   })
-  if (config.onTop !== false) win.setAlwaysOnTop(true, 'floating')
+  if (config.onTop === true) win.setAlwaysOnTop(true, 'floating')
   // Finché il mouse non è sopra una parte disegnata del tema, i clic attraversano la finestra (lo segnala la pagina)
   win.setIgnoreMouseEvents(true, { forward: true })
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'))
+  // Tornata davanti, smette di lampeggiare; il menu del vassoio segue lo stato (Mostra / Riduci a icona)
+  win.on('focus', () => { win.flashFrame(false); refreshTray() })
+  win.on('blur', () => { lastBlur = Date.now() })
+  win.on('minimize', refreshTray)
+  win.on('restore', refreshTray)
   // Nessun link si apre dentro la finestra
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   win.webContents.on('will-navigate', (e) => e.preventDefault())
@@ -245,19 +253,31 @@ function stopGesture() {
   saveConfig()
 }
 
+// Vassoio e scorciatoia: se la finestra è in vista la riducono a icona (resta nella barra delle applicazioni),
+// altrimenti la riportano davanti
+function shown() {
+  return win.isVisible() && !win.isMinimized()
+}
+function bringBack() {
+  if (!win.isVisible()) win.show()
+  if (win.isMinimized()) win.restore()
+  win.focus()
+}
+// Un clic sull'icona del vassoio toglie prima il fuoco alla finestra: se l'aveva un attimo fa, conta come davanti
+let lastBlur = 0
 function toggleVisible() {
-  if (win.isVisible()) win.hide()
-  else win.show()
+  if (shown() && (win.isFocused() || Date.now() - lastBlur < 400)) win.minimize()
+  else bringBack()
   refreshTray()
 }
 
 function trayMenu() {
   return Menu.buildFromTemplate([
-    { label: win && win.isVisible() ? 'Nascondi' : 'Mostra', click: toggleVisible },
+    { label: win && shown() ? 'Riduci a icona' : 'Mostra', click: () => { if (shown()) win.minimize(); else bringBack(); refreshTray() } },
     { label: 'Nuovo capitolo', click: () => send('chat:reset') },
     { label: 'Tema', submenu: themes.map((t) => ({ label: t.name, type: 'radio', checked: t.id === currentTheme().id, click: () => setTheme(t.id) })) },
     { label: 'Cartella di lavoro…', click: chooseWorkdir },
-    { label: 'Sempre in primo piano', type: 'checkbox', checked: config.onTop !== false, click: (item) => setOnTop(item.checked) },
+    { label: 'Sempre in primo piano', type: 'checkbox', checked: config.onTop === true, click: (item) => setOnTop(item.checked) },
     { label: 'Riporta al centro', click: () => { const p = defaultPosition(); const [w, h] = win.getSize(); win.setBounds({ x: p.x, y: p.y, width: w, height: h }); config.position = p; saveConfig() } },
     { label: 'Dimensione iniziale', click: () => {
       if (config.sizes) delete config.sizes[currentTheme().id]
@@ -310,7 +330,7 @@ function registerIpc() {
   ipcMain.on('window:mode', (_e, mode) => setWinMode(mode === winMode ? 'normal' : String(mode)))
   ipcMain.handle('window:state', () => winMode)
   ipcMain.on('gesture:end', stopGesture)
-  ipcMain.on('window:hide', () => { win.hide(); refreshTray() })
+  ipcMain.on('window:hide', () => { win.minimize(); refreshTray() })
   ipcMain.on('app:quit', () => app.quit())
   ipcMain.handle('app:info', () => ({
     scene: config.scene,
@@ -365,6 +385,8 @@ function registerIpc() {
   })
   ipcMain.on('tray:icon', (_e, dataUrl) => {
     const img = nativeImage.createFromDataURL(dataUrl)
+    // La stessa icona del tema va anche sulla finestra: è quella della barra delle applicazioni
+    if (process.platform !== 'darwin') win.setIcon(img)
     if (tray) { tray.setImage(img); return }
     tray = new Tray(img)
     tray.setToolTip('Claude Skins')
@@ -377,7 +399,12 @@ function registerIpc() {
   bridge.on('toolDone', (t) => send('claude:toolDone', t))
   bridge.on('done', (r) => send('claude:done', r))
   bridge.on('error', (m) => send('claude:error', m))
-  bridge.on('ask', (q) => { if (!win.isVisible()) win.show(); send('perm:ask', q) })
+  // Una domanda di permesso: se la finestra è ridotta a icona lampeggia nella barra, come le altre app
+  bridge.on('ask', (q) => {
+    if (!win.isVisible()) win.show()
+    if (win.isMinimized() || !win.isFocused()) win.flashFrame(true)
+    send('perm:ask', q)
+  })
   bridge.on('askClosed', (q) => send('perm:closed', q))
   // Il modo cambia dalla finestra, dall'approvazione di un piano o da Claude Code stesso: si ricorda e si mostra
   // I comandi con /: si ricordano su disco, così ci sono subito al prossimo avvio
@@ -395,7 +422,7 @@ function registerIpc() {
 }
 
 app.on('second-instance', () => {
-  if (win) { win.show(); win.focus() }
+  if (win) bringBack()
 })
 
 // --cattura <file.png> [notte|giorno] [chat|cronache] [LxA] [--tema <id>]: per le prove, una conversazione finta, uno
@@ -446,6 +473,9 @@ function fakeConversation(capture) {
     app.quit()
   }, 2500)
 }
+
+// Il nome con cui Windows raggruppa la finestra nella barra delle applicazioni
+if (process.platform === 'win32') app.setAppUserModelId('Claude Skins')
 
 app.whenReady().then(() => {
   loadConfig()

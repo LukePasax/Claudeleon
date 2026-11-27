@@ -101,7 +101,8 @@ colori, disegni e tono di Claude. Il motore non conosce la forma: cerca i pezzi 
 `data-action="send"`, `data-drag`, `data-art`...) e delega gli eventi al documento, così un cambio di tema sostituisce
 tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un tema è `src/renderer/themes/LEGGIMI.md`.
 
-- `src/main.js` — processo principale: finestra trasparente, senza bordi, sempre in primo piano; i clic passano alle
+- `src/main.js` — processo principale: finestra trasparente, senza bordi, nella barra delle applicazioni (riduci a
+  icona invece di nascondere; sempre in primo piano solo se acceso dal vassoio, `onTop: true`); i clic passano alle
   finestre sotto finché il mouse non è sul rotolo (`setIgnoreMouseEvents(true, { forward: true })`, la pagina dice
   quando attivarla). Spostamento e ridimensionamento seguiti dal processo principale col cursore a 60 Hz
   (`gesture:start/end`): con una finestra trasparente il trascinamento nativo (`-webkit-app-region`) e i bordi di

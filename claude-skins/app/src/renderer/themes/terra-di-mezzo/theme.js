@@ -265,7 +265,7 @@
       diffMore: 'Sfoglia altre {n} righe',
       diffLess: 'Richiudi',
       diffNew: 'Pagina nuova.',
-      hideTip: 'Nascondi',
+      hideTip: 'Riduci a icona',
       quitTip: 'Chiudi',
       gripTip: 'Ridimensiona',
     },

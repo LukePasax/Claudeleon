@@ -98,7 +98,7 @@
     // Il pulsante della scena mostra il nome dell'altra
     notte: 'notte',
     giorno: 'giorno',
-    hideTip: 'Nascondi (si riapre col vassoio o con la scorciatoia)',
+    hideTip: 'Riduci a icona',
     maxTip: 'Ingrandisci (F11: schermo intero)',
     restoreTip: 'Ripristina',
     quitTip: 'Chiudi',
