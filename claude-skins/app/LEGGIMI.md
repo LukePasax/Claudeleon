@@ -130,6 +130,16 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   stato, da quanto, quanti strumenti ha usato, l'ultimo e il riassunto finale, con "Ferma" e "Uscita" (il file con
   l'uscita). Mentre Claude lavora, "Manda in background" (o Ctrl+B) sposta in background il comando o il sotto-agente
   in corso, come nel terminale, e Claude va avanti. Con attività in corso la conversazione non si spegne da sola.
+- **Copia separata per ogni conversazione (worktree):** nel menu della cartella (o nelle impostazioni) si accende
+  "Una copia separata per ogni conversazione". Da lì, nei repo git, il primo messaggio di una conversazione nuova crea
+  una copia del repo in `.claude/worktrees/<nome>` (nome dalle prime parole del messaggio) su un branch suo,
+  `claude/<nome>`, partito dal branch della cartella principale; Claude lavora lì, e la cartella principale non si tocca.
+  Più conversazioni sullo stesso progetto non si pestano i piedi. Il pulsante del branch prende il colore della copia;
+  nel pannello di git, oltre a commit, push e pull request, "Unisci in <base>" porta i commit della copia nella
+  cartella principale (serve che lì si sia sulla base e che nella copia sia tutto committato; con un conflitto
+  l'unione si annulla) e "Elimina la copia" la toglie (chiede conferma se ci sono modifiche senza commit o commit non
+  uniti, che restano comunque nel branch). La cartella `.claude/worktrees/` è esclusa da git solo in locale
+  (`.git/info/exclude`).
 - **Commenti sulle differenze:** passando su una riga di una differenza (nella conversazione, nei file modificati, nel
   pannello di git) compare un "+": un clic apre un commento su quella riga (Invio per aggiungerlo). I commenti restano
   in attesa come etichette sopra la penna (× per toglierne uno) e, nei pannelli, in una barra con "Manda a Claude";

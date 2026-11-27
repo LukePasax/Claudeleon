@@ -90,3 +90,53 @@ test('git: stato, differenze, branch, commit e push', async () => {
   // Sul branch principale niente pull request
   assert.match((await gitOps.createPr(repo)).error, /crea prima un branch/)
 })
+
+test('worktree: il nome dalle prime parole del messaggio', () => {
+  const { slug } = gitOps._internals
+  assert.match(slug('Aggiungi i fiumi prima delle strade, però'), /^aggiungi-fiumi-prima-delle-[0-9a-f]{1,4}$/)
+  assert.match(slug('Perché è così? Città'), /^perche-cosi-citta-[0-9a-f]{1,4}$/)
+  assert.match(slug(''), /^sessione-[0-9a-f]{1,4}$/)
+  assert.match(slug('<diff_comments>\nxx\n</diff_comments>'), /^sessione-/)
+})
+
+test('worktree: copia separata, unione nella cartella principale, eliminazione', async () => {
+  const { repo } = tempRepo()
+  fs.writeFileSync(path.join(repo, 'a.txt'), 'uno\n')
+  await gitOps.commit(repo, 'Primo')
+  const wt = await gitOps.createWorktree(repo, 'Aggiungi i fiumi')
+  assert.equal(wt.ok, true)
+  assert.match(wt.branch, /^claude\/aggiungi-fiumi-/)
+  assert.equal(wt.base, 'main')
+  assert.ok(fs.existsSync(path.join(wt.path, 'a.txt')))
+  // La copia non compare fra le modifiche del repo principale
+  assert.deepEqual((await gitOps.status(repo)).files, [])
+  assert.equal((await gitOps.status(repo)).worktree, null)
+  let st = await gitOps.status(wt.path)
+  assert.equal(st.worktree.base, 'main')
+  assert.equal(st.worktree.unmerged, 0)
+
+  // Modifiche senza commit: niente unione, ed eliminare chiede conferma
+  fs.writeFileSync(path.join(wt.path, 'b.txt'), 'due\n')
+  assert.match((await gitOps.mergeWorktree(wt.path)).error, /fai prima il commit/)
+  assert.deepEqual(await gitOps.removeWorktree(wt.path), { ok: false, needsForce: true, dirty: true, unmerged: 0 })
+  await gitOps.commit(wt.path, 'Secondo')
+  st = await gitOps.status(wt.path)
+  assert.equal(st.worktree.unmerged, 1)
+  assert.deepEqual(await gitOps.mergeWorktree(wt.path), { ok: true })
+  assert.equal(fs.readFileSync(path.join(repo, 'b.txt'), 'utf8'), 'due\n')
+  assert.equal((await gitOps.status(wt.path)).worktree.unmerged, 0)
+  // Unito: si toglie senza chiedere, e il branch se ne va
+  const rm = await gitOps.removeWorktree(wt.path)
+  assert.equal(rm.ok, true)
+  assert.equal(rm.branchKept, '')
+  assert.equal(fs.existsSync(wt.path), false)
+  assert.deepEqual(await gitOps.branches(repo), ['main'])
+
+  // Una copia con un commit non unito, eliminata con force: il branch resta
+  const wt2 = await gitOps.createWorktree(repo, 'Altro')
+  fs.writeFileSync(path.join(wt2.path, 'c.txt'), 'tre\n')
+  await gitOps.commit(wt2.path, 'Terzo')
+  const rm2 = await gitOps.removeWorktree(wt2.path, true)
+  assert.equal(rm2.ok, true)
+  assert.equal(rm2.branchKept, wt2.branch)
+})

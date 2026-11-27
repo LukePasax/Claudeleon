@@ -8,7 +8,7 @@
   // giusta anche se non è quella in vista (vedi "conversazioni")
   const base = window.skins || fakeApi()
   const api = Object.assign({}, base)
-  const CONV_EVENTS = ['onDelta', 'onTool', 'onToolDone', 'onDone', 'onError', 'onAsk', 'onAskClosed', 'onCommandOutput', 'onToolSummary', 'onCompacted', 'onStatus', 'onTodos', 'onBusy', 'onContext', 'onThinkingStart', 'onThinking', 'onThinkingEnd', 'onSuggestion', 'onRewound', 'onTasks']
+  const CONV_EVENTS = ['onDelta', 'onTool', 'onToolDone', 'onDone', 'onError', 'onAsk', 'onAskClosed', 'onCommandOutput', 'onToolSummary', 'onCompacted', 'onStatus', 'onTodos', 'onBusy', 'onContext', 'onThinkingStart', 'onThinking', 'onThinkingEnd', 'onSuggestion', 'onRewound', 'onTasks', 'onWorktree']
   for (const n of CONV_EVENTS) if (base[n]) api[n] = (fn) => base[n]((payload, id) => dispatch(id, n, () => fn(payload)))
   const app = document.getElementById('app')
   const t = Theming.t
@@ -35,6 +35,8 @@
   // Le attività in background della conversazione (comandi, sotto-agenti), dal ponte
   let bgTasks = []
   let reviews = []
+  // Le conversazioni nuove nei repo partono in un worktree (impostazione)
+  let worktreeOn = false
 
   // ------------------------------------------------------------------ conversazioni
 
@@ -488,6 +490,8 @@
   let workdirChosen = true
   let pendingSend = false
   const baseName = (p) => String(p || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() || String(p || '')
+  // Una cartella dentro <repo>/.claude/worktrees/<nome>: la copia separata di una conversazione
+  const wtOf = (p) => { const s = String(p || '').replace(/\\/g, '/'); const m = /\/\.claude\/worktrees\/([^/]+)\/?$/.exec(s); return m ? { main: s.slice(0, m.index), name: m[1] } : null }
 
   function renderFolder() {
     if (quiet) return
@@ -500,9 +504,25 @@
         box.appendChild(b)
       }
       const unset = !workdirChosen && !currentSession && !chapterHasMessages()
+      const dir = convoDir || workdir
+      const wt = wtOf(dir)
       b.classList.toggle('unset', unset)
-      b.textContent = unset ? t('folderPick') : baseName(convoDir || workdir)
-      b.title = unset ? t('folderPick') : (convoDir || workdir)
+      b.textContent = ''
+      const nameEl = document.createElement('span')
+      nameEl.className = 'fb-name'
+      nameEl.textContent = unset ? t('folderPick') : baseName(wt ? wt.main : dir)
+      b.appendChild(nameEl)
+      b.title = unset ? t('folderPick') : dir
+      // In un worktree, o in una conversazione che ci partirà
+      const fresh = !currentSession && !chapterHasMessages()
+      // (in una copia già fatta lo dice il pulsante del branch, che ha il colore del worktree)
+      if (!unset && !wt && worktreeOn && fresh && active && active.git && !active.git.worktree) {
+        const tag = document.createElement('span')
+        tag.className = 'wt-tag pending'
+        tag.textContent = t('wtTagNew')
+        b.title = t('wtPendingTip')
+        b.appendChild(tag)
+      }
     }
     // Un'altra cartella: un altro repo (o nessuno)
     if (active && active.gitDir !== (convoDir || workdir)) refreshGit()
@@ -822,7 +842,8 @@
       const seen = new Set()
       const dirs = []
       for (const x of [{ cwd: convoDir || workdir }, ...sessions]) {
-        const d = x.cwd
+        // Le copie separate valgono come il loro repo
+        const d = x.cwd && (wtOf(x.cwd) ? wtOf(x.cwd).main : x.cwd)
         if (!d || seen.has(d.toLowerCase())) continue
         seen.add(d.toLowerCase())
         dirs.push(d)
@@ -838,6 +859,16 @@
         list.appendChild(it)
       }
     } catch {}
+    // Le copie separate per le conversazioni nuove (solo nei repo git)
+    const wtRow = document.createElement('label')
+    wtRow.className = 'folder-item wt-toggle'
+    wtRow.innerHTML = '<input type="checkbox"><span class="fi-text"><span class="fi-name"></span><span class="fi-wrap"></span></span>'
+    label(wtRow.querySelector('.fi-name'), 'wtToggle')
+    label(wtRow.querySelector('.fi-wrap'), 'wtToggleNote')
+    const cb = wtRow.querySelector('input')
+    cb.checked = worktreeOn
+    cb.addEventListener('change', () => { worktreeOn = cb.checked; api.setSetting('worktree', worktreeOn); renderFolder() })
+    menu.appendChild(wtRow)
   }
 
   async function chooseFolder(dir) {
@@ -1322,6 +1353,7 @@
     c.git = st && st.repo ? st : null
     if (c === active) {
       renderGit()
+      renderFolder()
       const panel = document.querySelector('.git-panel')
       if (panel && panel.fill) panel.fill()
     }
@@ -1344,11 +1376,13 @@
       b.hidden = !st
       if (!st) continue
       b.innerHTML = '<span class="gb-icon">⎇</span><span class="gb-name"></span><span class="gb-n"></span><span class="gb-up"></span>'
-      b.querySelector('.gb-name').textContent = st.detached ? 'HEAD' : st.branch
+      // Il branch di una copia separata senza il suo prefisso (claude/)
+      b.querySelector('.gb-name').textContent = st.detached ? 'HEAD' : st.worktree ? st.branch.replace(/^claude\//, '') : st.branch
       b.querySelector('.gb-n').textContent = st.files.length ? `· ${st.files.length}` : ''
       b.querySelector('.gb-up').textContent = st.ahead ? `↑${st.ahead}` : ''
       b.classList.toggle('dirty', st.files.length > 0)
-      b.title = t('gitTip', { branch: st.detached ? 'HEAD' : st.branch })
+      b.classList.toggle('worktree', !!st.worktree)
+      b.title = t('gitTip', { branch: st.detached ? 'HEAD' : st.branch }) + (st.worktree ? `\n${t('wtTagTip', { x: st.worktree.path })}` : '')
     }
   }
   window.addEventListener('focus', () => refreshGit())
@@ -1429,7 +1463,7 @@
       const ta = body.querySelector('.git-msg')
       if (ta) message = ta.value
       body.innerHTML = ''
-      label(panel.querySelector('.theme-picker-head span'), 'gitTitle', { x: baseName(st.root) })
+      label(panel.querySelector('.theme-picker-head span'), 'gitTitle', { x: baseName(st.worktree ? st.worktree.main : st.root) })
       if (note) {
         const n = document.createElement('div')
         n.className = `git-note${note.error ? ' error' : ''}`
@@ -1470,6 +1504,34 @@
         sel.addEventListener('change', () => act(() => api.gitCheckout(conv, sel.value, false)))
         bc.append(sel, btn('gitNewBranch', () => { newBranch = true; panel.fill() }))
         if (!branchList) api.gitBranches(conv).then((list) => { if (Array.isArray(list) && list.length && !branchList) { branchList = list; panel.fill() } }).catch(() => {})
+      }
+
+      // La copia separata: unire nella cartella principale, eliminarla
+      if (st.worktree) {
+        const wt = st.worktree
+        section('wtSection')
+        const ctl = row(t('wtLabel', { repo: baseName(wt.main) }), t('wtNote', { base: wt.base, branch: wt.branch, x: wt.unmerged ? t('wtUnmerged', { n: wt.unmerged }) : t('wtMerged') }))
+        if (wt.unmerged) ctl.appendChild(btn('wtMergeBtn', async () => {
+          const r = await act(() => api.mergeWorktree(conv))
+          if (r && r.ok) { note = { text: t(r.nothing ? 'wtNothing' : 'wtMergedOk', { base: wt.base }) }; panel.fill() }
+        }, '', { base: wt.base }))
+        const rm = async (force) => {
+          const r = await act(() => api.removeWorktree(conv, force))
+          if (r && r.needsForce) {
+            const why = [r.dirty ? t('wtRemoveDirty') : '', r.unmerged ? t('wtRemoveUnmerged', { n: r.unmerged }) : ''].filter(Boolean).join(', ')
+            note = { text: t('wtRemoveWarn', { x: why }), error: true, force: true }
+            panel.fill()
+          } else if (r && r.ok) {
+            closeThemes()
+            labelled('footnote', 'wtRemoved')
+            if (r.branchKept) labelled('footnote', 'wtBranchKept', { branch: r.branchKept })
+          }
+        }
+        ctl.appendChild(btn('wtRemoveBtn', () => rm(false)))
+        if (note && note.force) {
+          const n = body.querySelector('.git-note')
+          if (n) n.appendChild(btn('wtRemoveForce', () => rm(true), 'deny'))
+        }
       }
 
       // Le modifiche
@@ -1574,6 +1636,17 @@
     refreshGit()
   }
 
+  // Il worktree della conversazione è pronto (o non si è potuto fare): la cartella diventa la copia
+  if (api.onWorktree) api.onWorktree((r) => {
+    if (r && r.ok) {
+      convoDir = r.path
+      labelled('footnote', 'wtCreated', { branch: r.branch })
+      renderFolder()
+      if (cur === active) refreshGit()
+    } else if (r && r.error) labelled('error', 'wtFailed', { err: r.error })
+  })
+  if (api.settings) api.settings().then((st) => { worktreeOn = !!(st && st.worktree); renderFolder() }).catch(() => {})
+
   // ------------------------------------------------------------------ impostazioni
 
   // Il pannello delle impostazioni, sopra il layout come il selettore dei temi: aspetto, finestra, notifiche,
@@ -1649,6 +1722,7 @@
       // Conversazioni
       section('setConversations')
       button(row('setWorkdir', st.workdir || t('setWorkdirNone')), 'setChange', () => set('workdir'))
+      toggle(row('setWorktree', t('setWorktreeNote')), st.worktree, (v) => { worktreeOn = v; set('worktree', v); renderFolder() })
       select(row('setMode'), MODES.map(([m, key]) => [m, t(key)]), mode, (v) => { chooseMode(v); st.mode = v })
       select(row('setModel'), [['', t('modelDefault')], ...models.filter((m) => m.value !== 'default').map((m) => [m.value, m.name])], model || '', (v) => {
         model = v || null
@@ -3681,7 +3755,7 @@
     gitTotals()
     const fakeBranches = ['fiumi', 'main', 'sentieri']
     const fakeUpdate = { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/luca/Claude-desktop-skins', installed: true }
-    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '0.1.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claude Skins', shortcut: 'Ctrl+Alt+P' }
+    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '0.1.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claude Skins', shortcut: 'Ctrl+Alt+P', worktree: false }
     const fakeSessions = [
       { id: 's0', title: 'Allegati e domande con le opzioni', lastModified: Date.now() - 600000, cwd: 'C:/Workspace/Progetti/Claude-desktop-skins', branch: 'main' },
       { id: 's1', title: 'Temi per Claude Skins', lastModified: Date.now() - 3600000, cwd: 'C:/Workspace/Progetti/Claude-desktop-skins', branch: 'main' },
@@ -3749,6 +3823,8 @@
       gitPush: async () => { fakeGit.ahead = 0; fakeGit.upstream = `origin/${fakeGit.branch}`; return { ok: true } },
       gitPrInfo: async () => null,
       gitPr: async () => ({ ok: true, url: 'https://github.com/luca/MapEditor/pull/7' }),
+      mergeWorktree: async () => { fakeGit.worktree.unmerged = 0; return { ok: true } },
+      removeWorktree: async (_c, force) => (!force && (fakeGit.files.length || fakeGit.worktree.unmerged) ? { ok: false, needsForce: true, dirty: fakeGit.files.length > 0, unmerged: fakeGit.worktree.unmerged } : { ok: true, branchKept: '' }),
       revealFile: async () => false,
       extensions: async () => ({ ok: true, mcp: [
         { name: 'github', status: 'connected', scope: 'user', source: 'user', tools: 48, error: '' },
@@ -3763,7 +3839,7 @@
       onUpdate: on('onUpdate'),
       stopTask: async () => true,
       backgroundNow: async () => true,
-      onTasks: on('onTasks'),
+      onTasks: on('onTasks'), onWorktree: on('onWorktree'),
       settings: async () => fakeSettings,
       setSetting: async (k, v) => { if (k in fakeSettings) fakeSettings[k] = v; return fakeSettings },
       suggestFiles: async (q) => ['src/', 'src/MapView.cpp', 'src/MapView.h', 'src/MapLoader.cpp', 'src/RouteFinder.h', 'docs/', 'docs/specifiche.pdf', 'README.md', 'CMakeLists.txt'].filter((f) => f.toLowerCase().includes(q.toLowerCase())).slice(0, 15),
@@ -3775,6 +3851,12 @@
       send(msg, conv) {
         const fire = (n, v, ms) => fireAll(n, v, ms, conv)
         // Una conversazione nuova riceve la sua sessione e compare negli annali
+        // Con le copie separate accese, la prima domanda di una conversazione parte in un worktree
+        if (conv && fakeSettings.worktree && !fakeSessions.some((x) => x.conv === conv)) {
+          const wt = { ok: true, name: 'aggiungi-fiumi-1a2b', branch: 'claude/aggiungi-fiumi-1a2b', path: 'C:/Users/luca/MapEditor/.claude/worktrees/aggiungi-fiumi-1a2b', main: 'C:/Users/luca/MapEditor', base: 'fiumi' }
+          Object.assign(fakeGit, { branch: wt.branch, upstream: '', ahead: 0, root: wt.path, worktree: { main: wt.main, path: wt.path, name: wt.name, branch: wt.branch, base: 'fiumi', mainBranch: 'fiumi', unmerged: 2 } })
+          fire('onWorktree', wt, 10)
+        }
         if (conv && !fakeSessions.some((x) => x.conv === conv)) {
           fakeSessions.unshift({ id: `fs-${conv}`, conv, title: (typeof msg === 'string' ? msg : msg.text.replace(/\s*<diff_comments>[\s\S]*$/, '') || 'Commenti sulle modifiche').slice(0, 40), lastModified: Date.now(), cwd: 'C:/Workspace' })
           fire('onConvSession', { id: `fs-${conv}`, cwd: 'C:/Workspace' }, 30)

@@ -298,6 +298,21 @@ Nella pagina: `data-part="git"` (o dentro `data-part="folder"`), pannello `.git-
 conversazione, `refreshGit()` lo rilegge (cambio di cartella o di conversazione, fine risposta, focus della finestra).
 Prove: `test/unit/git.test.js` (un repo vero con un remoto nudo), e il pannello nelle prove della finestra.
 
+## Worktree
+
+`config.worktree` (menu della cartella, impostazioni). In `chat:send` (main.js), se è acceso e la conversazione non
+ha ancora sessione né worktree, `gitOps.createWorktree(workdir, testo)` crea `<repo>/.claude/worktrees/<slug>` col
+branch `claude/<slug>` da HEAD della cartella principale (la base si ricorda in `branch.<b>.skinsBase` della config
+di git), aggiunge `/.claude/worktrees/` a `.git/info/exclude`, mette `c.worktree` e `bridge.workdir` sulla copia, e
+manda `conv:worktree` (la pagina sposta `convoDir` e scrive una nota); il messaggio parte dopo (`c.ready`). Se non è
+un repo o non riesce, si lavora nella cartella (con una nota d'errore, tranne fuori dai repo). `status()` porta
+`worktree` (cartella principale, branch, base, commit non uniti) se la cartella è un worktree collegato
+(`--git-dir` diverso da `--git-common-dir`). `mergeWorktree`: `merge --no-ff` nella cartella principale, solo se la
+copia è pulita e la principale è sulla base; un conflitto fa `merge --abort`. `removeWorktree`: senza force rifiuta
+con `needsForce` se ci sono modifiche o commit non uniti; il branch si toglie solo con `-d` (i commit non uniti
+restano). Nella pagina: `wtOf(path)` riconosce le copie (il pulsante della cartella e le cartelle recenti mostrano il
+repo), `.git-btn.worktree`, `.wt-tag.pending` sulla cartella prima del primo messaggio.
+
 ## Commenti sulle differenze
 
 `changeView` segna le righe vere (`data-ln`, `data-side` "+"/"-"/" ", `rawLine`) e mette il pulsante `.dl-cm` se la

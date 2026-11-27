@@ -155,6 +155,7 @@ async function status(cwd) {
     repo: true, root, ...head, files, totals, remote, web, base, last: hash ? { hash, subject } : null,
     compare: head.branch && base && head.branch !== base ? compareUrl(web, base, head.branch) : '',
     gh: await hasGh(),
+    worktree: await worktreeStatus(root),
   }
 }
 
@@ -254,4 +255,105 @@ async function createPr(cwd, opts = {}) {
   return { ok: true, url }
 }
 
-module.exports = { status, diff, branches, checkout, commit, push, prInfo, createPr, _internals: { parseHead, parseStatus, parseNumstat, webOf, compareUrl, clean } }
+// ------------------------------------------------------------------ worktree
+
+// Una conversazione può lavorare in una copia separata del repo (un worktree di git), su un branch suo: le modifiche
+// non toccano la cartella principale finché non si uniscono, e più conversazioni sullo stesso progetto non si pestano
+// i piedi. Le copie stanno in <repo>/.claude/worktrees/<nome> (come quelle di Claude Code), escluse da git con
+// .git/info/exclude; il branch è claude/<nome>
+
+// Il nome dalle prime parole del messaggio: minuscole, senza accenti, con i trattini, più un pezzetto a caso
+function slug(text) {
+  const words = String(text || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .replace(/<(attached_files|diff_comments)>[\s\S]*/g, '').match(/[a-z0-9]+/g) || []
+  const base = words.filter((w) => w.length > 2).slice(0, 4).join('-').slice(0, 32).replace(/-+$/, '')
+  const tail = Math.random().toString(16).slice(2, 6)
+  return base ? `${base}-${tail}` : `sessione-${tail}`
+}
+
+// La cartella principale del repo di un worktree (o del repo stesso) e se cwd è dentro un worktree collegato
+async function worktreeInfo(cwd) {
+  const root = await rootOf(cwd)
+  if (!root) return null
+  const r = await git(['rev-parse', '--git-dir', '--git-common-dir'], root)
+  if (!r.ok) return null
+  const [gitDir, commonDir] = r.out.trim().split(/\r?\n/).map((p) => path.resolve(root, p.trim()))
+  const linked = path.normalize(gitDir) !== path.normalize(commonDir)
+  const main = linked ? path.dirname(commonDir) : root
+  return { root, main, linked }
+}
+
+async function createWorktree(cwd, hint) {
+  const info = await worktreeInfo(cwd)
+  if (!info) return { ok: false, error: 'Non è un repo git' }
+  const head = await git(['rev-parse', '--verify', '--quiet', 'HEAD'], info.main)
+  if (!head.ok) return { ok: false, error: 'Il repo non ha ancora commit: il worktree parte da un commit' }
+  const name = slug(hint)
+  const branch = `claude/${name}`
+  const dir = path.join(info.main, '.claude', 'worktrees', name)
+  // Le copie non devono comparire fra le modifiche del repo principale
+  try {
+    const exclude = path.join(path.resolve(info.main, (await git(['rev-parse', '--git-common-dir'], info.main)).out.trim()), 'info', 'exclude')
+    const now = fs.existsSync(exclude) ? fs.readFileSync(exclude, 'utf8') : ''
+    if (!/^\/?\.claude\/worktrees\/?$/m.test(now)) {
+      fs.mkdirSync(path.dirname(exclude), { recursive: true })
+      fs.appendFileSync(exclude, `${now && !now.endsWith('\n') ? '\n' : ''}/.claude/worktrees/\n`)
+    }
+  } catch {}
+  // Dal commit su cui sta la cartella principale (il suo branch è la base per unire, dopo)
+  const base = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], info.main)).out.trim()
+  const r = await git(['worktree', 'add', '-b', branch, dir, 'HEAD'], info.main, 120000)
+  if (!r.ok) return { ok: false, error: clean(r.err) }
+  // La base si ricorda nella configurazione del branch, per sapere dove unire
+  if (base && base !== 'HEAD') await git(['config', `branch.${branch}.skinsBase`, base], info.main)
+  return { ok: true, path: dir.replace(/\\/g, '/'), branch, name, main: info.main.replace(/\\/g, '/'), base }
+}
+
+// Lo stato del worktree per il pannello: in quale repo, su quale branch, la base, se è già tutto unito
+async function worktreeStatus(cwd) {
+  const info = await worktreeInfo(cwd)
+  if (!info || !info.linked) return null
+  const branch = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], info.root)).out.trim()
+  let base = (await git(['config', `branch.${branch}.skinsBase`], info.main)).out.trim()
+  const mainBranch = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], info.main)).out.trim()
+  if (!base) base = mainBranch
+  const ahead = await git(['rev-list', '--count', `${base}..${branch}`], info.main)
+  return {
+    main: info.main.replace(/\\/g, '/'), path: info.root.replace(/\\/g, '/'), name: path.basename(info.root), branch, base, mainBranch,
+    unmerged: ahead.ok ? Number(ahead.out.trim()) : 0,
+  }
+}
+
+// Unisce il branch del worktree nel branch della cartella principale (che dev'essere la base). Le modifiche non
+// salvate del worktree non passano: prima il commit
+async function mergeWorktree(cwd) {
+  const wt = await worktreeStatus(cwd)
+  if (!wt) return { ok: false, error: 'Questa conversazione non lavora in un worktree' }
+  const dirty = await git(['status', '--porcelain', '--untracked-files=all'], wt.path)
+  if (dirty.out.trim()) return { ok: false, error: 'Ci sono modifiche senza commit nel worktree: fai prima il commit' }
+  if (wt.mainBranch !== wt.base) return { ok: false, error: `La cartella principale è su ${wt.mainBranch}, non su ${wt.base}: torna su ${wt.base} per unire` }
+  if (!wt.unmerged) return { ok: true, nothing: true }
+  const r = await git(['merge', '--no-ff', '--no-edit', wt.branch], wt.main, 120000)
+  if (!r.ok) {
+    await git(['merge', '--abort'], wt.main)
+    return { ok: false, error: `Unione non riuscita (conflitti o modifiche nella cartella principale), annullata:\n${clean(r.err || r.out)}` }
+  }
+  return { ok: true }
+}
+
+// Toglie il worktree (con force anche se ci sono modifiche senza commit, che si perdono); il branch se ne va solo se
+// è già unito
+async function removeWorktree(cwd, force) {
+  const wt = await worktreeStatus(cwd)
+  if (!wt) return { ok: false, error: 'Questa conversazione non lavora in un worktree' }
+  const dirty = (await git(['status', '--porcelain', '--untracked-files=all'], wt.path)).out.trim()
+  if (!force && (dirty || wt.unmerged)) return { ok: false, needsForce: true, dirty: !!dirty, unmerged: wt.unmerged }
+  const r = await git(['worktree', 'remove', ...(force ? ['--force'] : []), wt.path], wt.main, 120000)
+  if (!r.ok) return { ok: false, error: clean(r.err) }
+  // Il branch si toglie solo se è unito: i commit non uniti restano lì, anche eliminando la copia
+  const del = await git(['branch', '-d', wt.branch], wt.main)
+  if (del.ok) await git(['config', '--unset', `branch.${wt.branch}.skinsBase`], wt.main)
+  return { ok: true, main: wt.main, branchKept: !del.ok ? wt.branch : '' }
+}
+
+module.exports = { status, diff, branches, checkout, commit, push, prInfo, createPr, createWorktree, worktreeStatus, mergeWorktree, removeWorktree, _internals: { parseHead, parseStatus, parseNumstat, webOf, compareUrl, clean, slug } }

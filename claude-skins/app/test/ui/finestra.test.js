@@ -194,6 +194,25 @@ for (const tema of TEMI) {
     assert.deepEqual(errors, [])
   })
 
+  test(`${tema}: copia separata (worktree) per una conversazione nuova`, async () => {
+    await open(tema)
+    await page.click('.folder-btn')
+    await page.click('.wt-toggle input')
+    await page.keyboard.press('Escape')
+    await page.waitForSelector('.folder-btn .wt-tag.pending')
+    await send('Aggiungi i fiumi')
+    await page.waitForSelector('.git-btn.worktree')
+    assert.match(await page.textContent('.folder-btn'), /MapEditor/)
+    assert.match(await page.textContent('.convo:not([hidden])'), /copia separata.*claude\/aggiungi-fiumi/s)
+    await done()
+    await page.click('.git-btn')
+    await page.click('.git-panel >> text=Elimina la copia')
+    await page.waitForSelector('.git-panel .git-note.error >> text=Elimina comunque')
+    await page.click('.git-panel >> text=Unisci in fiumi')
+    await page.waitForFunction(() => /Unito in fiumi/.test(document.querySelector('.git-panel .git-note').textContent))
+    assert.deepEqual(errors, [])
+  })
+
   test(`${tema}: impostazioni, estensioni, contesto, cambio di tema che tiene la conversazione`, async () => {
     await open(tema)
     await send('Ciao')

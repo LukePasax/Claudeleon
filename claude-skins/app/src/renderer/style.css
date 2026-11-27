@@ -659,3 +659,12 @@ body.busy .entry .edit-btn { display: none; }
 [data-part="folder"] .folder-btn, [data-part="git"] .git-btn { max-width: min(220px, 100%); min-width: 0; }
 [data-part="model"] .model-btn { max-width: min(320px, 100%); min-width: 0; }
 [data-part="folder"] .git-btn { flex: 0 1 auto; }
+
+/* Worktree: l'etichetta sul pulsante della cartella e l'interruttore nel suo menu */
+.wt-tag { flex: none; font-size: 11px; line-height: 1.4; padding: 0 6px; border-radius: 8px; color: var(--gold); border: var(--line) solid var(--gold); }
+.wt-tag.pending { border-style: dashed; opacity: 0.8; }
+.folder-item.wt-toggle { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; margin-top: 4px; border-top: var(--line) solid var(--edge-light); border-radius: 0; padding-top: 8px; cursor: pointer; }
+.folder-item.wt-toggle input { flex: none; margin: 3px 0 0; accent-color: var(--btn-bg); }
+.folder-item.wt-toggle .fi-text { display: flex; flex-direction: column; min-width: 0; }
+[data-part="folder"] .folder-btn .fb-name { min-width: 4ch; overflow: hidden; text-overflow: ellipsis; }
+.git-btn.worktree { color: var(--gold); border-color: var(--gold); }

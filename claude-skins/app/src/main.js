@@ -412,6 +412,7 @@ async function settingsState() {
     dataDir: app.getPath('userData'),
     shortcut: TOGGLE_SHORTCUT.replace('Control', 'Ctrl'),
     autoUpdate: config.autoUpdate !== false,
+    worktree: config.worktree === true,
   }
 }
 // Una scelta del pannello: si applica subito e si ricorda
@@ -419,6 +420,7 @@ async function applySetting(key, value) {
   if (key === 'onTop') setOnTop(!!value)
   else if (key === 'notify') { config.notify = !!value; saveConfig() }
   else if (key === 'autoUpdate') { config.autoUpdate = !!value; saveConfig() }
+  else if (key === 'worktree') { config.worktree = !!value; saveConfig() }
   else if (key === 'openAtLogin') { try { app.setLoginItemSettings(Object.assign({ openAtLogin: !!value }, loginArgs())) } catch {} }
   else if (key === 'entrypoint') {
     config.entrypoint = value === 'claude-desktop' ? 'claude-desktop' : 'cli'
@@ -454,7 +456,7 @@ function setWorkdir(dir) {
   const w = dir.replace(/\\/g, '/')
   // Vale per le conversazioni che non sono ancora cominciate (quelle cominciate restano nella loro cartella)
   bridge.workdir = w
-  for (const c of convs.values()) if (!c.sessionId) c.bridge.workdir = w
+  for (const c of convs.values()) if (!c.sessionId && !c.worktree) c.bridge.workdir = w
   saveConfig()
   send('workdir:changed', w)
   return w
@@ -563,7 +565,25 @@ function registerIpc() {
     return { chapter: config.chapter, conv: c.id }
   })
   // Il messaggio: testo, o { text, images, files } con gli allegati
-  ipcMain.on('chat:send', (_e, msg, conv) => { const c = convOf(conv); if (c) c.bridge.send(msg && typeof msg === 'object' ? msg : String(msg || '')) })
+  // Il primo messaggio di una conversazione nuova, con i worktree accesi e la cartella in un repo: prima la copia
+  // separata (Claude parte lì), poi il messaggio. I messaggi seguenti aspettano in fila che sia pronta
+  ipcMain.on('chat:send', (_e, msg, conv) => {
+    const c = convOf(conv)
+    if (!c) return
+    const payload = msg && typeof msg === 'object' ? msg : String(msg || '')
+    if (config.worktree && !c.sessionId && !c.worktree && !c.worktreeTried) {
+      c.worktreeTried = true
+      const text = typeof payload === 'string' ? payload : payload.text
+      c.ready = gitOps.createWorktree(c.bridge.workdir, text).then((r) => {
+        if (r.ok) {
+          c.worktree = r
+          c.bridge.workdir = r.path
+          send('conv:worktree', r, c.id)
+        } else if (r.error !== 'Non è un repo git') send('conv:worktree', { ok: false, error: r.error }, c.id)
+      }).catch(() => {})
+    }
+    ;(c.ready || Promise.resolve()).then(() => c.bridge.send(payload))
+  })
   // Il pulsante "allega": file e immagini dal disco
   ipcMain.handle('files:choose', async () => {
     const r = await dialog.showOpenDialog(win, { title: 'Allega file o immagini', defaultPath: (convOf(activeConv) && convOf(activeConv).cwd) || bridge.workdir, properties: ['openFile', 'multiSelections'] })
@@ -597,6 +617,8 @@ function registerIpc() {
   ipcMain.handle('git:push', gitCall((cwd) => gitOps.push(cwd)))
   ipcMain.handle('git:pr-info', gitCall((cwd) => gitOps.prInfo(cwd)))
   ipcMain.handle('git:pr', gitCall((cwd, opts) => gitOps.createPr(cwd, opts && typeof opts === 'object' ? opts : {})))
+  ipcMain.handle('git:wt-merge', gitCall((cwd) => gitOps.mergeWorktree(cwd)))
+  ipcMain.handle('git:wt-remove', gitCall((cwd, force) => gitOps.removeWorktree(cwd, !!force)))
   // I file da citare con @, nella cartella della conversazione
   ipcMain.handle('files:suggest', async (_e, query, conv) => {
     const c = convOf(conv)
