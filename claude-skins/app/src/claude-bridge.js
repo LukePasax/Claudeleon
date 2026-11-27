@@ -14,6 +14,48 @@ const FALLBACK_PERSONA = [
   'Resta preciso e conciso. Usa markdown leggero (grassetto, `codice`, blocchi di codice, elenchi).',
 ].join(' ')
 
+// Gli strumenti della lista delle attività: non diventano righe nella conversazione ma il riquadro delle attività.
+// TodoWrite (la lista intera a ogni chiamata) e TaskCreate/TaskUpdate (una voce alla volta), a seconda della versione
+const TODO_TOOLS = new Set(['TodoWrite', 'TaskCreate', 'TaskUpdate'])
+
+// La lista delle attività che si aggiorna con uno strumento: todos è l'elenco corrente ({ id, content, activeForm,
+// status }), created le TaskCreate in attesa del loro id. Restituisce true se l'elenco è cambiato
+function applyTodo(todos, created, name, id, input) {
+  const i = input && typeof input === 'object' ? input : {}
+  if (name === 'TodoWrite' && Array.isArray(i.todos)) {
+    todos.splice(0, todos.length, ...i.todos.map((t, k) => ({ id: String(k + 1), content: String(t.content || ''), activeForm: String(t.activeForm || t.content || ''), status: t.status || 'pending' })))
+    return true
+  }
+  if (name === 'TaskCreate') {
+    created.set(id, { content: String(i.subject || ''), activeForm: String(i.activeForm || i.subject || ''), status: 'pending' })
+    return false
+  }
+  if (name === 'TaskUpdate' && i.taskId != null) {
+    const k = todos.findIndex((t) => t.id === String(i.taskId))
+    if (k < 0) return false
+    if (i.status === 'deleted') { todos.splice(k, 1); return true }
+    const t = todos[k]
+    if (i.status) t.status = i.status
+    if (i.subject) t.content = String(i.subject)
+    if (i.activeForm) t.activeForm = String(i.activeForm)
+    return true
+  }
+  return false
+}
+// Il risultato di una TaskCreate porta l'id dell'attività: allora entra nell'elenco
+function settleTodo(todos, created, toolUseId, result) {
+  const c = created.get(toolUseId)
+  if (!c) return false
+  created.delete(toolUseId)
+  let taskId = result && result.task && result.task.id
+  if (taskId == null) {
+    const m = /#?(\d+)/.exec(typeof result === 'string' ? result : '')
+    taskId = m ? m[1] : String(todos.length + 1)
+  }
+  todos.push(Object.assign({ id: String(taskId) }, c))
+  return true
+}
+
 // Il nome del server del titolo: lo stesso dell'app desktop, così istruzioni e skill scritte per lei funzionano qui
 const TITLE_SERVER = 'ccd_session_mgmt'
 
@@ -152,6 +194,13 @@ class ClaudeBridge extends EventEmitter {
     // La cartella della conversazione in corso: quella in cui è nata, perché Claude Code la riprende solo da lì.
     // Vuota per un capitolo nuovo, che nasce nella cartella di lavoro
     this.sessionCwd = null
+    // Modello e ragionamento (null: quelli di partenza di Claude Code)
+    this.model = null
+    this.effort = null
+    // Le attività della conversazione in corso
+    this.todos = []
+    this.todoCreated = new Map()
+    this.questions = new Map()
     this.query = null
     this.pending = new Map()
     this.nextAsk = 1
@@ -194,12 +243,31 @@ class ClaudeBridge extends EventEmitter {
       try {
         const list = await Promise.race([q.supportedCommands(), new Promise((_, reject) => setTimeout(() => reject(new Error('tempo scaduto')), 60000))])
         this.setCommands(list)
+        // I modelli disponibili, per il selettore
+        const models = await Promise.race([q.supportedModels(), new Promise((resolve) => setTimeout(() => resolve(null), 20000))]).catch(() => null)
+        if (Array.isArray(models) && models.length) this.emit('models', models.map((m) => ({ value: m.value, name: m.displayName || m.value, description: m.description || '', efforts: m.supportsEffort ? (m.supportedEffortLevels || ['low', 'medium', 'high']) : [] })))
       } finally {
         release()
         try { q.close() } catch {}
       }
     })().catch(() => { if (!this.commandList.length) this.emit('commandsError') }).finally(() => { this.commandsLoading = null })
     return this.commandsLoading
+  }
+
+  // Modello e ragionamento: valgono dal prossimo messaggio; il modello cambia anche nella risposta in corso
+  setModel(model) {
+    this.model = model || null
+    if (this.query) this.query.setModel(this.model || undefined).catch(() => {})
+  }
+  setEffort(effort) {
+    this.effort = ['low', 'medium', 'high', 'xhigh', 'max'].includes(effort) ? effort : null
+  }
+
+  // Le attività ricominciano con la conversazione (capitolo nuovo o cronaca aperta)
+  resetTodos(list) {
+    this.todos = Array.isArray(list) ? list : []
+    this.todoCreated.clear()
+    this.emit('todos', this.todos)
   }
 
   // Cambia modo, anche mentre Claude lavora: vale da subito per la conversazione in corso
@@ -268,10 +336,17 @@ class ClaudeBridge extends EventEmitter {
   }
 
   // La risposta della finestra a una domanda di permesso
-  answer(id, allow, always) {
+  answer(id, allow, always, answers) {
     const resolve = this.pending.get(id)
     if (!resolve) return
     this.pending.delete(id)
+    // Le risposte alle domande di Claude (AskUserQuestion): domanda → risposta, le scelte multiple separate da virgole
+    const q = this.questions.get(id)
+    this.questions.delete(id)
+    if (q) {
+      if (!allow || !answers || typeof answers !== 'object') return resolve({ behavior: 'deny', message: 'La persona ha chiuso le domande senza rispondere: chiedile in un messaggio come vuole procedere.' })
+      return resolve({ behavior: 'allow', updatedInput: Object.assign({}, q, { answers }) })
+    }
     const plan = this.plans.get(id)
     this.plans.delete(id)
     if (plan) {
@@ -309,6 +384,8 @@ class ClaudeBridge extends EventEmitter {
           cwd,
           pathToClaudeCodeExecutable: CLAUDE,
           permissionMode: this.mode,
+          model: this.model || undefined,
+          effort: this.effort || undefined,
           systemPrompt: { type: 'preset', preset: 'claude_code', append: this.persona || FALLBACK_PERSONA },
           // Gli hook dell'utente partono una volta per conversazione, al primo messaggio: i successivi riprendono la
           // sessione con un processo nuovo, e farli ripartire a ogni risposta moltiplicherebbe backup e log
@@ -361,7 +438,9 @@ class ClaudeBridge extends EventEmitter {
           }
         } else if (msg.type === 'assistant') {
           for (const block of msg.message?.content || []) {
-            if (block.type === 'tool_use') this.emit('tool', { id: block.id, name: block.name, summary: summary(block.input), intent: intent(block.name, block.input), change: this.change(block.name, block.input) })
+            if (block.type === 'tool_use' && TODO_TOOLS.has(block.name)) {
+              if (applyTodo(this.todos, this.todoCreated, block.name, block.id, block.input)) this.emit('todos', this.todos)
+            } else if (block.type === 'tool_use') this.emit('tool', { id: block.id, name: block.name, summary: summary(block.input), intent: intent(block.name, block.input), change: this.change(block.name, block.input) })
             else if (block.type === 'text' && !sawDelta && block.text) {
               this.emit('delta', (wroteText ? '\n\n' : '') + block.text)
               wroteText = true
@@ -372,7 +451,14 @@ class ClaudeBridge extends EventEmitter {
           const out = localStdout(msg.message)
           if (out != null && !sawOutput) { sawOutput = true; this.emit('commandOutput', plainOutput(out)) }
           for (const block of Array.isArray(msg.message?.content) ? msg.message.content : []) {
-            if (block.type === 'tool_result') this.emit('toolDone', { id: block.tool_use_id, error: !!block.is_error })
+            if (block.type !== 'tool_result') continue
+            if (this.todoCreated.has(block.tool_use_id)) {
+              const text = typeof block.content === 'string' ? block.content : (Array.isArray(block.content) ? block.content.map((c) => c.text || '').join(' ') : '')
+              if (!block.is_error && settleTodo(this.todos, this.todoCreated, block.tool_use_id, msg.tool_use_result || text)) this.emit('todos', this.todos)
+              else this.todoCreated.delete(block.tool_use_id)
+              continue
+            }
+            this.emit('toolDone', { id: block.tool_use_id, error: !!block.is_error })
           }
         } else if (msg.type === 'result') {
           if (msg.is_error || msg.subtype !== 'success') this.emit('error', msg.result || `Il messaggero si è fermato (${msg.subtype}).`)
@@ -428,6 +514,7 @@ class ClaudeBridge extends EventEmitter {
     const id = this.nextAsk++
     this.suggestions.set(id, options.suggestions)
     if (toolName === 'ExitPlanMode') return this.askPlan(id, input, options)
+    if (toolName === 'AskUserQuestion' && input && Array.isArray(input.questions)) return this.askQuestions(id, input, options)
     return new Promise((resolve) => {
       this.pending.set(id, resolve)
       options.signal?.addEventListener('abort', () => {
@@ -442,6 +529,26 @@ class ClaudeBridge extends EventEmitter {
         change: this.change(toolName, input),
         canAlways: Array.isArray(options.suggestions) && options.suggestions.length > 0,
       })
+    })
+  }
+
+  // Le domande di Claude con le opzioni: la finestra le mostra come schede da cliccare
+  askQuestions(id, input, options) {
+    this.questions.set(id, input)
+    return new Promise((resolve) => {
+      this.pending.set(id, resolve)
+      options.signal?.addEventListener('abort', () => {
+        this.questions.delete(id)
+        if (this.pending.delete(id)) resolve({ behavior: 'deny', message: 'Richiesta annullata.' })
+        this.emit('askClosed', { id })
+      })
+      const questions = input.questions.map((q) => ({
+        question: String(q.question || ''),
+        header: String(q.header || ''),
+        multiSelect: !!q.multiSelect,
+        options: (q.options || []).map((o) => ({ label: String(o.label || ''), description: String(o.description || ''), preview: o.preview ? String(o.preview) : '' })),
+      }))
+      this.emit('ask', { id, kind: 'question', questions })
     })
   }
 
@@ -480,6 +587,9 @@ class ClaudeBridge extends EventEmitter {
     const messages = await getSessionMessages(sessionId, cwd ? { dir: cwd } : {})
     const items = []
     const tools = new Map()
+    // Le attività si rifanno ripercorrendo gli strumenti della lista
+    const todos = []
+    const created = new Map()
     for (const m of messages) {
       // Le conversazioni dei sottoagenti restano fuori: si vede l'azione che li ha lanciati
       if ((m.type !== 'user' && m.type !== 'assistant') || m.parent_tool_use_id) continue
@@ -490,6 +600,7 @@ class ClaudeBridge extends EventEmitter {
         if (text.trim()) items.push({ role: 'assistant', text })
         for (const b of blocks) {
           if (b.type !== 'tool_use') continue
+          if (TODO_TOOLS.has(b.name)) { applyTodo(todos, created, b.name, b.id, b.input); continue }
           const item = { role: 'tool', id: b.id, name: b.name, summary: summary(b.input), intent: intent(b.name, b.input), change: this.change(b.name, b.input, true), error: null }
           tools.set(b.id, item)
           items.push(item)
@@ -497,7 +608,11 @@ class ClaudeBridge extends EventEmitter {
         continue
       }
       for (const b of blocks) {
-        if (b.type === 'tool_result') {
+        if (b.type === 'tool_result' && created.has(b.tool_use_id)) {
+          const text = typeof b.content === 'string' ? b.content : (Array.isArray(b.content) ? b.content.map((c) => c.text || '').join(' ') : '')
+          if (b.is_error) created.delete(b.tool_use_id)
+          else settleTodo(todos, created, b.tool_use_id, m.tool_use_result || m.toolUseResult || text)
+        } else if (b.type === 'tool_result') {
           const t = tools.get(b.tool_use_id)
           if (t) t.error = !!b.is_error
         }
@@ -521,6 +636,8 @@ class ClaudeBridge extends EventEmitter {
       if (/^<(command|local-command|system-reminder|task-notification)/.test(text)) continue
       items.push(pics.length ? { role: 'user', text, images: pics } : { role: 'user', text })
     }
+    // La cronaca riaperta continua con le sue attività
+    this.resetTodos(todos)
     return items
   }
 }

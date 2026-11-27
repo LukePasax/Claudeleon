@@ -40,6 +40,15 @@ npm 11 altrimenti non arriva.
   un'anteprima di ogni tema, oppure dal vassoio, **Tema**. Cambia sul posto (forma della finestra compresa) senza perdere la conversazione;
   Claude prende il tono del nuovo tema dal messaggio successivo. Il pulsante "Accendi le stelle"/"Apri le imposte" (o "notte"/"giorno")
   passa da una scena all'altra.
+- **Domande di Claude:** quando Claude chiede di scegliere (AskUserQuestion) compare una scheda con le opzioni da
+  cliccare (una o più), la loro spiegazione, l'anteprima se c'è e un campo per rispondere a parole; "Rispondi"
+  manda le scelte, "Salta" chiude senza rispondere. Con una sola domanda a scelta singola basta un clic.
+- **Attività:** la lista dei passi di Claude (TodoWrite, TaskCreate/TaskUpdate) sta in un riquadro sopra la penna,
+  con quello in corso in evidenza e quelli fatti barrati; chiuso mostra il conto e il passo in corso. Si chiude da sé
+  quando è tutto fatto e torna con le cronache riaperte. Questi strumenti non compaiono come righe nella conversazione.
+- **Modello e ragionamento:** accanto alla cartella, il pulsante del modello apre l'elenco dei modelli che Claude Code
+  mette a disposizione (letto all'avvio, poi ricordato) e i livelli di ragionamento. Valgono dal messaggio dopo e si
+  ricordano (`model`, `effort` in config.json). I modi dei permessi stanno in un menu a tendina, come nell'app desktop.
 - **Allegati:** immagini e file, come nell'app desktop. Si incolla uno screenshot (Ctrl+V) o dei file copiati in
   Esplora file, si trascinano file sulla finestra, o si sceglie col pulsante "+" accanto ai modi. Sopra la penna
   compaiono come miniature ed etichette, ciascuna con la sua ×. Le immagini partono come immagini (rimpicciolite oltre

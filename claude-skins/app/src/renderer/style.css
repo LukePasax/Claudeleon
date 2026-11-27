@@ -310,3 +310,59 @@ body.maximized .ctl.max::before, body.fullscreen .ctl.max::before { -webkit-mask
 .sent-attachments img { display: block; max-height: 120px; max-width: 220px; border-radius: var(--radius-small); }
 /* Mentre si trascinano file sulla finestra la penna si illumina */
 body.dropping [data-part="input"] { outline: 2px dashed var(--gold); outline-offset: 4px; }
+
+/* Le domande di Claude con le opzioni: per ogni domanda l'etichetta, il testo, le opzioni come righe cliccabili (un
+   pallino, o un quadratino se se ne scelgono più) e la risposta libera */
+.ask.question .q { margin: 2px 0 12px; }
+.q-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.q-tag { flex: none; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; padding: 1px 7px; border-radius: 10px; background: var(--btn-bg); color: var(--btn-ink); }
+.q-text { color: var(--strong); font-weight: 600; }
+.q-options { display: flex; flex-direction: column; gap: 4px; }
+.q-opt {
+  display: flex; align-items: flex-start; gap: 9px; text-align: left; cursor: pointer; padding: 6px 10px; font: inherit; color: var(--ink);
+  background: var(--field); border: var(--line) solid var(--edge-light); border-radius: var(--radius-small);
+}
+.q-opt:hover:not(:disabled) { border-color: var(--gold); }
+.q-opt.picked { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+.q-mark { flex: none; width: 13px; height: 13px; margin-top: 4px; border-radius: 50%; border: 1.5px solid var(--ink-soft); }
+.q-opt.multi .q-mark { border-radius: 3px; }
+.q-opt.picked .q-mark { border-color: var(--gold); background: radial-gradient(circle, var(--gold) 45%, transparent 50%); }
+.q-opt.multi.picked .q-mark { background: var(--gold); box-shadow: inset 0 0 0 2px var(--field); }
+.q-body { display: flex; flex-direction: column; min-width: 0; }
+.q-label { font-weight: 600; }
+.q-desc { font-size: var(--small-size); color: var(--ink-soft); }
+.q-desc:empty { display: none; }
+.q-other { font: inherit; font-size: 14px; padding: 6px 10px; color: var(--ink); background: var(--field); border: var(--line) dashed var(--edge-light); border-radius: var(--radius-small); outline: none; user-select: text; }
+.q-other:focus { border-color: var(--gold); border-style: solid; }
+.q-preview { margin-top: 6px; padding: 8px 10px; white-space: pre-wrap; font-family: var(--font-code); font-size: var(--code-size); background: var(--code); border-radius: var(--radius-small); max-height: 260px; overflow: auto; user-select: text; }
+.btn:disabled, .q-opt:disabled { opacity: 0.55; cursor: default; }
+
+/* Le attività: un riquadro sopra la penna con la testata (conto e attività in corso) e l'elenco */
+.todos { margin: 0 0 8px; padding: 6px 12px; background: var(--field); border: var(--line) solid var(--edge-light); border-radius: var(--radius); font-size: 14px; }
+.todos-head { display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--ink-soft); min-width: 0; }
+.todos-head .caret { width: 0; height: 0; border-left: 5px solid var(--ink-soft); border-top: 4px solid transparent; border-bottom: 4px solid transparent; transition: transform 0.12s; flex: none; }
+.todos.open .todos-head .caret { transform: rotate(90deg); }
+.todos-title { flex: none; font-size: var(--small-size); }
+.todos-now { color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.todos-list { margin: 6px 0 2px; max-height: 180px; overflow-y: auto; }
+.todo { display: flex; align-items: flex-start; gap: 8px; padding: 2px 0; line-height: 1.4; }
+.todo-mark { flex: none; width: 12px; height: 12px; margin-top: 4px; border-radius: 50%; border: 1.5px solid var(--ink-soft); }
+.todo.in_progress .todo-mark { border-color: var(--gold); background: conic-gradient(var(--gold) 0 50%, transparent 50%); }
+.todo.in_progress .todo-text { color: var(--strong); font-weight: 600; }
+.todo.completed .todo-mark { border-color: var(--plus); background: var(--plus); box-shadow: inset 0 0 0 2px var(--field); }
+.todo.completed .todo-text { color: var(--ink-soft); text-decoration: line-through; }
+
+/* Il modello: un pulsante come quello della cartella; il menu riusa quello delle cartelle */
+.model-btn, .mode-btn {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 220px; cursor: pointer; font-size: var(--small-size);
+  padding: 2px 9px; color: var(--ink-soft); background: none; border: var(--line) solid var(--edge-light); border-radius: 20px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.model-btn::before { content: ''; flex: none; width: 8px; height: 8px; transform: rotate(45deg); border: 1.5px solid currentColor; border-radius: 1px; }
+.model-btn:hover, .mode-btn:hover { color: var(--ink); }
+.mode-btn::before { content: ''; flex: none; width: 7px; height: 9px; border: 1.5px solid currentColor; border-radius: 4px 4px 1px 1px; }
+.mode-btn::after { content: ''; flex: none; border-top: 4px solid currentColor; border-left: 3.5px solid transparent; border-right: 3.5px solid transparent; opacity: 0.7; }
+.model-btn::after { content: ''; flex: none; border-top: 4px solid currentColor; border-left: 3.5px solid transparent; border-right: 3.5px solid transparent; opacity: 0.7; }
+.folder-item .fi-wrap { white-space: normal; font-size: var(--small-size); line-height: 1.35; }
+body[data-perm-mode="bypassPermissions"] .mode-btn, body[data-perm-mode="acceptEdits"] .mode-btn { color: var(--gold); border-color: var(--gold); }
+.effort-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 8px 6px; }

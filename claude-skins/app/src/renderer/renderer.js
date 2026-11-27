@@ -201,6 +201,21 @@
   // classe active. body[data-perm-mode] dice il modo anche al CSS del tema
   function renderModes() {
     for (const box of all('[data-part="modes"]')) {
+      // data-style="menu": un solo pulsante col modo attivo, che apre il menu dei modi (come nell'app desktop)
+      if (box.dataset.style === 'menu') {
+        let b = box.querySelector('.mode-btn')
+        if (!b) {
+          b = document.createElement('button')
+          b.className = 'mode-btn'
+          b.addEventListener('click', () => openModeMenu(b))
+          box.appendChild(b)
+        }
+        const key = (MODES.find(([m]) => m === mode) || MODES[0])[1]
+        label(b, key)
+        b.dataset.sTitle = `${key}Tip`
+        b.title = t(`${key}Tip`)
+        continue
+      }
       if (!box.querySelector('[data-perm-mode]')) {
         box.appendChild(label(Object.assign(document.createElement('span'), { className: 'modes-label' }), 'modesLabel'))
         for (const [m, key] of MODES) {
@@ -217,7 +232,38 @@
     document.body.dataset.permMode = mode
   }
 
+  // Il menu dei modi: nome e spiegazione di ciascuno; un clic sceglie (lo gestisce il clic su [data-perm-mode])
+  function openModeMenu(anchor) {
+    closeFolderMenu()
+    const menu = document.createElement('div')
+    menu.className = 'folder-menu mode-menu'
+    const head = document.createElement('div')
+    head.className = 'folder-head'
+    menu.appendChild(label(head, 'modesTitle'))
+    for (const [m, key] of MODES) {
+      const it = document.createElement('div')
+      it.className = 'folder-item' + (m === mode ? ' current' : '')
+      it.dataset.permMode = m
+      it.innerHTML = '<span class="fi-name"></span><span class="fi-path fi-wrap"></span>'
+      label(it.children[0], key)
+      label(it.children[1], `${key}Tip`)
+      menu.appendChild(it)
+    }
+    placeMenu(menu, anchor)
+  }
+  // Un menu sopra o sotto il suo pulsante, a seconda dello spazio
+  function placeMenu(menu, anchor) {
+    const host = app.querySelector('[data-solid]') || app
+    host.appendChild(menu)
+    const r = anchor.getBoundingClientRect()
+    const hr = host.getBoundingClientRect()
+    menu.style.left = `${Math.max(8, Math.min(r.left - hr.left, hr.width - menu.offsetWidth - 8))}px`
+    if (r.top - hr.top > menu.offsetHeight + 12) menu.style.bottom = `${hr.bottom - r.top + 6}px`
+    else menu.style.top = `${r.bottom - hr.top + 6}px`
+  }
+
   function chooseMode(m) {
+    closeFolderMenu()
     if (m === mode) return
     mode = m
     renderModes()
@@ -257,6 +303,139 @@
       b.title = unset ? t('folderPick') : (convoDir || workdir)
     }
   }
+
+  // ------------------------------------------------------------------ attività
+
+  // La lista delle attività di Claude (TodoWrite, TaskCreate/TaskUpdate): un riquadro sopra la penna, come nell'app
+  // desktop. Chiuso mostra solo il conto e l'attività in corso; un clic sulla testata lo apre. Sta in
+  // data-part="todos" se il tema lo mette, altrimenti il motore lo crea subito sopra il contenitore della penna
+  let todos = []
+  let todosOpen = true
+  function todosBox() {
+    let box = part('todos')
+    if (box) return box
+    const input = part('input')
+    if (!input) return null
+    const holder = input.parentElement
+    box = holder.parentElement && [...holder.parentElement.children].find((c) => c.classList.contains('todos'))
+    if (!box) {
+      box = document.createElement('div')
+      box.className = 'todos'
+      holder.before(box)
+    }
+    return box
+  }
+  function renderTodos() {
+    const box = todosBox()
+    if (!box) return
+    box.hidden = !todos.length
+    box.innerHTML = ''
+    if (!todos.length) return
+    const done = todos.filter((x) => x.status === 'completed').length
+    const doing = todos.find((x) => x.status === 'in_progress')
+    box.classList.toggle('open', todosOpen)
+    const head = document.createElement('div')
+    head.className = 'todos-head'
+    head.innerHTML = '<span class="caret"></span><span class="todos-title"></span><span class="todos-now"></span>'
+    head.querySelector('.todos-title').textContent = t('todosTitle', { done, total: todos.length })
+    head.querySelector('.todos-now').textContent = !todosOpen && doing ? doing.activeForm || doing.content : ''
+    head.addEventListener('click', () => { todosOpen = !todosOpen; renderTodos() })
+    box.appendChild(head)
+    if (!todosOpen) return
+    const list = document.createElement('div')
+    list.className = 'todos-list'
+    for (const x of todos) {
+      const row = document.createElement('div')
+      row.className = `todo ${x.status}`
+      row.innerHTML = '<span class="todo-mark"></span><span class="todo-text"></span>'
+      row.querySelector('.todo-text').textContent = x.status === 'in_progress' ? x.activeForm || x.content : x.content
+      list.appendChild(row)
+    }
+    box.appendChild(list)
+  }
+  if (api.onTodos) api.onTodos((list) => {
+    const before = todos.length
+    todos = Array.isArray(list) ? list : []
+    // Una lista nuova si apre; una lista finita si chiude da sola
+    if (!before && todos.length) todosOpen = true
+    if (todos.length && todos.every((x) => x.status === 'completed')) todosOpen = false
+    renderTodos()
+  })
+
+  // ------------------------------------------------------------------ modello e ragionamento
+
+  // Il pulsante del modello (in data-part="model"): il nome del modello scelto e il ragionamento; un clic apre il
+  // menu con i modelli che Claude Code dà (supportedModels) e i livelli di ragionamento del modello scelto
+  let models = []
+  let model = null
+  let effort = null
+  const modelInfo = () => models.find((m) => m.value === model) || null
+  function renderModel() {
+    for (const box of all('[data-part="model"]')) {
+      let b = box.querySelector('.model-btn')
+      if (!b) {
+        b = document.createElement('button')
+        b.className = 'model-btn'
+        b.addEventListener('click', () => openModelMenu(b))
+        box.appendChild(b)
+      }
+      const m = modelInfo()
+      const name = m ? m.name : model || t('modelDefault')
+      b.textContent = effort ? `${name} · ${t(`effort_${effort}`)}` : name
+      b.title = m && m.description ? m.description : name
+    }
+  }
+  function openModelMenu(anchor) {
+    closeFolderMenu()
+    const menu = document.createElement('div')
+    menu.className = 'folder-menu model-menu'
+    const head = (key) => { const h = document.createElement('div'); h.className = 'folder-head'; menu.appendChild(label(h, key)) }
+    head('modelTitle')
+    const list = document.createElement('div')
+    list.className = 'folder-list'
+    const item = (value, name, desc) => {
+      const it = document.createElement('div')
+      it.className = 'folder-item' + ((value || null) === model ? ' current' : '')
+      it.innerHTML = '<span class="fi-name"></span><span class="fi-path"></span>'
+      it.children[0].textContent = name
+      it.children[1].textContent = desc
+      it.addEventListener('click', () => {
+        model = value || null
+        const m = modelInfo()
+        if (effort && m && !m.efforts.includes(effort)) effort = null
+        api.setModel(model, effort)
+        renderModel()
+        closeFolderMenu()
+      })
+      list.appendChild(it)
+    }
+    item(null, t('modelDefault'), t('modelDefaultDesc'))
+    for (const m of models) if (m.value !== 'default') item(m.value, m.name, m.description)
+    menu.appendChild(list)
+    if (!models.length) { const n = document.createElement('div'); n.className = 'folder-note'; menu.appendChild(label(n, 'modelNone')) }
+    // Il ragionamento: i livelli del modello scelto (per il predefinito, quelli più comuni)
+    const m = modelInfo()
+    const levels = m ? m.efforts : ['low', 'medium', 'high', 'xhigh', 'max']
+    if (levels.length) {
+      head('effortTitle')
+      const row = document.createElement('div')
+      row.className = 'effort-row'
+      for (const lv of [null, ...levels]) {
+        const b = document.createElement('button')
+        b.className = 'mode' + (lv === effort ? ' active' : '')
+        label(b, lv ? `effort_${lv}` : 'effortAuto')
+        b.addEventListener('click', () => { effort = lv; api.setModel(model, effort); renderModel(); closeFolderMenu() })
+        row.appendChild(b)
+      }
+      menu.appendChild(row)
+    }
+    const note = document.createElement('div')
+    note.className = 'folder-note'
+    menu.appendChild(label(note, 'modelNote'))
+    placeMenu(menu, anchor)
+  }
+  if (api.models) api.models().then((x) => { models = x.models || []; model = x.model || null; effort = x.effort || null; renderModel() }).catch(() => {})
+  if (api.onModels) api.onModels((list) => { models = list || []; renderModel() })
 
   function chapterHasMessages() {
     return all('[data-part="log"] .entry.you').length > 0
@@ -337,7 +516,7 @@
   }
 
   document.addEventListener('mousedown', (e) => {
-    if (document.querySelector('.folder-menu') && !e.target.closest('.folder-menu, .folder-btn')) closeFolderMenu()
+    if (document.querySelector('.folder-menu') && !e.target.closest('.folder-menu, .folder-btn, .model-btn, .mode-btn')) closeFolderMenu()
   }, true)
 
   // ------------------------------------------------------------------ comandi con /
@@ -558,6 +737,8 @@
     renderModes()
     renderFolder()
     renderAttachments()
+    renderTodos()
+    renderModel()
     renderChapterHead()
     paint()
     scrollDown()
@@ -1014,6 +1195,7 @@
     reply = null
     hook('ask', q)
     if (q.kind === 'plan') return askPlan(q)
+    if (q.kind === 'question') return askQuestions(q)
     const { id, title, description, detail, change, canAlways } = q
     const card = add('ask', '<div class="ask-title"></div><div class="ask-desc"></div><div class="ask-detail"></div><div class="ask-buttons"></div>')
     card.querySelector('.ask-title').textContent = title
@@ -1062,6 +1244,92 @@
       })
       buttons.appendChild(b)
     }
+    asks.set(id, card)
+    scrollDown()
+  }
+
+  // Le domande di Claude con le opzioni (AskUserQuestion), come nell'app desktop: per ogni domanda l'etichetta, il
+  // testo, le opzioni da cliccare (una, o più se è a scelta multipla) e una risposta libera. Con una sola domanda a
+  // scelta singola basta un clic; altrimenti "Rispondi" quando tutte hanno una risposta. Le risposte tornano a Claude
+  // come { domanda: risposta } (le scelte multiple separate da virgole)
+  function askQuestions({ id, questions }) {
+    const card = add('ask question', '')
+    const state = questions.map(() => ({ picked: new Set(), other: '' }))
+    const quick = questions.length === 1 && !questions[0].multiSelect
+    const answers = () => {
+      const out = {}
+      questions.forEach((q, k) => {
+        const parts = q.options.filter((o) => state[k].picked.has(o.label)).map((o) => o.label)
+        if (state[k].other.trim()) parts.push(state[k].other.trim())
+        if (parts.length) out[q.question] = parts.join(', ')
+      })
+      return out
+    }
+    const finish = (allow) => {
+      if (!asks.has(id)) return
+      const a = allow ? answers() : null
+      api.answer(id, allow, false, a)
+      for (const el of card.querySelectorAll('button, input')) el.disabled = true
+      closeAsk(buttons, allow ? 'qAnswered' : 'qSkipped')
+      asks.delete(id)
+    }
+    questions.forEach((q, k) => {
+      const box = document.createElement('div')
+      box.className = 'q'
+      box.innerHTML = '<div class="q-head"><span class="q-tag"></span><span class="q-text"></span></div><div class="q-options"></div><div class="q-preview" hidden></div>'
+      box.querySelector('.q-tag').textContent = q.header
+      if (!q.header) box.querySelector('.q-tag').remove()
+      box.querySelector('.q-text').textContent = q.question
+      const opts = box.querySelector('.q-options')
+      const preview = box.querySelector('.q-preview')
+      const refresh = () => {
+        for (const b of opts.querySelectorAll('.q-opt')) b.classList.toggle('picked', state[k].picked.has(b.dataset.label))
+        const shown = q.options.find((o) => o.preview && state[k].picked.has(o.label))
+        preview.hidden = !shown
+        if (shown) preview.textContent = shown.preview
+        submit.disabled = !questions.every((qq, j) => state[j].picked.size || state[j].other.trim())
+      }
+      for (const o of q.options) {
+        const b = document.createElement('button')
+        b.className = `q-opt${q.multiSelect ? ' multi' : ''}`
+        b.dataset.label = o.label
+        b.innerHTML = '<span class="q-mark"></span><span class="q-body"><span class="q-label"></span><span class="q-desc"></span></span>'
+        b.querySelector('.q-label').textContent = o.label
+        b.querySelector('.q-desc').textContent = o.description
+        b.addEventListener('click', () => {
+          if (q.multiSelect) { if (state[k].picked.has(o.label)) state[k].picked.delete(o.label); else state[k].picked.add(o.label) }
+          else { state[k].picked = new Set([o.label]); state[k].other = ''; other.value = '' }
+          refresh()
+          if (quick) finish(true)
+        })
+        opts.appendChild(b)
+      }
+      const other = document.createElement('input')
+      other.className = 'q-other'
+      other.placeholder = t('qOther')
+      other.addEventListener('input', () => {
+        state[k].other = other.value
+        if (!q.multiSelect && other.value.trim()) state[k].picked.clear()
+        refresh()
+      })
+      other.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !submit.disabled) { e.preventDefault(); finish(true) } })
+      opts.appendChild(other)
+      box.refresh = refresh
+      card.appendChild(box)
+    })
+    const buttons = document.createElement('div')
+    buttons.className = 'ask-buttons'
+    const submit = document.createElement('button')
+    submit.className = 'btn small'
+    label(submit, 'qSubmit')
+    submit.disabled = true
+    submit.addEventListener('click', () => finish(true))
+    const skip = document.createElement('button')
+    skip.className = 'btn small deny'
+    label(skip, 'qSkip')
+    skip.addEventListener('click', () => finish(false))
+    buttons.append(submit, skip)
+    card.appendChild(buttons)
     asks.set(id, card)
     scrollDown()
   }
@@ -1364,6 +1632,14 @@
       // Una risposta di Claude con il testo dato, come se arrivasse adesso
       risposta: (text) => { fire('onDelta', String(text), 0); fire('onDone', { durationMs: 1000 }, 10) },
       piano: () => fire('onAsk', { id: Date.now(), kind: 'plan', plan: '## Fiumi sulla mappa\n\n1. Aggiungere `DrawRivers()` in **MapView.cpp**, prima delle strade\n2. Leggere i fiumi dal file della mappa in `MapLoader`\n3. Un interruttore `m_showRivers` nel menu Vista\n\nNessun file cambia finché non approvi.' }, 0),
+      domande: () => fire('onAsk', { id: Date.now(), kind: 'question', questions: [
+        { question: 'Dove disegno i fiumi rispetto alle strade?', header: 'Ordine', multiSelect: false, options: [{ label: 'Sotto le strade', description: 'Le strade passano sopra i fiumi, come ponti' }, { label: 'Sopra le strade', description: 'I fiumi coprono le strade dove si incrociano' }] },
+        { question: 'Quali elementi aggiungo anche?', header: 'Extra', multiSelect: true, options: [{ label: 'Guadi', description: 'Dove un sentiero attraversa un fiume' }, { label: 'Ponti', description: 'Sulle strade principali' }, { label: 'Laghi', description: 'Alle sorgenti' }] },
+      ] }, 0),
+      attivita: () => {
+        const list = [{ id: '1', content: 'Leggere MapView.cpp', activeForm: 'Legge MapView.cpp', status: 'completed' }, { id: '2', content: 'Aggiungere DrawRivers()', activeForm: 'Aggiunge DrawRivers()', status: 'in_progress' }, { id: '3', content: 'Compilare e provare la mappa', activeForm: 'Compila e prova la mappa', status: 'pending' }]
+        fire('onTodos', list, 0)
+      },
       permesso: () => fire('onAsk', { id: Date.now(), title: 'Claude vuole modificare un file', description: '', detail: 'src/MapView.cpp', canAlways: true }, 0),
     }
     const day = 86400000
@@ -1403,6 +1679,14 @@
       pathForFile: (f) => `C:/Workspace/${f.name}`,
       chooseFiles: async () => ['C:/Workspace/MapEditor/docs/specifiche.pdf', 'C:/Workspace/MapEditor/src/MapView.cpp'],
       readImage: async () => null,
+      models: async () => ({ models: [
+        { value: 'default', name: 'Predefinito', description: 'Il modello consigliato', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+        { value: 'opus', name: 'Opus', description: 'Il più capace, per il lavoro complesso', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+        { value: 'sonnet', name: 'Sonnet', description: 'Veloce e capace, per l\'uso di tutti i giorni', efforts: ['low', 'medium', 'high'] },
+        { value: 'haiku', name: 'Haiku', description: 'Il più rapido, per le risposte brevi', efforts: [] },
+      ], model: null, effort: null }),
+      setModel() {},
+      onModels: on('onModels'), onTodos: on('onTodos'),
       send(msg) {
         const text = typeof msg === 'string' ? msg : msg.text || '(allegati)'
         if (text.startsWith('/')) {

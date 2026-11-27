@@ -78,11 +78,13 @@ c'è.
 | `data-part="log"` | Dove scorre la conversazione. Il motore vi aggiunge le voci (classe `item`); il resto del contenuto (per esempio il titolo del capitolo) resta |
 | `data-part="input"` | La `textarea` dove si scrive. Invio spedisce, Maiusc+Invio va a capo |
 | `data-part="input"` (menu) | Scrivendo `/` il motore apre il menu dei comandi (`.cmd-menu`, righe `.cmd`) sopra la penna, dentro il suo contenitore: il tema può ridisegnarlo nel suo CSS |
+| `data-part="todos"` | Il riquadro delle attività di Claude (`.todos`, testata `.todos-head`, righe `.todo.pending/.in_progress/.completed`). Se manca, il motore lo crea subito prima del contenitore della penna |
+| `data-part="model"` | Il pulsante del modello e del ragionamento (`.model-btn`), che apre il menu (`.folder-menu.model-menu`) |
 | `data-part="attachments"` | La striscia degli allegati (`.attachment.image`, `.attachment.file`, ognuno con `.attachment-remove`). Se manca, il motore la crea subito prima della `textarea`, nel suo contenitore |
 | `data-part="folder"` | La cartella della conversazione: il motore ci mette un pulsante (`.folder-btn`) che apre il menu delle cartelle (`.folder-menu`) |
 | `data-part="hint"` | Il suggerimento sotto la penna, che cambia mentre Claude lavora |
 | `data-part="chapter-title"`, `data-part="chapter-date"` | Il titolo del capitolo, o della cronaca aperta, e la sua data |
-| `data-part="modes"` | Il selettore del modo dei permessi: il motore ci mette l'etichetta e un pulsante `.mode` per modo (`data-perm-mode`), quello attivo con `.active`. Anche `body[data-perm-mode]` dice il modo, per il CSS del tema |
+| `data-part="modes"` | Il selettore del modo dei permessi. Con `data-style="menu"` è un solo pulsante (`.mode-btn`) che apre il menu dei modi, come nell'app desktop; senza, il motore ci mette l'etichetta e un pulsante `.mode` per modo (`data-perm-mode`), quello attivo con `.active`. Anche `body[data-perm-mode]` dice il modo, per il CSS del tema |
 | `data-part="sessions"` | Il pannello delle cronache. Con `hidden` è in sovrimpressione: lo apre `data-action="sessions"`. Con `data-mode="always"` è sempre visibile, come la barra laterale dell'app desktop, e si aggiorna da solo |
 | `data-part="sessions-list"` | Dentro il pannello: l'elenco delle cronache |
 

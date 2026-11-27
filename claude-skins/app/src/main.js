@@ -359,6 +359,7 @@ function registerIpc() {
   // Un capitolo per conversazione: il numero cresce, la sessione di Claude Code ricomincia
   ipcMain.handle('chapter:new', () => {
     bridge.cancel()
+    bridge.resetTodos()
     config.chapter += 1
     config.sessionId = null
     config.sessionCwd = null
@@ -383,7 +384,19 @@ function registerIpc() {
     } catch { return null }
   })
   ipcMain.on('chat:stop', () => bridge.cancel())
-  ipcMain.on('perm:answer', (_e, { id, allow, always }) => bridge.answer(id, !!allow, !!always))
+  ipcMain.on('perm:answer', (_e, { id, allow, always, answers }) => bridge.answer(id, !!allow, !!always, answers))
+  // Modello e ragionamento, ricordati per le prossime volte
+  ipcMain.on('model:set', (_e, { model, effort }) => {
+    config.model = model || null
+    config.effort = effort || null
+    bridge.setModel(config.model)
+    bridge.setEffort(config.effort)
+    saveConfig()
+  })
+  ipcMain.handle('models:get', () => {
+    const cached = (() => { try { return JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'models.json'), 'utf8')) } catch { return [] } })()
+    return { models: bridge.modelList || cached, model: config.model || null, effort: config.effort || null }
+  })
   ipcMain.handle('sessions:list', () => bridge.sessions())
   ipcMain.handle('commands:get', () => {
     if (bridge.commandList.length) return bridge.commandList
@@ -428,6 +441,12 @@ function registerIpc() {
     send('commands:list', list)
   })
   bridge.on('commandsError', () => send('commands:error'))
+  bridge.on('models', (list) => {
+    bridge.modelList = list
+    try { fs.writeFileSync(path.join(app.getPath('userData'), 'models.json'), JSON.stringify(list)) } catch {}
+    send('models:list', list)
+  })
+  bridge.on('todos', (list) => send('claude:todos', list))
   bridge.on('commandOutput', (text) => send('claude:commandOutput', text))
   bridge.on('toolSummary', (x) => send('claude:toolSummary', x))
   bridge.on('compacted', (c) => send('claude:compacted', c))
@@ -510,6 +529,8 @@ app.whenReady().then(() => {
   // Come si presentano le sessioni a Claude Code (cli: visibili nel /resume e nelle altre app). Si può cambiare in
   // config.json, ad esempio "claude-desktop"
   bridge.entrypoint = config.entrypoint || 'cli'
+  bridge.setModel(config.model || null)
+  bridge.setEffort(config.effort || null)
   bridge.sessionCwd = config.sessionCwd || null
   if (capture) bridge.send = () => {}
   registerIpc()

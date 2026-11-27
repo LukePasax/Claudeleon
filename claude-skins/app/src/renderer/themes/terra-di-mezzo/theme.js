@@ -200,14 +200,16 @@
       </header>
       <div class="log" data-part="log"></div>
       <div class="composer">
+        <div class="todos" data-part="todos" hidden></div>
         <div class="box-wrap">
         <div class="candle">${CANDLE}</div>
         <div class="box">
           <textarea data-part="input" data-s-placeholder="placeholder" spellcheck="false"></textarea>
           <div class="row">
             <button class="attach-btn" data-action="attach" data-s-title="attachTip">+</button>
-            <div class="modes" data-part="modes"></div>
+            <div class="modes" data-part="modes" data-style="menu"></div>
             <div class="folder" data-part="folder"></div>
+            <div class="model" data-part="model"></div>
             <span class="sp"></span>
             <button class="btn send" data-action="send" data-s="send"></button>
             <button class="btn deny stop" data-action="stop" data-s="stop" hidden></button>

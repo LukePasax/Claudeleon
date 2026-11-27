@@ -53,6 +53,27 @@
     folderFirst: 'In quale cartella lavoriamo? Scegline una e il messaggio parte.',
     folderNew: 'Una conversazione resta nella sua cartella: sceglierne un\'altra apre un capitolo nuovo.',
     folderOther: 'Scegli un\'altra cartella…',
+    // Le domande di Claude con le opzioni
+    qSubmit: 'Rispondi',
+    qSkip: 'Salta',
+    qOther: 'Altro: scrivi tu la risposta…',
+    qAnswered: 'Risposto.',
+    qSkipped: 'Domande saltate.',
+    // La lista delle attività
+    todosTitle: 'Attività · {done} di {total}',
+    // Modello e ragionamento
+    modelDefault: 'Modello predefinito',
+    modelDefaultDesc: 'Quello scelto nelle impostazioni di Claude Code',
+    modelTitle: 'Modello',
+    modelNote: 'Vale dal prossimo messaggio.',
+    modelNone: 'L\'elenco dei modelli arriva da Claude Code poco dopo l\'avvio.',
+    effortTitle: 'Ragionamento',
+    effortAuto: 'automatico',
+    effort_low: 'basso',
+    effort_medium: 'medio',
+    effort_high: 'alto',
+    effort_xhigh: 'molto alto',
+    effort_max: 'massimo',
     // Gli allegati
     attachTip: 'Allega file o immagini (anche incollando o trascinando)',
     attachRemove: 'Togli',
@@ -67,6 +88,7 @@
     cmdCompactedShort: 'Conversazione riassunta.',
     // Il modo dei permessi
     modesLabel: 'Permessi:',
+    modesTitle: 'Permessi',
     modeAuto: 'automatico',
     modeAutoTip: 'Un classificatore approva le azioni chiare e chiede solo quando non sa',
     modeDefault: 'chiedi sempre',

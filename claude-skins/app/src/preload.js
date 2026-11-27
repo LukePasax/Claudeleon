@@ -27,7 +27,12 @@ contextBridge.exposeInMainWorld('skins', {
   readImage: (p) => ipcRenderer.invoke('file:image', p),
   stop: () => ipcRenderer.send('chat:stop'),
   setTrayIcon: (dataUrl) => ipcRenderer.send('tray:icon', dataUrl),
-  answer: (id, allow, always) => ipcRenderer.send('perm:answer', { id, allow, always }),
+  answer: (id, allow, always, answers) => ipcRenderer.send('perm:answer', { id, allow, always, answers }),
+  // Modello e ragionamento
+  models: () => ipcRenderer.invoke('models:get'),
+  setModel: (model, effort) => ipcRenderer.send('model:set', { model, effort }),
+  onModels: listen('models:list'),
+  onTodos: listen('claude:todos'),
   sessions: () => ipcRenderer.invoke('sessions:list'),
   commands: () => ipcRenderer.invoke('commands:get'),
   openSession: (id, cwd) => ipcRenderer.invoke('session:open', id, cwd),
