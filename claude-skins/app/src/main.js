@@ -593,6 +593,9 @@ function registerIpc() {
   })
   // Un messaggio già mandato, modificato: la conversazione riparte da lì (e i file, se chiesto)
   ipcMain.on('chat:edit', (_e, { uuid, msg, restoreFiles }, conv) => { const c = convOf(conv); if (c) c.bridge.edit(String(uuid || ''), msg, !!restoreFiles) })
+  // Le attività in background: fermarne una, mandare in background quello che Claude sta facendo
+  ipcMain.handle('task:stop', async (_e, id, conv) => { const c = convOf(conv); try { return c ? await c.bridge.stopTask(String(id)) : false } catch { return false } })
+  ipcMain.handle('task:background', async (_e, conv) => { const c = convOf(conv); try { return c ? await c.bridge.backgroundNow() : false } catch { return false } })
   ipcMain.on('chat:stop', (_e, conv) => { const c = convOf(conv); if (c) { c.replyText = ''; c.bridge.stop() } })
   ipcMain.on('perm:answer', (_e, { id, allow, always, answers, conv }) => { const c = convOf(conv); if (c) c.bridge.answer(id, !!allow, !!always, answers) })
   // Modello e ragionamento, ricordati per le prossime volte
@@ -710,6 +713,7 @@ function wireConv(c) {
   fwd('todos', 'claude:todos')
   fwd('suggestion', 'claude:suggestion')
   fwd('rewound', 'claude:rewound')
+  fwd('tasks', 'claude:tasks')
   b.on('usage', (u) => { lastUsage = u; send('claude:usage', u) })
   b.on('context', (x) => {
     send('claude:context', x, c.id)

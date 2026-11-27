@@ -223,6 +223,7 @@
             <div class="folder" data-part="folder"></div>
             <div class="model" data-part="model"></div>
             <span class="sp"></span>
+            <div class="tasks" data-part="tasks"></div>
             <div class="files" data-part="files"></div>
             <div class="context" data-part="context"></div>
             <button class="btn send" data-action="send" data-s="send"></button>

@@ -8,7 +8,7 @@
   // giusta anche se non è quella in vista (vedi "conversazioni")
   const base = window.skins || fakeApi()
   const api = Object.assign({}, base)
-  const CONV_EVENTS = ['onDelta', 'onTool', 'onToolDone', 'onDone', 'onError', 'onAsk', 'onAskClosed', 'onCommandOutput', 'onToolSummary', 'onCompacted', 'onStatus', 'onTodos', 'onBusy', 'onContext', 'onThinkingStart', 'onThinking', 'onThinkingEnd', 'onSuggestion', 'onRewound']
+  const CONV_EVENTS = ['onDelta', 'onTool', 'onToolDone', 'onDone', 'onError', 'onAsk', 'onAskClosed', 'onCommandOutput', 'onToolSummary', 'onCompacted', 'onStatus', 'onTodos', 'onBusy', 'onContext', 'onThinkingStart', 'onThinking', 'onThinkingEnd', 'onSuggestion', 'onRewound', 'onTasks']
   for (const n of CONV_EVENTS) if (base[n]) api[n] = (fn) => base[n]((payload, id) => dispatch(id, n, () => fn(payload)))
   const app = document.getElementById('app')
   const t = Theming.t
@@ -32,6 +32,8 @@
   let tools = new Map()
   // I file toccati da Claude nella conversazione: percorso → modifiche (id dell'azione → { change, added, removed })
   let changed = new Map()
+  // Le attività in background della conversazione (comandi, sotto-agenti), dal ponte
+  let bgTasks = []
 
   // ------------------------------------------------------------------ conversazioni
 
@@ -55,17 +57,17 @@
     if (part('log')) part('log').appendChild(el)
     const c = {
       id, el, reply: null, pending: false, tools: new Map(), busy: false, thinking: null, todos: [], todosOpen: true,
-      context: null, currentSession: null, convoDir: workdir, chapter, asks: new Map(), stick: true, suggestion: '', changed: new Map(),
+      context: null, currentSession: null, convoDir: workdir, chapter, asks: new Map(), stick: true, suggestion: '', changed: new Map(), bgTasks: [],
       sessionId: null, unread: false, attention: false,
     }
     convs.set(id, c)
     return c
   }
   function save(c) {
-    if (c) Object.assign(c, { reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick, suggestion, changed })
+    if (c) Object.assign(c, { reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick, suggestion, changed, bgTasks })
   }
   function load(c) {
-    ;({ reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick, suggestion, changed } = c)
+    ;({ reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick, suggestion, changed, bgTasks } = c)
   }
   function run(c, fn) {
     if (!c || c === cur) return fn()
@@ -117,6 +119,7 @@
     renderTodos()
     renderContext()
     renderChanged()
+    renderTasks()
     renderFolder()
     renderChapterHead()
     renderGhost()
@@ -1202,6 +1205,97 @@
     host.appendChild(panel)
   }
 
+  // ------------------------------------------------------------------ attività in background
+
+  // I comandi lanciati in background, i sotto-agenti e i monitor di Claude: un pulsante "N in background" (in
+  // data-part="tasks", con una rotella finché ce n'è uno in corso) apre il pannello con stato, durata, ultimo
+  // strumento, il riassunto e i pulsanti per fermarle o aprirne l'uscita. "Manda in background" (anche Ctrl+B) sposta
+  // in background quello che Claude sta facendo adesso, come nel terminale
+  const elapsed = (t) => { const s = Math.max(0, Math.round(((t.ended || Date.now()) - t.started) / 1000)); return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s` }
+  function renderTasks() {
+    if (quiet) return
+    const running = bgTasks.filter((t) => t.status === 'running').length
+    for (const box of all('[data-part="tasks"]')) {
+      let b = box.querySelector('.tasks-btn')
+      if (!b) {
+        b = document.createElement('button')
+        b.className = 'tasks-btn'
+        b.addEventListener('click', openTasks)
+        box.appendChild(b)
+      }
+      b.hidden = !bgTasks.length
+      b.classList.toggle('running', running > 0)
+      b.innerHTML = '<span class="tb-spin"></span><span class="tb-text"></span>'
+      b.querySelector('.tb-text').textContent = running ? t('tasksRunning', { n: running }) : t('tasksDone', { n: bgTasks.length })
+      b.title = t('tasksTip')
+    }
+    const panel = document.querySelector('.tasks-panel')
+    if (panel && panel.fill) panel.fill()
+  }
+  if (api.onTasks) api.onTasks((list) => { bgTasks = Array.isArray(list) ? list : []; renderTasks() })
+  function openTasks() {
+    closeThemes()
+    closeFolderMenu()
+    const host = app.querySelector('[data-solid]') || app
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+    const panel = document.createElement('div')
+    panel.className = 'theme-picker tasks-panel'
+    panel.innerHTML = '<div class="theme-picker-box settings-box"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="settings-body"></div></div>'
+    label(panel.querySelector('.theme-picker-head span'), 'tasksTitle')
+    const close = panel.querySelector('.theme-picker-head button')
+    label(close, 'themesClose')
+    close.addEventListener('click', closeThemes)
+    panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    const body = panel.querySelector('.settings-body')
+    const conv = active && active.id
+    panel.fill = () => {
+      body.innerHTML = ''
+      if (busy) {
+        const r = document.createElement('div')
+        r.className = 'set-row'
+        r.innerHTML = '<div class="set-text"><div class="set-label"></div><div class="set-note"></div></div><div class="set-control"><button class="btn small deny"></button></div>'
+        label(r.querySelector('.set-label'), 'tasksBackgroundNow')
+        label(r.querySelector('.set-note'), 'tasksBackgroundNote')
+        const b = r.querySelector('button')
+        label(b, 'tasksBackgroundBtn')
+        b.addEventListener('click', async () => { b.disabled = true; await api.backgroundNow(conv).catch(() => {}) })
+        body.appendChild(r)
+      }
+      const list = [...bgTasks].sort((a, b) => (a.status === 'running' ? 0 : 1) - (b.status === 'running' ? 0 : 1) || b.started - a.started)
+      if (!list.length) { const n = document.createElement('div'); n.className = 'folder-note'; body.appendChild(label(n, 'tasksNone')) }
+      for (const tk of list) {
+        const r = document.createElement('div')
+        r.className = `set-row task-row ${tk.status}`
+        r.innerHTML = '<span class="ext-dot"></span><div class="set-text"><div class="set-label"></div><div class="set-note"></div></div><div class="set-control"></div>'
+        r.querySelector('.ext-dot').classList.add(tk.status === 'running' ? 'pending' : tk.status === 'completed' ? 'connected' : tk.status === 'failed' ? 'failed' : 'disabled')
+        r.querySelector('.set-label').textContent = tk.description || tk.id
+        const kind = tk.type === 'local_agent' ? t('tasksAgent', { x: tk.agent || 'agente' }) : tk.type === 'monitor' ? t('tasksMonitor') : t('tasksShell')
+        const bits = [kind, t(`taskStatus_${tk.status}`) || tk.status, elapsed(tk), tk.tools ? t('tasksTools', { n: tk.tools }) : '', tk.lastTool && tk.status === 'running' ? t('tasksLast', { x: tk.lastTool }) : '']
+        r.querySelector('.set-note').textContent = bits.filter(Boolean).join(' · ') + (tk.summary ? `\n${tk.summary}` : '')
+        const ctl = r.querySelector('.set-control')
+        if (tk.status === 'running') {
+          const b = document.createElement('button')
+          b.className = 'btn small deny'
+          label(b, 'tasksStop')
+          b.addEventListener('click', async () => { b.disabled = true; await api.stopTask(tk.id, conv).catch(() => {}) })
+          ctl.appendChild(b)
+        }
+        if (tk.output && api.openFile) {
+          const b = document.createElement('button')
+          b.className = 'btn small deny'
+          label(b, 'tasksOutput')
+          b.addEventListener('click', () => api.openFile(tk.output, conv))
+          ctl.appendChild(b)
+        }
+        body.appendChild(r)
+      }
+    }
+    panel.fill()
+    host.appendChild(panel)
+    // La durata delle attività in corso si aggiorna da sola
+    const tick = setInterval(() => { if (!panel.isConnected) clearInterval(tick); else if (bgTasks.some((x) => x.status === 'running')) panel.fill() }, 1000)
+  }
+
   // ------------------------------------------------------------------ impostazioni
 
   // Il pannello delle impostazioni, sopra il layout come il selettore dei temi: aspetto, finestra, notifiche,
@@ -1521,6 +1615,7 @@
     renderModel()
     renderContext()
     renderChanged()
+    renderTasks()
     renderGhost()
     renderUpdateBanner()
     renderChapterHead()
@@ -2921,6 +3016,7 @@
     if (mod && !e.shiftKey && k === 'k') { e.preventDefault(); focusSessionsSearch(); return }
     if (mod && !e.shiftKey && k === 'f') { e.preventDefault(); openFind(); return }
     if (mod && e.shiftKey && k === 'c') { e.preventDefault(); copyLastReply(); return }
+    if (mod && !e.shiftKey && k === 'b' && busy && !e.target.matches('[data-part="input"]')) { e.preventDefault(); api.backgroundNow(active && active.id); return }
     if (e.key === 'Escape' && find.bar) { closeFind(); return }
     if (e.key === 'Escape' && document.querySelector('.folder-menu')) { closeFolderMenu(); return }
     // F11: schermo intero, e di nuovo per tornare
@@ -3112,6 +3208,11 @@
         { id: 'memory_files', name: 'Memory files', tokens: 2400, kind: 'used' }, { id: 'messages', name: 'Messages', tokens: Math.max(0, Math.round(200000 * p / 100) - 19700), kind: 'used' },
         { id: 'autocompact_buffer', name: 'Autocompact buffer', tokens: 33000, kind: 'buffer' }, { id: 'free_space', name: 'Free space', tokens: Math.max(0, 200000 - Math.round(200000 * p / 100) - 33000), kind: 'free' },
       ] }, 0),
+      // Due attività in background: un comando in corso e un sotto-agente finito
+      background: () => fire('onTasks', [
+        { id: 'b1', type: 'local_bash', agent: '', description: 'npm run build -- --watch', status: 'running', background: true, started: Date.now() - 42000, ended: null, tokens: 0, tools: 0, lastTool: '', summary: '', output: 'C:/Temp/b1.txt' },
+        { id: 'a1', type: 'local_agent', agent: 'Explore', description: 'Cerca dove si disegnano le strade', status: 'completed', background: true, started: Date.now() - 120000, ended: Date.now() - 60000, tokens: 18200, tools: 14, lastTool: 'Grep', summary: 'Le strade si disegnano in MapView::DrawRoads.', output: '' },
+      ], 0),
       attivita: () => {
         const list = [{ id: '1', content: 'Leggere MapView.cpp', activeForm: 'Legge MapView.cpp', status: 'completed' }, { id: '2', content: 'Aggiungere DrawRivers()', activeForm: 'Aggiunge DrawRivers()', status: 'in_progress' }, { id: '3', content: 'Compilare e provare la mappa', activeForm: 'Compila e prova la mappa', status: 'pending' }]
         fire('onTodos', list, 0)
@@ -3192,6 +3293,9 @@
       checkUpdate: async () => fakeUpdate,
       applyUpdate: () => { const steps = ['pull', 'deps', 'build', 'install']; steps.forEach((st, i) => fireAll('onUpdate', Object.assign({}, fakeUpdate, { state: 'updating', step: st }), 600 * (i + 1))) },
       onUpdate: on('onUpdate'),
+      stopTask: async () => true,
+      backgroundNow: async () => true,
+      onTasks: on('onTasks'),
       settings: async () => fakeSettings,
       setSetting: async (k, v) => { if (k in fakeSettings) fakeSettings[k] = v; return fakeSettings },
       suggestFiles: async (q) => ['src/', 'src/MapView.cpp', 'src/MapView.h', 'src/MapLoader.cpp', 'src/RouteFinder.h', 'docs/', 'docs/specifiche.pdf', 'README.md', 'CMakeLists.txt'].filter((f) => f.toLowerCase().includes(q.toLowerCase())).slice(0, 15),

@@ -133,6 +133,18 @@ for (const tema of TEMI) {
     assert.equal(await page.$('.find-bar'), null)
   })
 
+  test(`${tema}: attività in background`, async () => {
+    await open(tema)
+    await page.evaluate(() => anteprima.background())
+    await page.waitForSelector('.tasks-btn.running')
+    assert.match(await page.textContent('.tasks-btn'), /1 in background/)
+    await page.click('.tasks-btn')
+    await page.waitForSelector('.tasks-panel .task-row')
+    assert.equal(await page.$$eval('.tasks-panel .task-row', (r) => r.length), 2)
+    assert.ok(await page.$('.tasks-panel .task-row.running .btn'))
+    assert.deepEqual(errors, [])
+  })
+
   test(`${tema}: impostazioni, estensioni, contesto, cambio di tema che tiene la conversazione`, async () => {
     await open(tema)
     await send('Ciao')

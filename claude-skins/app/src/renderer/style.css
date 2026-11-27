@@ -589,3 +589,11 @@ body.busy .entry .edit-btn { display: none; }
 .find-bar button:hover { background: var(--ctl-hover); color: var(--ink); }
 ::highlight(find) { background-color: rgba(255, 200, 60, 0.38); color: inherit; }
 ::highlight(find-current) { background-color: rgba(255, 150, 30, 0.85); color: #000; }
+
+/* Le attività in background: il pulsante con la rotella finché ce n'è una in corso, e le righe del pannello */
+.tasks-btn { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font: inherit; font-size: var(--small-size); color: var(--ink-soft); background: none; border: var(--line) solid var(--edge-light); border-radius: 20px; padding: 2px 9px; white-space: nowrap; }
+.tasks-btn:hover { color: var(--ink); border-color: var(--ink-soft); }
+.tasks-btn.running { color: var(--ink); }
+.tb-spin { display: none; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid currentColor; border-right-color: transparent; animation: w-spin 0.9s linear infinite; }
+.tasks-btn.running .tb-spin { display: inline-block; }
+.task-row .set-note { white-space: pre-line; }

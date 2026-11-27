@@ -589,6 +589,7 @@ class ClaudeBridge extends EventEmitter {
         this.refreshContext(live)
       }
       else if (msg.subtype === 'status') this.emit('status', msg.status || null)
+      else if (/^task_(started|progress|updated|notification)$/.test(msg.subtype) || msg.subtype === 'background_tasks_changed') this.taskEvent(live, msg)
     }
     // La frase che riassume le azioni appena fatte
     if (msg.type === 'tool_use_summary' && msg.summary) this.emit('toolSummary', { summary: String(msg.summary), ids: msg.preceding_tool_use_ids || [] })
@@ -654,7 +655,8 @@ class ClaudeBridge extends EventEmitter {
       // Una conversazione ferma da molto si spegne (gli hook di fine sessione partono allora); il prossimo messaggio la
       // riaccende riprendendo la sessione
       clearTimeout(live.idle)
-      live.idle = setTimeout(() => { if (this.live === live && !live.turn.open) this.closeLive() }, IDLE_CLOSE_MS)
+      // (non con attività in background ancora in corso: si spegnerebbero con lui)
+      live.idle = setTimeout(() => { if (this.live === live && !live.turn.open && !this.runningTasks()) this.closeLive() }, IDLE_CLOSE_MS)
     }
   }
 
@@ -688,6 +690,78 @@ class ClaudeBridge extends EventEmitter {
     }).catch(() => {})
   }
 
+  // ------------------------------------------------------------------ attività in background
+
+  // Le attività di Claude Code che girano accanto alla conversazione: comandi lanciati in background, sotto-agenti,
+  // monitor. Si seguono dagli eventi task_* (inizio, avanzamento, cambio di stato, fine) e da
+  // background_tasks_changed (l'insieme di quelle in background in questo momento). La finestra riceve l'elenco intero
+  // a ogni cambio: { id, type, agent, description, status, background, started, ended, tokens, tools, lastTool,
+  // summary, output }
+  taskEvent(live, msg) {
+    if (!this.tasks) this.tasks = new Map()
+    const get = (id) => {
+      if (!this.tasks.has(id)) this.tasks.set(id, { id, type: 'local_bash', agent: '', description: '', status: 'running', background: false, started: Date.now(), ended: null, tokens: 0, tools: 0, lastTool: '', summary: '', output: '' })
+      return this.tasks.get(id)
+    }
+    const st = msg.subtype
+    if (st === 'background_tasks_changed') {
+      const alive = new Set((msg.tasks || []).map((x) => x.task_id))
+      for (const x of msg.tasks || []) {
+        const t = get(x.task_id)
+        t.background = true
+        if (x.task_type) t.type = x.task_type
+        if (x.subagent_type) t.agent = x.subagent_type
+        if (x.description) t.description = x.description
+        if (t.status !== 'running' && !t.ended) t.status = 'running'
+      }
+      for (const t of this.tasks.values()) if (t.background && !alive.has(t.id) && t.status === 'running') { t.status = 'completed'; t.ended = Date.now() }
+    } else {
+      const t = get(msg.task_id)
+      if (st === 'task_started') {
+        Object.assign(t, { description: msg.description || t.description, agent: msg.subagent_type || t.agent, type: msg.task_type || (msg.subagent_type ? 'local_agent' : t.type), background: !!msg.is_backgrounded || t.background, status: 'running', started: Date.now(), ended: null })
+      } else if (st === 'task_progress') {
+        if (msg.description) t.description = msg.description
+        if (msg.usage) { t.tokens = msg.usage.total_tokens || t.tokens; t.tools = msg.usage.tool_uses || t.tools }
+        if (msg.last_tool_name) t.lastTool = msg.last_tool_name
+        if (msg.summary) t.summary = msg.summary
+      } else if (st === 'task_updated') {
+        const p = msg.patch || {}
+        if (p.description) t.description = p.description
+        if (p.is_backgrounded != null) t.background = !!p.is_backgrounded
+        if (p.status) {
+          t.status = p.status === 'killed' ? 'stopped' : p.status === 'pending' || p.status === 'paused' ? 'running' : p.status
+          if (/completed|failed|stopped/.test(t.status)) t.ended = p.end_time || Date.now()
+        }
+      } else if (st === 'task_notification') {
+        t.status = msg.status || 'completed'
+        t.ended = Date.now()
+        if (msg.summary) t.summary = msg.summary
+        if (msg.output_file) t.output = msg.output_file
+        if (msg.usage) { t.tokens = msg.usage.total_tokens || t.tokens; t.tools = msg.usage.tool_uses || t.tools }
+      }
+    }
+    // Le finite restano visibili, ma solo le ultime 12
+    const ended = [...this.tasks.values()].filter((x) => x.status !== 'running').sort((a, b) => (b.ended || 0) - (a.ended || 0))
+    for (const x of ended.slice(12)) this.tasks.delete(x.id)
+    this.emitTasks()
+  }
+  emitTasks() {
+    this.emit('tasks', [...(this.tasks || new Map()).values()].map((t) => Object.assign({}, t)))
+  }
+  runningTasks() {
+    return [...(this.tasks || new Map()).values()].filter((t) => t.status === 'running').length
+  }
+  // Ferma un'attività; manda in background quello che Claude sta facendo ora (come Ctrl+B nel terminale)
+  async stopTask(id) {
+    if (!this.live || this.live.ended || !this.live.query.stopTask) return false
+    await this.live.query.stopTask(id)
+    return true
+  }
+  async backgroundNow() {
+    if (!this.live || this.live.ended || !this.live.query.backgroundTasks) return false
+    return this.live.query.backgroundTasks()
+  }
+
   // Ferma la risposta in corso: le domande aperte si chiudono e Claude Code interrompe il turno, ma resta acceso
   stop() {
     for (const resolve of this.pending.values()) resolve({ behavior: 'deny', message: 'La persona ha fermato il messaggero.', interrupt: true })
@@ -710,6 +784,7 @@ class ClaudeBridge extends EventEmitter {
     live.ended = true
     clearTimeout(live.idle)
     live.inbox.close()
+    if (this.tasks && this.tasks.size) { this.tasks.clear(); this.emitTasks() }
     try { live.query.close() } catch {}
   }
 

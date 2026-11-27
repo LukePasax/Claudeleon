@@ -59,7 +59,7 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   piano" dal vassoio. Una domanda di permesso fa lampeggiare l'icona nella barra se la finestra è ridotta o dietro.
 - **Scorciatoie:** Ctrl+N nuova conversazione, Ctrl+K cerca negli annali, Ctrl+F cerca nella conversazione (una barra
   in alto: le corrispondenze si evidenziano, Invio e Maiusc+Invio avanti e indietro, Esc chiude), Ctrl+Maiusc+C
-  copia l'ultima risposta, Ctrl+, impostazioni, Esc ferma Claude, F11 schermo intero. L'elenco è anche nelle
+  copia l'ultima risposta, Ctrl+B manda in background quello che Claude sta facendo, Ctrl+, impostazioni, Esc ferma Claude, F11 schermo intero. L'elenco è anche nelle
   impostazioni.
 - **Impostazioni:** l'ingranaggio in fondo alla barra laterale (Terra di Mezzo) o "Impostazioni" in fondo alla barra (Metrios e
   Dream), Ctrl+, o il vassoio. Tutto vale subito: tema e scena; sempre in primo piano, avvio con Windows, riporta al
@@ -125,6 +125,11 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   scorre sotto; finito, diventa "Ha ragionato per N s" e si riapre con un clic. Anche nelle cronache riaperte. Il
   testo è il riassunto che Claude Code chiede all'API (`showThinkingSummaries`): con un modello che non lo manda
   resta solo la riga.
+- **Attività in background:** i comandi che Claude lascia girare, i sotto-agenti e i monitor. Accanto ai file
+  modificati compare "N in background" (con la rotella finché qualcosa è in corso); un clic apre l'elenco: cosa fa,
+  stato, da quanto, quanti strumenti ha usato, l'ultimo e il riassunto finale, con "Ferma" e "Uscita" (il file con
+  l'uscita). Mentre Claude lavora, "Manda in background" (o Ctrl+B) sposta in background il comando o il sotto-agente
+  in corso, come nel terminale, e Claude va avanti. Con attività in corso la conversazione non si spegne da sola.
 - **File modificati:** quando Claude modifica dei file, accanto al contesto compare "N file +a −r". Un clic apre
   l'elenco dei file della conversazione, con le righe aggiunte e tolte e un segno per quelli nuovi; un clic su un file
   mostra tutte le sue modifiche, e "Apri" e "Cartella" lo aprono col programma di sistema o in Esplora file. Vale per

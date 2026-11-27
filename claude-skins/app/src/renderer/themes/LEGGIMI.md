@@ -82,6 +82,7 @@ c'è.
 | `data-part="input"` | La `textarea` dove si scrive. Invio spedisce, Maiusc+Invio va a capo |
 | `data-part="input"` (menu) | Scrivendo `/` il motore apre il menu dei comandi (`.cmd-menu`, righe `.cmd`) sopra la penna, dentro il suo contenitore: il tema può ridisegnarlo nel suo CSS |
 | `data-part="todos"` | Il riquadro delle attività di Claude (`.todos`, testata `.todos-head`, righe `.todo.pending/.in_progress/.completed`). Se manca, il motore lo crea subito prima del contenitore della penna |
+| `data-part="tasks"` | Il pulsante delle attività in background (`.tasks-btn`, `.running` con la rotella), che apre il pannello (`.theme-picker.tasks-panel`, righe `.task-row`) |
 | `data-part="files"` | Il pulsante dei file modificati (`.files-btn`, nascosto finché non ce ne sono), che apre il pannello (`.theme-picker.files-panel`, righe `.file-row`) |
 | `data-part="context"` | L'anello del contesto (`.context-btn`, `.warn` oltre l'80%), che apre il dettaglio (`.folder-menu.context-menu`) |
 | `data-part="model"` | Il pulsante del modello e del ragionamento (`.model-btn`), che apre il menu (`.folder-menu.model-menu`) |
