@@ -50,6 +50,24 @@ laterale dell'app desktop), conversazione a destra.
 
 ## Com'è fatta
 
+**Verso la versione pubblica (novembre 2026).** L'utente vuole pubblicare il repo e fare le release su GitHub, per
+aggiornare più facilmente e passare l'app ai colleghi. Per questo i temi fatti finora (Terra di Mezzo / Casa Baggins,
+Metrios e Dream) non sono più nell'app né nel repo: sono diventati file `.skin` che l'utente importa sul suo PC (i
+commit vecchi li contengono ancora). Di serie resta **Essenziale** (`themes/essenziale`, kit moderno, chiaro/scuro
+come Windows con `kit.adaptive` e `followSystem`). Le scritte di partenza del motore (`STRINGS` in theming.js) sono
+neutre ("Scrivi a Claude…", "Conversazioni", "Invia"): quelle da scrittoio le aveva già il tema. Molti paragrafi
+qui sotto parlano ancora dei temi di allora: sono la storia di come si è arrivati qui.
+
+Temi `.skin` (themes.js): `bundleFor(id)` (del programma, importato con codice, o dell'editor), `checkBundle`
+(formato, id, file ammessi e senza `..`, 25 MB), `installBundle` (in `temi/<id>/` con `theme.json`; i temi di
+colori diventano temi dell'editor con id nuovo), `installedThemes`. main.js: protocollo privilegiato
+`skins-theme://<id>/…` (`protocol.handle`, solo dentro `temi/<id>`, con `Access-Control-Allow-Origin: *` perché i
+caratteri da una pagina file:// passano solo così), CSP della pagina con `skins-theme:`, IPC `theme:export`
+(dialogo di salvataggio) e `theme:import` (dialogo, conferma per il codice, "Sostituisci"). Il processo principale
+non fa mai `require` di un tema importato. Theming: `load(entries, fresh)` con `{ id, base }`, `baseOf(theme)` per
+`theme.css` e `asset()`, `installed(id)`. Provato nell'app vera importando i tre file e riesportandone uno.
+
+
 **Pergamena tolto (novembre 2026).** Il tema del rotolo generico era un residuo del Libro Rosso e tenerlo aggiornato
 costava: l'utente l'ha fatto togliere. Resta nella storia del repo (commit precedenti a quello che lo toglie); il kit
 pixel e `Pixel.lib` (carta, capo del rotolo, candela, rotolino del vassoio, sfere, rumore) restano, perché il Libro

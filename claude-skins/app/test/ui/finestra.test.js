@@ -5,7 +5,7 @@ const assert = require('node:assert/strict')
 const path = require('path')
 const { _electron } = require('playwright-core')
 
-const TEMI = ['terra-di-mezzo', 'metrios', 'dream']
+const TEMI = ['essenziale']
 const INDEX = path.join(__dirname, '..', '..', 'src', 'renderer', 'index.html')
 
 let app = null
@@ -336,7 +336,7 @@ for (const tema of TEMI) {
     assert.equal(await convo('.entry.you'), 1)
     // Fra i temi, coi suoi pulsanti; Annulla nell'editor torna a quello di prima
     await page.click('[data-action="themes"]')
-    await page.click('.theme-card.mine .btn:has-text("Modifica")')
+    await page.click('.theme-card.mine:has-text("Città di notte") .btn:has-text("Modifica")')
     await page.waitForSelector('.theme-editor')
     assert.equal(await page.inputValue('.te-name'), 'Città di notte')
     await page.click('.te-cancel')
@@ -348,12 +348,31 @@ for (const tema of TEMI) {
     await open(tema)
     await page.evaluate(() => anteprima.avvioSicuro())
     await page.waitForSelector('.safe-banner')
-    assert.match(await page.textContent('.safe-banner'), /Dream.*errore/)
+    assert.match(await page.textContent('.safe-banner'), /Notturno.*errore/)
     assert.equal(await page.$$eval('.update-banner', (b) => b.length), 1)
     await page.click('.safe-banner .btn:has-text("Riprova")')
-    await page.waitForFunction(() => Theming.current.id === 'dream' && !document.querySelector('.safe-banner'))
+    await page.waitForFunction(() => Theming.current.id === 'notturno' && !document.querySelector('.safe-banner'))
     // Chiuso l'avviso, torna quello degli aggiornamenti
     await page.waitForSelector('.update-banner:not(.safe-banner)')
+    assert.deepEqual(errors, [])
+  })
+
+  test(`${tema}: chiaro o scuro come il sistema; temi da esportare e importare`, async () => {
+    await open(tema)
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await page.waitForFunction(() => getComputedStyle(document.body).getPropertyValue('--bg').trim() === '#17191c')
+    await page.emulateMedia({ colorScheme: 'light' })
+    await page.waitForFunction(() => getComputedStyle(document.body).getPropertyValue('--bg').trim() === '#fafafa')
+    await page.click('[data-action="themes"]')
+    // Il tema di partenza si esporta ma non si elimina; quelli tuoi sì
+    assert.ok(await page.$('.theme-card.current .btn:has-text("Esporta")'))
+    assert.equal(await page.$('.theme-card.current .btn:has-text("Elimina")'), null)
+    assert.ok(await page.$('.theme-card.mine:has-text("Notturno") .btn:has-text("Elimina")'))
+    await page.click('.theme-card.current .btn:has-text("Esporta")')
+    await page.waitForSelector('.convo:not([hidden]) .item:has-text("Tema esportato")')
+    await page.click('[data-action="themes"]')
+    await page.click('.theme-import')
+    await page.waitForFunction(() => Theming.current.id === 'citta-di-sera')
     assert.deepEqual(errors, [])
   })
 
@@ -372,7 +391,8 @@ for (const tema of TEMI) {
     await page.click('.context-btn')
     await page.waitForSelector('.context-menu .usage-row')
     await page.keyboard.press('Escape')
-    const other = TEMI.find((x) => x !== tema)
+    // L'altro tema: quello dell'editor che la versione finta ha già salvato
+    const other = 'notturno'
     await page.evaluate((id) => anteprima.tema(id), other)
     await page.waitForFunction((id) => document.body.dataset.theme === id || !!document.querySelector('[data-part="log"] .convo .entry.you'), other)
     assert.equal(await convo('.entry.you'), 1)

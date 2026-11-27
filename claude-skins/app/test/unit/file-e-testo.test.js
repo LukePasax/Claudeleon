@@ -63,11 +63,51 @@ test('temi dell\'editor: colori di base, id dal nome, salvataggio ed eliminazion
   const a = t.saveUserTheme(d, { name: 'Città di notte' })
   assert.equal(a.id, 'citta-di-notte')
   assert.equal(t.saveUserTheme(d, { name: 'Città di notte' }).id, 'citta-di-notte-2')
-  assert.equal(t.saveUserTheme(d, { name: 'Dream' }).id, 'dream-2')
+  assert.equal(t.saveUserTheme(d, { name: 'Essenziale' }).id, 'essenziale-2')
   assert.equal(t.saveUserTheme(d, { id: 'citta-di-notte', name: 'Altro' }).id, 'citta-di-notte')
-  assert.deepEqual(t.userThemes(d).map((x) => x.id).sort(), ['citta-di-notte', 'citta-di-notte-2', 'dream-2'])
+  assert.deepEqual(t.userThemes(d).map((x) => x.id).sort(), ['citta-di-notte', 'citta-di-notte-2', 'essenziale-2'])
   assert.equal(t.userThemeInfo(a).custom, true)
-  assert.ok(t.deleteUserTheme(d, 'dream-2'))
+  assert.ok(t.deleteUserTheme(d, 'essenziale-2'))
   assert.ok(!t.deleteUserTheme(d, '../fuori'))
   assert.equal(t.userThemes(d).length, 2)
+})
+
+test('temi in file .skin: esporta, controlla, installa (con codice e di colori)', () => {
+  const t = require('../../src/themes')
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'skins-skin-'))
+  // Il tema del programma si esporta coi suoi file e il manifest
+  const b = t.bundleFor('essenziale', d)
+  assert.equal(b.format, 'claude-skins-theme')
+  assert.equal(b.kind, 'code')
+  assert.equal(b.manifest.name, 'Essenziale')
+  assert.deepEqual(Object.keys(b.files), ['theme.js'])
+  // ...e non si reinstalla al suo posto
+  assert.match(t.installBundle(d, b).error, /programma/)
+  // Un tema con codice importato: nella sua cartella, con theme.json; una seconda volta chiede di sostituire
+  const own = JSON.parse(JSON.stringify(b))
+  own.manifest.id = 'mio'
+  own.files['fonts/x.woff2'] = Buffer.from('font').toString('base64')
+  assert.deepEqual(t.installBundle(d, own), { ok: true, kind: 'code', id: 'mio', name: 'Essenziale' })
+  assert.ok(fs.existsSync(path.join(d, 'mio', 'fonts', 'x.woff2')))
+  assert.deepEqual(t.installedThemes(d).map((x) => [x.id, x.code]), [['mio', true]])
+  assert.equal(t.installBundle(d, own).exists, true)
+  assert.equal(t.installBundle(d, own, true).ok, true)
+  assert.deepEqual(Object.keys(t.bundleFor('mio', d).files).sort(), ['fonts/x.woff2', 'theme.js'])
+  // File non ammessi, id sbagliati, formati sconosciuti
+  for (const bad of [
+    Object.assign({}, own, { files: Object.assign({}, own.files, { '../fuori.js': 'AA==' }) }),
+    Object.assign({}, own, { files: Object.assign({}, own.files, { 'x.exe': 'AA==' }) }),
+    Object.assign({}, own, { files: { 'theme.css': 'AA==' } }),
+    Object.assign({}, own, { manifest: { id: 'Non Va' } }),
+    { format: 'altro' },
+  ]) assert.equal(t.checkBundle(bad).ok, false)
+  // Un tema di colori diventa un tema dell'editor, con un id nuovo dal nome
+  t.saveUserTheme(d, { name: 'Sera', colors: { bg: '#101010' } })
+  const c = t.bundleFor('sera', d)
+  assert.equal(c.kind, 'colors')
+  const r = t.installBundle(d, c)
+  assert.deepEqual([r.ok, r.kind, r.id], [true, 'colors', 'sera-2'])
+  // Eliminare un tema con codice toglie la cartella
+  assert.ok(t.deleteUserTheme(d, 'mio'))
+  assert.equal(fs.existsSync(path.join(d, 'mio')), false)
 })

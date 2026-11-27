@@ -7,8 +7,8 @@ poi sull'installer che crea (`claude-skins\app\dist\Claude Skins Setup <versione
 installare: doppio clic su `avvia.cmd`. Serve [Node.js](https://nodejs.org) LTS.
 
 - [`claude-skins/`](claude-skins/) — **Claude Skins**: un'app Electron a temi, grande come l'app desktop, che
-  comanda Claude Code con l'Agent SDK. È a temi, ognuno con la sua forma: Terra di Mezzo (lo scrittoio di Casa Baggins,
-  ad acquerello), Metrios e Dream (puliti, coi colori dei due software). Prima si chiamava Pergamena, come il suo primo aspetto, il rotolo.
+  comanda Claude Code con l'Agent SDK. Di serie ha un tema pulito, chiaro o scuro come Windows; altri temi si creano
+  con l'editor o si importano da un file `.skin`, anche con una forma tutta loro.
   - [`app/LEGGIMI.md`](claude-skins/app/LEGGIMI.md): installazione e uso.
   - [`app/src/renderer/themes/LEGGIMI.md`](claude-skins/app/src/renderer/themes/LEGGIMI.md): come si scrive un tema.
   - [`CONTESTO-PER-CLAUDE.md`](claude-skins/CONTESTO-PER-CLAUDE.md): storia, scelte, prossimi passi.

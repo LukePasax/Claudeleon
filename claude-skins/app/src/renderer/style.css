@@ -767,3 +767,5 @@ body.busy .entry .edit-btn { display: none; }
 .safe-banner { max-width: min(680px, calc(100% - 40px)); }
 .safe-banner .ub-text { white-space: normal; line-height: 1.35; }
 .safe-banner .ub-icon { background: var(--minus); }
+/* Il messaggio dell'elenco vuoto va a capo (non è il titolo di una conversazione) */
+.session-row.note, .session-row.note .when { white-space: normal; overflow: visible; }

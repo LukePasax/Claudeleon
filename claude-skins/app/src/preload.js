@@ -115,6 +115,8 @@ contextBridge.exposeInMainWorld('skins', {
   logError: (text) => ipcRenderer.send('log:error', text),
   openErrorLog: () => ipcRenderer.send('log:open'),
   saveTheme: (spec) => ipcRenderer.invoke('theme:save', spec),
+  exportTheme: (id) => ipcRenderer.invoke('theme:export', id),
+  importTheme: () => ipcRenderer.invoke('theme:import'),
   deleteTheme: (id) => ipcRenderer.invoke('theme:delete', id),
   onWindowState: listen('window:state'),
   onMode: listen('mode:changed'),

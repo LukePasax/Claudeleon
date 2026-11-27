@@ -1132,16 +1132,32 @@
       card.querySelector('.theme-name').textContent = th.name
       card.querySelector('.theme-desc').textContent = th.description
       if (th.id === Theming.current.id) card.appendChild(label(Object.assign(document.createElement('span'), { className: 'theme-current' }), 'themesCurrent'))
-      // I temi fatti con l'editor: si modificano e si eliminano (con una conferma sul posto)
+      // Ogni tema si esporta; i tuoi (dell'editor o importati) si eliminano, con una conferma sul posto; quelli
+      // dell'editor si modificano
       const full = Theming.get(th.id)
+      const mine = full && (full.custom || Theming.installed(th.id))
+      const acts = document.createElement('span')
+      acts.className = 'theme-actions'
       if (full && full.custom && api.saveTheme) {
-        card.classList.add('mine')
-        const acts = document.createElement('span')
-        acts.className = 'theme-actions'
         const edit = document.createElement('span')
         edit.className = 'btn small deny'
         label(edit, 'themesEdit')
         edit.addEventListener('click', (e) => { e.stopPropagation(); openThemeEditor(th.id) })
+        acts.appendChild(edit)
+      }
+      if (api.exportTheme) {
+        const exp = document.createElement('span')
+        exp.className = 'btn small deny'
+        label(exp, 'themesExport')
+        exp.addEventListener('click', async (e) => {
+          e.stopPropagation()
+          const r = await api.exportTheme(th.id).catch((err) => ({ ok: false, error: err.message }))
+          if (r && r.ok) { closeThemes(); labelled('footnote', 'themesExported', { x: r.file }) } else if (r && !r.canceled) { closeThemes(); labelled('error', 'themesFail', { x: r.error || '?' }) }
+        })
+        acts.appendChild(exp)
+      }
+      if (mine && api.deleteTheme) {
+        card.classList.add('mine')
         const del = document.createElement('span')
         del.className = 'btn small deny'
         label(del, 'themesDelete')
@@ -1150,9 +1166,9 @@
           if (!del.classList.contains('sure')) { del.classList.add('sure'); label(del, 'themesDeleteSure'); return }
           if (await api.deleteTheme(th.id)) { Theming.unregister(th.id); openThemes() }
         })
-        acts.append(edit, del)
-        card.appendChild(acts)
+        acts.appendChild(del)
       }
+      if (acts.children.length) card.appendChild(acts)
       card.addEventListener('click', () => {
         closeThemes()
         if (th.id !== Theming.current.id) api.setTheme(th.id)
@@ -1168,7 +1184,27 @@
       card.addEventListener('click', () => openThemeEditor(null))
       cards.appendChild(card)
     }
+    if (api.importTheme) {
+      const card = document.createElement('button')
+      card.className = 'theme-card theme-new theme-import'
+      card.innerHTML = '<span class="tn-plus">⇩</span><span class="theme-name"></span><span class="theme-desc"></span>'
+      label(card.querySelector('.theme-name'), 'themesImport')
+      label(card.querySelector('.theme-desc'), 'themesImportDesc')
+      card.addEventListener('click', importTheme)
+      cards.appendChild(card)
+    }
     host.appendChild(panel)
+  }
+  // Un tema da un file .skin: il processo principale lo controlla, chiede conferma e lo installa; qui si carica e si
+  // mette in uso
+  async function importTheme() {
+    const r = await api.importTheme().catch((err) => ({ ok: false, error: err.message }))
+    if (!r || !r.ok) { if (r && !r.canceled) { closeThemes(); labelled('error', 'themesFail', { x: r.error || '?' }) } return }
+    if (r.kind === 'code') await Theming.load([{ id: r.id, base: r.base }], true)
+    else Theming.register(window.SkinsKits.moderno.fromColors(r.spec))
+    closeThemes()
+    if (!Theming.get(r.id)) { labelled('error', 'themesFail', { x: `il file del tema non registra «${r.id}»` }); return }
+    api.setTheme(r.id)
   }
 
   // ------------------------------------------------------------------ editor dei temi
@@ -1185,8 +1221,9 @@
     const kit = window.SkinsKits.moderno
     if (themeEditor) themeEditor.el.remove()
     const prev = Theming.current.id === DRAFT ? (themeEditor && themeEditor.prev) : Theming.current.id
-    const from = editId ? Theming.get(editId) : ((Theming.current.kits || []).includes('moderno') ? Theming.current : Theming.get('metrios'))
-    const spec = kit.colorsOf(from)
+    const firstModern = Theming.list().map((x) => Theming.get(x.id)).find((x) => x && (x.kits || []).includes('moderno'))
+    const from = editId ? Theming.get(editId) : ((Theming.current.kits || []).includes('moderno') ? Theming.current : firstModern)
+    const spec = kit.colorsOf(from, scene)
     spec.id = editId || ''
     spec.name = editId ? from.name : t('teNameDefault')
     spec.description = editId ? (from.description || '') : ''
@@ -1231,7 +1268,7 @@
       }
       fromSel.addEventListener('change', () => {
         if (!fromSel.value) return
-        const c = kit.colorsOf(Theming.get(fromSel.value))
+        const c = kit.colorsOf(Theming.get(fromSel.value), scene)
         Object.assign(spec, { colors: c.colors, font: c.font, textSize: c.textSize, radius: c.radius })
         autoOn = spec.colors.onAccent === kit.readableOn(spec.colors.accent)
         apply()
@@ -2167,12 +2204,22 @@
       await mountTheme(fallback)
     }
   }
+  // I temi che seguono Windows (followSystem): la scena è chiara o scura come il sistema, e cambia con lui
+  const darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null
+  const systemScene = () => (darkQuery && !darkQuery.matches ? 'giorno' : 'notte')
+  if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener('change', () => {
+    if (!Theming.current.followSystem) return
+    scene = systemScene()
+    paint()
+    hook('scene', scene)
+  })
   async function mountTheme(id) {
     closeMenu()
     const convEls = [...convs.values()].map((c) => c.el)
     const draft = part('input') ? part('input').value : ''
     if (app.children.length) hook('unmount')
     const theme = await Theming.use(id)
+    if (theme.followSystem) scene = systemScene()
     app.innerHTML = theme.layout || '<div data-solid style="background:#000;color:#fff;padding:20px">Questo tema non ha un layout.</div>'
     addEdges()
     const log = part('log')
@@ -4353,13 +4400,13 @@
     const fireAll = fire
     let n = 1
     let fakeWin = 'normal'
-    // Dalla console dell'anteprima: anteprima.tema('metrios'), anteprima.permesso(), anteprima.piano(),
+    // Dalla console dell'anteprima: anteprima.tema('notturno'), anteprima.permesso(), anteprima.piano(),
     // anteprima.risposta('testo in markdown')
     window.anteprima = {
       tema: (id) => fire('onTheme', id, 0),
       // Una risposta di Claude con il testo dato, come se arrivasse adesso
       // L'avviso dell'avvio sicuro, come dopo un tema che non partiva
-      avvioSicuro: () => fireAll('onSafeState', { reason: 'error', theme: 'dream', themeName: 'Dream', error: 'il layout non ha la casella' }, 0),
+      avvioSicuro: () => fireAll('onSafeState', { reason: 'error', theme: 'notturno', themeName: 'Notturno', error: 'il layout non ha la casella' }, 0),
       risposta: (text) => { fire('onDelta', String(text), 0); fire('onDone', { durationMs: 1000 }, 10) },
       piano: () => fire('onAsk', { id: Date.now(), kind: 'plan', plan: '## Fiumi sulla mappa\n\n1. Aggiungere `DrawRivers()` in **MapView.cpp**, prima delle strade\n2. Leggere i fiumi dal file della mappa in `MapLoader`\n3. Un interruttore `m_showRivers` nel menu Vista\n\nNessun file cambia finché non approvi.' }, 0),
       domande: () => fire('onAsk', { id: Date.now(), kind: 'question', questions: [
@@ -4397,6 +4444,8 @@
     const gitTotals = () => { fakeGit.totals = fakeGit.files.reduce((t, f) => ({ files: t.files + 1, added: t.added + f.added, removed: t.removed + f.removed }), { files: 0, added: 0, removed: 0 }) }
     gitTotals()
     const fakeBranches = ['fiumi', 'main', 'sentieri']
+    // Un tema dell'editor già salvato, per le prove del cambio di tema
+    const fakeUserThemes = [{ id: 'notturno', name: 'Notturno', description: 'Un tema di prova', colors: { bg: '#101820', side: '#16202a', surface: '#1d2833', ink: '#e8e2d6', inkSoft: '#9a958b', accent: '#f2aa4c', line: '#2c3a47', bubble: '#2b3a4a' }, font: 'libro', textSize: 15, radius: 10 }]
     // Le regole dei permessi finte, nei tre posti
     const fakePerms = {
       user: { allow: ['WebSearch', 'Bash(git status)'], ask: [], deny: ['Bash(rm -rf:*)'], dirs: [] },
@@ -4425,7 +4474,7 @@
       // ?tema=<id>&scena=giorno nell'indirizzo per guardare un tema
       info: async () => {
         const q = new URLSearchParams(location.search)
-        return { scene: q.get('scena') || 'notte', chapter: n, theme: q.get('tema') || 'terra-di-mezzo', themes: ['terra-di-mezzo', 'metrios', 'dream'], workdir: 'C:/Workspace', workdirChosen: q.get('cartella') !== 'no', mode: q.get('modo') || 'auto' }
+        return { scene: q.get('scena') || 'notte', chapter: n, theme: q.get('tema') || 'essenziale', themes: ['essenziale'], userThemes: fakeUserThemes, workdir: 'C:/Workspace', workdirChosen: q.get('cartella') !== 'no', mode: q.get('modo') || 'auto' }
       },
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
       setMode: (m) => fire('onMode', m, 0),
@@ -4488,10 +4537,12 @@
       writeMemory: async (_c, f, text) => { fakeMemory.set(f, text); return { ok: true } },
       openMemory: async () => true,
       dictate: async () => true,
-      retrySafeTheme: () => fireAll('onTheme', 'dream', 0),
+      retrySafeTheme: () => fireAll('onTheme', 'notturno', 0),
       dismissSafe() {},
       saveTheme: async (spec) => { const id = spec.id || String(spec.name || 'tema').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'tema'; return { ok: true, spec: Object.assign(window.SkinsKits.moderno.normalizeSpec(spec), { id }) } },
       deleteTheme: async () => true,
+      exportTheme: async (id) => ({ ok: true, file: `C:/Users/luca/Documents/${id}.skin` }),
+      importTheme: async () => ({ ok: true, kind: 'colors', id: 'citta-di-sera', spec: { id: 'citta-di-sera', name: 'Città di sera', description: '', colors: { bg: '#fbf4ea', side: '#f1e6d6', surface: '#ffffff', ink: '#2b2118', inkSoft: '#7a6a58', accent: '#c2562b', onAccent: '#ffffff', line: '#e4d6c3', bubble: '#f6e1cf' }, font: 'serif', textSize: 15, radius: 6 } }),
       capturePreview: async () => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
       gitStatus: async () => JSON.parse(JSON.stringify(fakeGit)),
       gitDiff: async (_c, f) => (f.endsWith('.cpp') ? { file: f, created: f.includes('Rivers'), hunks: [{ before: f.includes('Rivers') ? '' : 'void Draw(Map& map) {\n    DrawRoads(map);\n}\n', after: 'void Draw(Map& map) {\n    DrawRivers(map);\n    DrawRoads(map);\n}\n', line: 1 }] } : { file: f, deleted: true, hunks: [{ before: '# Vecchio\n', after: '', line: 1 }] }),

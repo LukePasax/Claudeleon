@@ -7,16 +7,16 @@
   // Le scritte dell'interfaccia. {s}, {dir} ecc. si sostituiscono con i valori del momento
   const STRINGS = {
     title: 'Claude Skins',
-    chapter: 'Capitolo',
-    placeholder: 'Intingi la penna e scrivi...',
-    hint: 'Invio spedisce, Maiusc+Invio va a capo, / per i comandi',
-    busyHint: 'Il messaggero è in viaggio...',
-    send: 'Spedisci',
+    chapter: 'Conversazione',
+    placeholder: 'Scrivi a Claude…',
+    hint: 'Invio per inviare · Maiusc+Invio per andare a capo · / per i comandi',
+    busyHint: 'Claude sta lavorando…',
+    send: 'Invia',
     stop: 'Ferma',
-    stopped: 'Il messaggero è stato richiamato.',
-    you: 'Tu scrivi:',
-    claude: 'Claude scrive:',
-    took: 'Vergato in {s} s',
+    stopped: 'Interrotto.',
+    you: 'Tu',
+    claude: 'Claude',
+    took: '{s} s',
     toolOk: 'ok',
     toolFail: 'errore',
     allow: 'Permetti',
@@ -27,8 +27,8 @@
     denied: 'Permesso negato.',
     cancelled: 'Richiesta annullata.',
     // Il selettore dei temi
-    themes: 'temi',
-    themesTitle: 'Scegli il tema',
+    themes: 'Temi',
+    themesTitle: 'Temi',
     themesCurrent: 'in uso',
     themesClose: 'Chiudi',
     themesNew: 'Crea un tema',
@@ -37,6 +37,11 @@
     themesDelete: 'Elimina',
     themesDeleteSure: 'Sicuro?',
     themesMine: 'tuo',
+    themesExport: 'Esporta',
+    themesImport: 'Importa un tema',
+    themesImportDesc: 'Da un file .skin: un tema passato da qualcun altro',
+    themesExported: 'Tema esportato in {x}',
+    themesFail: 'Non riuscito: {x}',
     // L'editor dei temi
     teTitleNew: 'Nuovo tema',
     teTitleEdit: 'Modifica il tema',
@@ -88,7 +93,7 @@
     folderPick: 'Scegli la cartella',
     folderTitle: 'Dove lavora Claude',
     folderFirst: 'In quale cartella lavoriamo? Scegline una e il messaggio parte.',
-    folderNew: 'Una conversazione resta nella sua cartella: sceglierne un\'altra apre un capitolo nuovo.',
+    folderNew: 'Una conversazione resta nella sua cartella: sceglierne un\'altra apre una conversazione nuova.',
     folderOther: 'Scegli un\'altra cartella…',
     // Gli aggiornamenti
     updTitle: 'Aggiornamenti',
@@ -121,7 +126,7 @@
     findNext: 'Successiva (Invio)',
     findClose: 'Chiudi (Esc)',
     setKeys: 'Scorciatoie della finestra',
-    setKeysList: 'Ctrl+N nuova conversazione · Ctrl+K cerca negli annali · Ctrl+F cerca nella conversazione · Ctrl+Maiusc+C copia l\'ultima risposta · Ctrl+Maiusc+P anteprima · Ctrl+, impostazioni · Esc ferma Claude · F11 schermo intero',
+    setKeysList: 'Ctrl+N nuova conversazione · Ctrl+K cerca fra le conversazioni · Ctrl+F cerca nella conversazione · Ctrl+Maiusc+C copia l\'ultima risposta · Ctrl+Maiusc+P anteprima · Ctrl+, impostazioni · Esc ferma Claude · F11 schermo intero',
     // I messaggi precedenti di una cronaca
     olderLoad: 'Carica i messaggi precedenti ({n})',
     // Le estensioni
@@ -182,7 +187,7 @@
     safe_timeout: 'Il tema «{x}» non finiva di caricarsi: ora usi quello di partenza.',
     safe_error: 'Il tema «{x}» ha dato un errore ({err}): ora usi quello di partenza.',
     safe_manual: 'Avvio sicuro: ora usi il tema di partenza; «Riprova» torna a quello di prima.',
-    safe_gone: 'La finestra si era bloccata ed è ripartita. Le conversazioni sono negli annali.',
+    safe_gone: 'La finestra si era bloccata ed è ripartita. Le conversazioni sono nell\'elenco.',
     safeRetry: 'Riprova «{x}»',
     safeLog: 'Errori',
     safeOk: 'Va bene',
@@ -273,7 +278,7 @@
     wtRemoveDirty: 'ci sono modifiche senza commit, che eliminando la copia si perdono',
     wtRemoveUnmerged: '{n} commit non sono ancora uniti (restano nel branch)',
     wtRemoveForce: 'Elimina comunque',
-    wtRemoved: 'Copia separata eliminata. Questa conversazione non ha più la sua cartella: per continuare apri un nuovo capitolo.',
+    wtRemoved: 'Copia separata eliminata. Questa conversazione non ha più la sua cartella: per continuare apri una nuova conversazione.',
     wtBranchKept: 'Il branch {branch} resta nel repo.',
     setWorktree: 'Una copia separata per ogni conversazione',
     setWorktreeNote: 'Nei repo git ogni conversazione nuova lavora in un worktree, su un branch suo (cartella .claude/worktrees del repo)',
@@ -516,14 +521,14 @@
     diffAll: 'In tutte le occorrenze nel file.',
     diffTooBig: 'Modifica troppo grande da mostrare qui.',
     diffSame: 'Nessuna differenza.',
-    newChapter: 'nuovo capitolo',
-    sessions: 'cronache',
-    sessionsTitle: 'Le cronache',
-    sessionsLoading: 'Sfoglio le cronache...',
-    sessionsEmpty: 'Nessuna cronaca: Claude Code non ha ancora conversazioni salvate su questo computer.',
+    newChapter: 'Nuova conversazione',
+    sessions: 'conversazioni',
+    sessionsTitle: 'Conversazioni',
+    sessionsLoading: 'Carico le conversazioni…',
+    sessionsEmpty: 'Nessuna conversazione: Claude Code non ne ha ancora salvate su questo computer.',
     back: 'Torna',
-    copying: 'Ricopio la cronaca...',
-    continueHere: 'Da qui in poi si scrive nella stessa cronaca.',
+    copying: 'Carico la conversazione…',
+    continueHere: 'Da qui la conversazione continua.',
     // Il pulsante della scena mostra il nome dell'altra
     notte: 'notte',
     giorno: 'giorno',
@@ -572,13 +577,23 @@
     })
   }
 
-  // ids: le cartelle dei temi. Ogni theme.js si registra in window.SkinsThemes
-  async function load(ids) {
+  // Da dove viene ogni tema: la cartella del programma (themes/<id>/) o, per quelli importati con codice,
+  // skins-theme://<id>/ (la cartella temi nei dati dell'app). Lì stanno theme.js, theme.css e i suoi file
+  const bases = new Map()
+  const baseOf = (theme) => bases.get(theme.id) || `themes/${theme.id}/`
+  // entries: gli id dei temi del programma, o { id, base } per quelli importati. Ogni theme.js si registra in
+  // window.SkinsThemes. fresh: ricaricare anche se c'è già (un tema importato di nuovo, al posto del vecchio)
+  async function load(entries, fresh) {
     window.SkinsThemes = window.SkinsThemes || []
-    await Promise.all(ids.map((id) => loadScript(`themes/${id}/theme.js`)))
+    const list = entries.map((e) => (typeof e === 'string' ? { id: e, base: `themes/${e}/` } : e)).filter((e) => e && e.id)
+    for (const e of list) {
+      bases.set(e.id, e.base)
+      if (fresh) { registry.delete(e.id); window.SkinsThemes = window.SkinsThemes.filter((th) => th.id !== e.id) }
+    }
+    await Promise.all(list.map((e) => loadScript(`${e.base}theme.js${fresh ? `?v=${Date.now()}` : ''}`)))
     // Nell'ordine dato (il predefinito per primo, poi per nome), non in quello in cui i file finiscono di caricarsi
     const loaded = new Map(window.SkinsThemes.filter((th) => th && th.id).map((th) => [th.id, th]))
-    for (const id of [...ids, ...loaded.keys()]) if (loaded.has(id) && !registry.has(id)) registry.set(id, loaded.get(id))
+    for (const id of [...list.map((e) => e.id), ...loaded.keys()]) if (loaded.has(id) && !registry.has(id)) registry.set(id, loaded.get(id))
     return [...registry.values()].map((th) => ({ id: th.id, name: th.name || th.id }))
   }
 
@@ -589,7 +604,7 @@
     current = registry.get(id) || registry.values().next().value || { id: 'nessuno' }
     document.body.dataset.theme = current.id
     for (const old of document.querySelectorAll('link[data-theme-css]')) old.remove()
-    const sheets = [...(current.kits || []).map((k) => `kits/${k}.css`), ...(current.css ? [`themes/${current.id}/theme.css`] : [])]
+    const sheets = [...(current.kits || []).map((k) => `kits/${k}.css`), ...(current.css ? [`${baseOf(current)}theme.css`] : [])]
     return Promise.all(sheets.map((href) => new Promise((resolve) => {
       const link = document.createElement('link')
       link.rel = 'stylesheet'
@@ -602,7 +617,7 @@
 
   // Un file della cartella del tema (immagini, caratteri, suoni), come indirizzo per la pagina
   function asset(path, theme = current) {
-    return `themes/${theme.id}/${String(path).replace(/^\.?\//, '')}`
+    return `${baseOf(theme)}${String(path).replace(/^\.?\//, '')}`
   }
 
   // I disegni del tema sono ingranditi di questa scala (data-art-scale la cambia per un elemento)
@@ -759,10 +774,13 @@
   }
   function unregister(id) {
     registry.delete(id)
+    bases.delete(id)
   }
 
   window.Theming = {
     register, unregister, get: (id) => registry.get(id),
+    // Un tema importato con codice (non del programma, non dell'editor)
+    installed: (id) => String(bases.get(id) || '').startsWith('skins-theme:'),
     preview,
     // I temi caricati, per il selettore: id, nome, descrizione
     list: () => [...registry.values()].filter((th) => !String(th.id).startsWith('__')).map((th) => ({ id: th.id, name: th.name || th.id, description: th.description || '' })),

@@ -1,6 +1,6 @@
 // La finestra: trasparente, senza bordi, sempre in primo piano. La sua forma la decide il tema in uso; dove il tema
 // non disegna nulla i clic passano alle finestre sotto, e si trascina dalla parte che il tema indica (data-drag).
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, globalShortcut, shell, dialog, Notification, clipboard } = require('electron')
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, globalShortcut, shell, dialog, Notification, clipboard, protocol, net } = require('electron')
 const fs = require('fs')
 const path = require('path')
 const { ClaudeBridge, DEFAULT_CLAUDE, loadContextMax, savedContextMax } = require('./claude-bridge')
@@ -10,7 +10,9 @@ const gitOps = require('./git')
 const permissions = require('./permissions')
 const memory = require('./memory')
 const { plainSnippet } = require('./text')
-const { listThemes, DEFAULT_THEME, userThemes, userThemeInfo, saveUserTheme, deleteUserTheme } = require('./themes')
+const { listThemes, DEFAULT_THEME, userThemes, userThemeInfo, saveUserTheme, deleteUserTheme, installedThemes, bundleFor, checkBundle, installBundle } = require('./themes')
+// I temi importati con codice si caricano da qui (skins-theme://<id>/theme.js), dalla cartella temi dei dati dell'app
+protocol.registerSchemesAsPrivileged([{ scheme: 'skins-theme', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }])
 
 // La misura di partenza, simile a quella dell'app desktop, e la minima, per i temi che non dicono le loro
 // (campo window del theme.js). La finestra di partenza non supera mai il 92% dello schermo
@@ -154,7 +156,7 @@ function visiblePosition(pos) {
 // I temi del programma e, dopo, quelli fatti con l'editor (cartella temi nei dati dell'app)
 const userThemesDir = () => path.join(app.getPath('userData'), 'temi')
 function allThemes() {
-  return [...listThemes(), ...userThemes(userThemesDir()).map(userThemeInfo)]
+  return [...listThemes(), ...installedThemes(userThemesDir()), ...userThemes(userThemesDir()).map(userThemeInfo)]
 }
 
 function currentTheme() {
@@ -426,7 +428,7 @@ function toggleVisible() {
 function trayMenu() {
   return Menu.buildFromTemplate([
     { label: win && shown() ? 'Riduci a icona' : 'Mostra', click: () => { if (shown()) win.minimize(); else bringBack(); refreshTray() } },
-    { label: 'Nuovo capitolo', click: () => send('chat:reset') },
+    { label: 'Nuova conversazione', click: () => send('chat:reset') },
     { label: 'Tema', submenu: themes.map((t) => ({ label: t.name, type: 'radio', checked: t.id === currentTheme().id, click: () => setTheme(t.id) })) },
     { label: 'Cartella di lavoro…', click: chooseWorkdir },
     { label: 'Notifiche', type: 'checkbox', checked: config.notify !== false, click: (item) => { config.notify = item.checked; saveConfig() } },
@@ -569,7 +571,8 @@ function registerIpc() {
     chapter: config.chapter,
     shortcut: TOGGLE_SHORTCUT.replace('Control', 'Ctrl'),
     theme: currentTheme().id,
-    themes: themes.filter((t) => !t.custom).map((t) => t.id),
+    // Quelli del programma per id, quelli importati con codice con l'indirizzo da cui caricarli
+    themes: themes.filter((t) => !t.custom || t.code).map((t) => (t.code ? { id: t.id, base: `skins-theme://${t.id}/` } : t.id)),
     // I temi dell'editor: la pagina li costruisce dai colori
     userThemes: userThemes(userThemesDir()),
     workdir: bridge.workdir,
@@ -608,6 +611,55 @@ function registerIpc() {
       themes = allThemes()
       refreshTray()
       return { ok: true, spec: saved }
+    } catch (err) {
+      return { ok: false, error: err.message }
+    }
+  })
+  // Esporta un tema in un file .skin (in Documenti, di solito)
+  ipcMain.handle('theme:export', async (_e, id) => {
+    try {
+      const b = bundleFor(String(id || ''), userThemesDir())
+      if (!b) return { ok: false, error: 'Tema sconosciuto' }
+      const name = (b.kind === 'colors' ? b.spec.name : b.manifest.name) || String(id)
+      const safe = name.replace(/[<>:"/\\|?*\x00-\x1f]+/g, ' ').trim().slice(0, 60) || 'tema'
+      const r = await dialog.showSaveDialog(win, { title: 'Esporta il tema', defaultPath: path.join(app.getPath('documents'), `${safe}.skin`), filters: [{ name: 'Tema di Claude Skins', extensions: ['skin'] }] })
+      if (r.canceled || !r.filePath) return { ok: false, canceled: true }
+      fs.writeFileSync(r.filePath, JSON.stringify(b))
+      return { ok: true, file: r.filePath }
+    } catch (err) {
+      return { ok: false, error: err.message }
+    }
+  })
+  // Importa un tema da un file .skin: uno con codice chiede conferma (il suo codice girerà nella finestra); uno che
+  // c'è già chiede se sostituirlo. Restituisce come caricarlo nella pagina
+  ipcMain.handle('theme:import', async () => {
+    try {
+      const pick = await dialog.showOpenDialog(win, { title: 'Importa un tema', properties: ['openFile'], filters: [{ name: 'Tema di Claude Skins', extensions: ['skin', 'json'] }] })
+      if (pick.canceled || !pick.filePaths[0]) return { ok: false, canceled: true }
+      const file = pick.filePaths[0]
+      if (fs.statSync(file).size > 40 * 1024 * 1024) return { ok: false, error: 'Il file è troppo grande' }
+      let b
+      try { b = JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return { ok: false, error: 'Il file non è un tema di Claude Skins' } }
+      const c = checkBundle(b)
+      if (!c.ok) return c
+      if (c.kind === 'code') {
+        const ok = await dialog.showMessageBox(win, {
+          type: 'warning', buttons: ['Installa', 'Annulla'], defaultId: 1, cancelId: 1, noLink: true,
+          title: 'Installare il tema?', message: `Installare il tema «${c.name}»?`,
+          detail: 'Questo tema contiene codice che girerà nella finestra di Claude Skins (può leggere le conversazioni e mandare messaggi a Claude). Installalo solo se viene da qualcuno di cui ti fidi.',
+        })
+        if (ok.response !== 0) return { ok: false, canceled: true }
+      }
+      let r = installBundle(userThemesDir(), b, false)
+      if (!r.ok && r.exists) {
+        const again = await dialog.showMessageBox(win, { type: 'question', buttons: ['Sostituisci', 'Annulla'], defaultId: 0, cancelId: 1, noLink: true, title: 'Tema già installato', message: `Il tema «${r.name}» c'è già. Sostituirlo con quello del file?` })
+        if (again.response !== 0) return { ok: false, canceled: true }
+        r = installBundle(userThemesDir(), b, true)
+      }
+      if (!r.ok) return r
+      themes = allThemes()
+      refreshTray()
+      return Object.assign(r, r.kind === 'code' ? { base: `skins-theme://${r.id}/` } : {})
     } catch (err) {
       return { ok: false, error: err.message }
     }
@@ -1089,9 +1141,29 @@ async function notify(title, body, c) {
   n.show()
 }
 
+// I file dei temi importati con codice: solo dentro temi/<id>/
+function serveThemes() {
+  protocol.handle('skins-theme', async (req) => {
+    try {
+      const u = new URL(req.url)
+      const dir = path.join(userThemesDir(), u.hostname)
+      const file = path.join(dir, ...decodeURIComponent(u.pathname).split('/').filter(Boolean))
+      if (!/^[a-z0-9][a-z0-9-]{0,40}$/.test(u.hostname) || path.relative(dir, file).startsWith('..') || !fs.existsSync(file)) return new Response('', { status: 404 })
+      // La pagina è file://: caratteri e immagini del tema passano solo col permesso esplicito
+      const res = await net.fetch(require('url').pathToFileURL(file).href)
+      const headers = new Headers(res.headers)
+      headers.set('Access-Control-Allow-Origin', '*')
+      return new Response(res.body, { status: res.status, headers })
+    } catch {
+      return new Response('', { status: 404 })
+    }
+  })
+}
+
 process.on('uncaughtException', (err) => { logError('errore nel processo principale:', err && err.stack || err); console.error(err) })
 
 app.whenReady().then(() => {
+  serveThemes()
   loadConfig()
   const capture = captureArgs()
   if (capture) {

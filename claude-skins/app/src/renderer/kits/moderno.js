@@ -253,15 +253,30 @@
     return theme
   }
 
-  // I colori di base di un tema del kit, per partire da lui nell'editor
-  function colorsOf(theme) {
+  // Un tema con due aspetti, chiaro (scena giorno) e scuro (scena notte), che segue l'impostazione di Windows:
+  // light e dark sono descrizioni come quelle dell'editor
+  function adaptive({ id, name, description, light, dark }) {
+    const l = fromColors(Object.assign({}, light, { id, name, description }))
+    const d = fromColors(Object.assign({}, dark, { id, name, description }))
+    const theme = kit({ id, name, description, look: d.scenes.notte })
+    theme.scenes = { notte: d.scenes.notte, giorno: l.scenes.notte }
+    theme.followSystem = true
+    theme.looks = { notte: d.custom, giorno: l.custom }
+    return theme
+  }
+
+  // I colori di base di un tema del kit (nella scena data, per quelli che ne hanno due), per partire da lui
+  // nell'editor
+  function colorsOf(theme, sceneName) {
     if (theme && theme.custom) return JSON.parse(JSON.stringify(theme.custom))
-    const sc = (theme && theme.scenes && (theme.scenes.notte || theme.scenes.giorno)) || {}
+    const key = sceneName === 'giorno' ? 'giorno' : 'notte'
+    if (theme && theme.looks && theme.looks[key]) return JSON.parse(JSON.stringify(theme.looks[key]))
+    const sc = (theme && theme.scenes && (theme.scenes[key] || theme.scenes.notte || theme.scenes.giorno)) || {}
     const p = sc.palette || {}
     return normalizeSpec({ colors: { bg: p.bg, side: p.side, surface: p.surface, ink: p.ink, inkSoft: p.inkSoft, accent: p.accent, onAccent: p.onAccent, line: p.line, bubble: p.bubble } })
   }
 
-  Object.assign(kit, { fromColors, normalizeSpec, colorsOf, COLOR_KEYS, FONTS, readableOn })
+  Object.assign(kit, { fromColors, adaptive, normalizeSpec, colorsOf, COLOR_KEYS, FONTS, readableOn })
 
   if (typeof module === 'object' && module.exports) module.exports = kit
   else (window.SkinsKits = window.SkinsKits || {}).moderno = kit
