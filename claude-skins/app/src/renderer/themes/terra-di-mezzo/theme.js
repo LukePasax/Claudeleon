@@ -66,38 +66,45 @@
     return B.svg(W, H)
   }
 
-  // La finestra tonda sulla Contea: colline, un albero, la porta tonda di un'altra casa; di notte stelle, luna e una
-  // finestra accesa
+  // La finestra tonda sulla Contea, come quelle delle case degli hobbit: un oblò con la cornice di legno verde e la
+  // croce. Dentro colline, un albero e la porta tonda di un'altra casa; di notte stelle, luna e una finestra accesa
   function porthole(night) {
-    const W = 740
-    const H = 330
+    const S = 340
+    const R = 150
+    const cx = S / 2
+    const cy = S / 2
     const B = brush(4)
     const rnd = seeded(5)
-    const frame = `M0 ${H} V165 A 165 165 0 0 1 165 0 H575 A 165 165 0 0 1 ${W} 165 V${H}`
-    B.raw(`<clipPath id="c"><path d="${frame}Z"/></clipPath><g clip-path="url(#c)">`)
-    B.raw(`<rect width="${W}" height="${H}" fill="${night ? '#1c2448' : '#f6efdf'}"/>`)
+    B.raw(`<clipPath id="c"><circle cx="${cx}" cy="${cy}" r="${R}"/></clipPath><g clip-path="url(#c)">`)
+    B.raw(`<rect width="${S}" height="${S}" fill="${night ? '#1c2448' : '#f6efdf'}"/>`)
     if (night) {
-      for (let i = 0; i < 80; i++) B.raw(`<circle cx="${rnd() * W}" cy="${rnd() * 180}" r="${rnd() * 2.4 + 0.6}" fill="#fff" opacity="${0.5 + rnd() * 0.5}"/>`)
-      B.wash('M590 80 a 34 34 0 1 1 0 .1z', '#f6efc8', 0.9, false, true)
+      for (let i = 0; i < 70; i++) B.raw(`<circle cx="${rnd() * S}" cy="${rnd() * 190}" r="${rnd() * 2.2 + 0.6}" fill="#fff" opacity="${0.5 + rnd() * 0.5}"/>`)
+      B.wash('M232 92 a 26 26 0 1 1 0 .1z', '#f6efc8', 0.9, false, true)
     } else {
-      B.sky(0, 0, W, 240, '#5ea8dc', 0.6)
-      B.wash('M590 84 a 38 38 0 1 1 0 .1z', '#ffd24a', 0.55)
+      B.sky(0, 0, S, 230, '#5ea8dc', 0.6)
+      B.wash('M236 94 a 28 28 0 1 1 0 .1z', '#ffd24a', 0.55)
     }
-    B.wash(`M-10 ${H} V 190 Q 130 110 300 180 T 560 160 T 760 140 V${H}Z`, night ? '#2e4a3a' : '#9ccf6a', 0.7)
-    B.wash(`M-10 ${H} V 250 Q 170 190 360 230 T 760 220 V${H}Z`, night ? '#1e3428' : '#5e9a3e', 0.7)
-    B.wash('M200 200 a 30 30 0 1 1 60 0 a 30 30 0 1 1 -60 0', night ? '#16281c' : '#3f8a2a', 0.75)
-    B.line('M230 262 V 214 M230 236 l -12 -12 M230 244 l 12 -10', { opacity: 0.6, width: 2 })
-    B.wash('M430 250 a 46 46 0 0 1 92 0 z', night ? '#16281c' : '#2e5c2a', 0.85)
-    B.raw(`<circle cx="476" cy="232" r="7" fill="${night ? '#ffd27a' : '#c9a646'}"/>`)
+    B.wash(`M-10 ${S} V 200 Q 70 150 170 190 T 350 170 V${S}Z`, night ? '#2e4a3a' : '#9ccf6a', 0.7)
+    B.wash(`M-10 ${S} V 250 Q 90 215 190 240 T 350 232 V${S}Z`, night ? '#1e3428' : '#5e9a3e', 0.7)
+    B.wash('M62 210 a 24 24 0 1 1 48 0 a 24 24 0 1 1 -48 0', night ? '#16281c' : '#3f8a2a', 0.75)
+    B.line('M86 262 V 222 M86 240 l -10 -10 M86 247 l 10 -8', { opacity: 0.6, width: 2 })
+    B.wash('M196 262 a 34 34 0 0 1 68 0 z', night ? '#16281c' : '#2e5c2a', 0.85)
+    B.raw(`<circle cx="230" cy="248" r="5" fill="${night ? '#ffd27a' : '#c9a646'}"/>`)
     if (night) {
-      B.wash('M540 226 h 18 v 16 h -18z', '#ffd27a', 0.9, false, true)
-      B.raw('<circle cx="549" cy="234" r="26" fill="#ffd27a" opacity=".14"/>')
+      B.wash('M276 236 h 14 v 13 h -14z', '#ffd27a', 0.9, false, true)
+      B.raw('<circle cx="283" cy="242" r="20" fill="#ffd27a" opacity=".14"/>')
     }
-    B.wash('M80 326 C 200 290 300 316 430 290', '#cbb184', 0.7)
-    B.paper(0, 0, W, H)
+    B.wash(`M40 ${S} C 110 300 170 312 240 288`, '#cbb184', 0.7)
+    B.paper(0, 0, S, S)
     B.raw('</g>')
-    B.raw(`<path d="${frame}Z" fill="none" stroke="#2e5c2a" stroke-width="22"/><path d="M370 0 V${H} M0 165 H${W}" stroke="#2e5c2a" stroke-width="12"/><path d="${frame}Z" fill="none" stroke="#1c3a1a" stroke-width="3"/>`)
-    return B.svg(W, H, ' preserveAspectRatio="xMidYMid meet"')
+    // Il vetro un po' lucido, la croce, la cornice verde e il bordo scuro
+    B.raw(`<path d="M${cx - R * 0.62} ${cy - R * 0.45} A ${R} ${R} 0 0 1 ${cx + R * 0.1} ${cy - R * 0.82}" fill="none" stroke="#fff" stroke-width="6" opacity=".18" stroke-linecap="round"/>`)
+    B.raw(`<path d="M${cx} ${cy - R} V${cy + R} M${cx - R} ${cy} H${cx + R}" stroke="#2e5c2a" stroke-width="11"/>`)
+    B.raw(`<circle cx="${cx}" cy="${cy}" r="${R + 6}" fill="none" stroke="#2e5c2a" stroke-width="20"/>`)
+    B.raw(`<circle cx="${cx}" cy="${cy}" r="${R + 16}" fill="none" stroke="#1c3a1a" stroke-width="3"/>`)
+    B.raw(`<circle cx="${cx}" cy="${cy}" r="${R - 4}" fill="none" stroke="#1c3a1a" stroke-width="2" opacity=".6"/>`)
+    B.raw(`<circle cx="${cx}" cy="${cy}" r="9" fill="#2e5c2a" stroke="#1c3a1a" stroke-width="2"/>`)
+    return B.svg(S, S, ' preserveAspectRatio="xMidYMid meet"')
   }
 
   // Il foglio, della misura esatta dell'elemento: carta con i bordi rotti e un alone più scuro verso il margine
@@ -254,6 +261,7 @@
       sessionsLoading: 'Sfoglio gli annali…',
       sessionsSearch: 'Cerca negli annali…',
       thinkingNow: 'Lo scriba medita…',
+      workingVerbs: 'Lo scriba intinge la penna|Lo scriba sfoglia gli annali|Lo scriba traccia la mappa|Lo scriba consulta gli Elfi|Lo scriba accende la candela|Lo scriba conta i passi|Lo scriba studia le rune',
       thinkingDone: 'Ha meditato per {s} s',
       thinkingPast: 'Le meditazioni dello scriba',
       sessionsEmpty: 'Nessun annale: Claude Code non ha ancora conversazioni salvate su questo computer.',
@@ -362,9 +370,11 @@
         g.fillStyle = 'rgba(0,0,0,.25)'; for (let x = 0; x < width; x += 12) g.fillRect(x, 0, 1, height)
         g.fillStyle = pal.side; g.globalAlpha = 0.6; g.fillRect(0, 0, 40, height); g.globalAlpha = 1
         // La finestra tonda
-        g.beginPath(); g.moveTo(5, 26); g.lineTo(5, 15); g.arc(15, 15, 10, Math.PI, Math.PI * 1.5); g.lineTo(25, 5); g.arc(25, 15, 10, Math.PI * 1.5, 0); g.lineTo(35, 26); g.closePath()
-        g.fillStyle = pal.sky; g.fill(); g.lineWidth = 2; g.strokeStyle = '#2e5c2a'; g.stroke()
-        g.fillStyle = pal.glass; g.fillRect(6, 19, 28, 6)
+        // La finestra tonda
+        g.save(); g.beginPath(); g.arc(20, 17, 11, 0, Math.PI * 2); g.fillStyle = pal.sky; g.fill(); g.clip()
+        g.fillStyle = pal.glass; g.fillRect(8, 20, 24, 10); g.restore()
+        g.beginPath(); g.arc(20, 17, 11, 0, Math.PI * 2); g.lineWidth = 2.5; g.strokeStyle = '#2e5c2a'; g.stroke()
+        g.lineWidth = 1.5; g.beginPath(); g.moveTo(20, 6); g.lineTo(20, 28); g.moveTo(9, 17); g.lineTo(31, 17); g.stroke()
         for (let i = 0; i < 4; i++) { g.fillStyle = 'rgba(244,234,210,.5)'; g.fillRect(6, 34 + i * 9, 20 + (i % 2) * 6, 3) }
         // Il foglio
         g.fillStyle = pal.paper; g.fillRect(46, 5, width - 51, height - 10)

@@ -460,6 +460,8 @@ class ClaudeBridge extends EventEmitter {
         // Lo strumento con cui Claude dà un titolo alla conversazione, con lo stesso nome che ha nell'app desktop
         mcpServers: { [TITLE_SERVER]: await this.titleServer() },
         includePartialMessages: true,
+        // Dopo ogni risposta, una previsione del prossimo messaggio della persona (Tab o un clic per usarla)
+        promptSuggestions: true,
         resume: resume || undefined,
         canUseTool: (toolName, input, options) => this.ask(toolName, input, options),
       },
@@ -504,6 +506,11 @@ class ClaudeBridge extends EventEmitter {
       live.sessionId = msg.session_id
       this.sessionCwd = cwd
       this.session.setSession(msg.session_id, cwd)
+    }
+    // Il prossimo messaggio previsto: arriva dopo il risultato del turno
+    if (msg.type === 'prompt_suggestion') {
+      if (msg.suggestion && String(msg.suggestion).trim()) this.emit('suggestion', String(msg.suggestion).trim())
+      return
     }
     // Un turno fermato dalla persona: quello che arriva ancora fino al suo risultato si lascia cadere
     if (live.turn.stopped) {

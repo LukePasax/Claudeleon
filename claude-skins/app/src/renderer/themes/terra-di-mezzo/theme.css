@@ -38,7 +38,8 @@ body, body.giorno {
 body.maximized .desk, body.fullscreen .desk { border-radius: 0; }
 
 .side { flex: none; width: 272px; display: flex; flex-direction: column; padding: 0 12px; background: rgba(30, 16, 6, 0.42); color: var(--side-ink); }
-.porthole { flex: none; height: 124px; margin: 14px -2px 8px; background: center / contain no-repeat; }
+.porthole { flex: none; height: 150px; margin: 14px 0 6px; background: center / contain no-repeat; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45)); }
+.side-head { text-align: center; }
 .side-head { flex: none; padding: 0 8px 8px; }
 .brand { font-family: var(--font-display); font-size: 21px; color: var(--brass); }
 .new {

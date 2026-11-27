@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld('skins', {
   onTodos: listen('claude:todos'),
   onBusy: listen('claude:busy'),
   onContext: listen('claude:context'),
+  onSuggestion: listen('claude:suggestion'),
   onThinkingStart: listen('claude:thinkingStart'),
   onThinking: listen('claude:thinking'),
   onThinkingEnd: listen('claude:thinkingEnd'),

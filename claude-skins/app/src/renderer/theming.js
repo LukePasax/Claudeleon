@@ -77,6 +77,10 @@
     effort_high: 'High',
     effort_xhigh: 'Extra',
     effort_max: 'Max',
+    // La riga "sta lavorando": un verbo a caso, separati da |
+    workingVerbs: 'Claudando|Rimuginando|Elucubrando|Architettando|Cogitando|Ponderando|Arzigogolando|Macinando|Districando|Combinando',
+    // Le risposte suggerite
+    suggestionTip: 'Manda questa risposta (Tab la scrive nella casella)',
     // Copiare
     copy: 'Copia',
     copied: 'Copiato',

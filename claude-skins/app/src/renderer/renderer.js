@@ -8,7 +8,7 @@
   // giusta anche se non è quella in vista (vedi "conversazioni")
   const base = window.skins || fakeApi()
   const api = Object.assign({}, base)
-  const CONV_EVENTS = ['onDelta', 'onTool', 'onToolDone', 'onDone', 'onError', 'onAsk', 'onAskClosed', 'onCommandOutput', 'onToolSummary', 'onCompacted', 'onStatus', 'onTodos', 'onBusy', 'onContext', 'onThinkingStart', 'onThinking', 'onThinkingEnd']
+  const CONV_EVENTS = ['onDelta', 'onTool', 'onToolDone', 'onDone', 'onError', 'onAsk', 'onAskClosed', 'onCommandOutput', 'onToolSummary', 'onCompacted', 'onStatus', 'onTodos', 'onBusy', 'onContext', 'onThinkingStart', 'onThinking', 'onThinkingEnd', 'onSuggestion']
   for (const n of CONV_EVENTS) if (base[n]) api[n] = (fn) => base[n]((payload, id) => dispatch(id, n, () => fn(payload)))
   const app = document.getElementById('app')
   const t = Theming.t
@@ -19,6 +19,8 @@
   let scene = 'notte'
   let busy = false
   let reply = null
+  // La risposta suggerita da Claude Code per il prossimo messaggio
+  let suggestion = ''
   let pending = false
   let chapter = 1
   let workdir = ''
@@ -51,17 +53,17 @@
     if (part('log')) part('log').appendChild(el)
     const c = {
       id, el, reply: null, pending: false, tools: new Map(), busy: false, thinking: null, todos: [], todosOpen: true,
-      context: null, currentSession: null, convoDir: workdir, chapter, asks: new Map(), stick: true,
+      context: null, currentSession: null, convoDir: workdir, chapter, asks: new Map(), stick: true, suggestion: '',
       sessionId: null, unread: false, attention: false,
     }
     convs.set(id, c)
     return c
   }
   function save(c) {
-    if (c) Object.assign(c, { reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick })
+    if (c) Object.assign(c, { reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick, suggestion })
   }
   function load(c) {
-    ;({ reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick } = c)
+    ;({ reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick, suggestion } = c)
   }
   function run(c, fn) {
     if (!c || c === cur) return fn()
@@ -113,6 +115,7 @@
     renderContext()
     renderFolder()
     renderChapterHead()
+    renderGhost()
     markCurrentSession()
     scrollDown(true)
     hook('chapter')
@@ -248,7 +251,10 @@
     const d = document.createElement('div')
     d.className = `item ${cls}`
     d.innerHTML = html
-    logEl().appendChild(d)
+    const log = logEl()
+    const working = [...log.children].find((x) => x.classList.contains('working'))
+    if (working) log.insertBefore(d, working)
+    else log.appendChild(d)
     scrollDown()
     return d
   }
@@ -1024,6 +1030,7 @@
     renderTodos()
     renderModel()
     renderContext()
+    renderGhost()
     renderChapterHead()
     paint()
     scrollDown(true)
@@ -1123,6 +1130,7 @@
   function setBusy(on) {
     const changed = busy !== on
     busy = on
+    setWorking(on)
     if (quiet) return
     for (const el of all('[data-action="send"]')) el.hidden = on
     for (const el of all('[data-action="stop"]')) el.hidden = !on
@@ -1131,6 +1139,157 @@
     // Dopo, così l'aggancio può cambiare anche il suggerimento
     if (changed) hook('busy', on)
   }
+
+  // ------------------------------------------------------------------ "sta lavorando"
+
+  // Mentre Claude lavora, in fondo alla conversazione una riga con un verbo a caso, i puntini che si animano e i
+  // secondi, come il "Clauding…" di Claude Code. I verbi vengono dal tema (workingVerbs, separati da |)
+  const WORKING_START = new WeakMap()
+  function setWorking(on) {
+    const log = logEl()
+    if (!log) return
+    let w = [...log.children].find((x) => x.classList.contains('working'))
+    if (!on) { if (w) w.remove(); return }
+    if (w) { log.appendChild(w); return }
+    w = document.createElement('div')
+    w.className = 'item working'
+    w.innerHTML = '<span class="w-spin"></span><span class="w-verb"></span><span class="w-dots"><i></i><i></i><i></i></span><span class="w-time"></span>'
+    const verbs = t('workingVerbs').split('|').map((x) => x.trim()).filter(Boolean)
+    w.dataset.verb = String(Math.floor(Math.random() * Math.max(1, verbs.length)))
+    w.querySelector('.w-verb').textContent = verbs[Number(w.dataset.verb)] || ''
+    WORKING_START.set(w, Date.now())
+    log.appendChild(w)
+    scrollDown()
+  }
+  // I secondi, e ogni tanto un verbo nuovo
+  setInterval(() => {
+    for (const w of document.querySelectorAll('.item.working')) {
+      const s = Math.floor((Date.now() - (WORKING_START.get(w) || Date.now())) / 1000)
+      w.querySelector('.w-time').textContent = s >= 2 ? `${s} s` : ''
+      if (s > 0 && s % 12 === 0) {
+        const verbs = t('workingVerbs').split('|').map((x) => x.trim()).filter(Boolean)
+        if (verbs.length > 1) w.querySelector('.w-verb').textContent = verbs[Math.floor(Math.random() * verbs.length)]
+      }
+    }
+  }, 1000)
+
+  // ------------------------------------------------------------------ risposte suggerite
+
+  // Dopo una risposta Claude Code prevede il prossimo messaggio (prompt_suggestion): un pulsante sotto la risposta lo
+  // manda con un clic, e nella penna vuota compare in grigio; Tab lo scrive nella penna, da correggere o spedire
+  function renderGhost() {
+    if (quiet) return
+    const input = part('input')
+    if (!input) return
+    input.placeholder = suggestion ? `${suggestion}   ⇥ Tab` : t(input.dataset.sPlaceholder || 'placeholder')
+    input.classList.toggle('has-suggestion', !!suggestion)
+  }
+  function clearSuggestion() {
+    suggestion = ''
+    for (const el of [...logEl().querySelectorAll(':scope > .item.suggestions')]) el.remove()
+    renderGhost()
+  }
+  function useSuggestion(text, send) {
+    const input = part('input')
+    if (!input) return
+    input.value = text
+    input.focus()
+    autoGrow(input)
+    if (send) sendMessage()
+  }
+  if (api.onSuggestion) api.onSuggestion((text) => {
+    clearSuggestion()
+    if (!text) return
+    suggestion = text
+    const row = add('suggestions', '')
+    const b = document.createElement('button')
+    b.className = 'suggestion-chip'
+    b.textContent = text
+    b.title = t('suggestionTip')
+    b.addEventListener('click', () => { const c = convs.get(row.closest('.convo') && row.closest('.convo').dataset.conv); if (c && c !== active) return; useSuggestion(text, true) })
+    row.appendChild(b)
+    renderGhost()
+  })
+
+  // ------------------------------------------------------------------ la penna: markdown come nell'app desktop
+
+  // Liste che continuano da sole (Maiusc+Invio su una riga "- …" o "1. …" apre la voce dopo; su una voce vuota la
+  // lista finisce), Tab e Maiusc+Tab per rientrare una voce, Ctrl+B e Ctrl+I per grassetto e corsivo. La penna
+  // cresce col testo. Le modifiche passano da insertText, così Ctrl+Z le annulla
+  const LIST = /^(\s*)([-*+]|(\d+)([.)]))(\s+)(\[[ xX]\]\s+)?(.*)$/
+  function lineAt(input) {
+    const v = input.value
+    const start = v.lastIndexOf('\n', input.selectionStart - 1) + 1
+    let end = v.indexOf('\n', input.selectionStart)
+    if (end < 0) end = v.length
+    return { start, end, text: v.slice(start, end) }
+  }
+  function insertText(input, text) {
+    if (!document.execCommand('insertText', false, text)) {
+      const a = input.selectionStart
+      input.setRangeText(text, a, input.selectionEnd, 'end')
+    }
+    autoGrow(input)
+  }
+  // Toglie un pezzo di testo (anche questo annullabile con Ctrl+Z)
+  function removeRange(input, a, b) {
+    if (a === b) return
+    input.setSelectionRange(a, b)
+    if (!document.execCommand('delete')) input.setRangeText('', a, b, 'end')
+    autoGrow(input)
+  }
+  function autoGrow(input) {
+    if (!input) return
+    if (!input.dataset.baseHeight) input.dataset.baseHeight = String(input.offsetHeight || 52)
+    const base = Number(input.dataset.baseHeight)
+    input.style.height = ''
+    if (input.scrollHeight > base + 2) input.style.height = `${Math.min(input.scrollHeight + 2, Math.max(base, window.innerHeight * 0.35))}px`
+  }
+  function composerKey(e, input) {
+    // Tab con la penna vuota e una risposta suggerita: la scrive
+    if (e.key === 'Tab' && !e.shiftKey && !input.value && suggestion) { e.preventDefault(); useSuggestion(suggestion, false); return true }
+    const line = lineAt(input)
+    const m = LIST.exec(line.text)
+    if (e.key === 'Enter' && e.shiftKey && m && input.selectionStart === input.selectionEnd) {
+      e.preventDefault()
+      const [, indent, marker, num, sep, space, check, body] = m
+      if (!body.trim() && !check) {
+        // Voce vuota: la lista finisce (si toglie il segno)
+        removeRange(input, line.start, line.end)
+        return true
+      }
+      const next = num ? `${Number(num) + 1}${sep}` : marker
+      insertText(input, `\n${indent}${next}${space}${check ? '[ ] ' : ''}`)
+      return true
+    }
+    if (e.key === 'Tab' && m && input.selectionStart === input.selectionEnd) {
+      e.preventDefault()
+      const pos = input.selectionStart
+      input.setSelectionRange(line.start, line.start)
+      if (e.shiftKey) {
+        const cut = Math.min(2, m[1].length)
+        if (!cut) { input.setSelectionRange(pos, pos); return true }
+        removeRange(input, line.start, line.start + cut)
+        input.setSelectionRange(pos - cut, pos - cut)
+      } else {
+        insertText(input, '  ')
+        input.setSelectionRange(pos + 2, pos + 2)
+      }
+      return true
+    }
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'b' || e.key === 'i')) {
+      e.preventDefault()
+      const mark = e.key === 'b' ? '**' : '*'
+      const a = input.selectionStart
+      const b = input.selectionEnd
+      const sel = input.value.slice(a, b)
+      insertText(input, `${mark}${sel}${mark}`)
+      if (!sel) input.setSelectionRange(a + mark.length, a + mark.length)
+      return true
+    }
+    return false
+  }
+  document.addEventListener('input', (e) => { if (e.target.matches && e.target.matches('[data-part="input"]')) autoGrow(e.target) })
 
   function sendMessage() {
     const input = part('input')
@@ -1146,6 +1305,8 @@
     // /clear e /new: un nuovo capitolo, come il pulsante
     if (/^\/(clear|new)\s*$/i.test(text)) { input.value = ''; newChapter(); return }
     input.value = ''
+    input.style.height = ''
+    clearSuggestion()
     // Chi spedisce vuole vedere il suo messaggio e la risposta: il log torna in fondo
     stick = true
     // Mentre Claude lavora il messaggio entra nel turno in corso: la risposta continua sotto di lui
@@ -2028,6 +2189,7 @@
     if (e.key === 'F11') { e.preventDefault(); api.windowMode('full'); return }
     if (!e.target.matches('[data-part="input"]')) return
     if (menuKey(e)) { e.preventDefault(); return }
+    if (composerKey(e, e.target)) return
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
   })
   // Il menu dei comandi segue quello che si scrive e dove sta il cursore
@@ -2262,7 +2424,7 @@
       ], model: null, effort: null }),
       setModel() {},
       onModels: on('onModels'), onTodos: on('onTodos'), onContext: on('onContext'),
-      onThinkingStart: on('onThinkingStart'), onThinking: on('onThinking'), onThinkingEnd: on('onThinkingEnd'),
+      onThinkingStart: on('onThinkingStart'), onSuggestion: on('onSuggestion'), onThinking: on('onThinking'), onThinkingEnd: on('onThinkingEnd'),
       send(msg, conv) {
         const fire = (n, v, ms) => fireAll(n, v, ms, conv)
         // Una conversazione nuova riceve la sua sessione e compare negli annali
@@ -2292,6 +2454,7 @@
         const answer = FAKE_ANSWER.replace('{text}', text)
         ;[...answer].forEach((ch, i) => fire('onDelta', ch, 900 + i * 15))
         fire('onDone', { durationMs: 2400 }, 900 + answer.length * 15 + 100)
+        fire('onSuggestion', 'Aggiungi anche i guadi sui sentieri', 900 + answer.length * 15 + 150)
         fire('onAsk', { id: 1, title: 'Claude vuole creare un file', description: '', detail: 'src/RouteFinder.h', change: FAKE_WRITE, canAlways: true }, 900 + answer.length * 15 + 200)
       },
       onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'), onMode: on('onMode'), onToolSummary: on('onToolSummary'), onWindowState: on('onWindowState'), onWorkdir: on('onWorkdir'), onCommands: on('onCommands'), onCommandsError: on('onCommandsError'), onCommandOutput: on('onCommandOutput'), onCompacted: on('onCompacted'), onTitle: on('onTitle'), onStatus: on('onStatus'),

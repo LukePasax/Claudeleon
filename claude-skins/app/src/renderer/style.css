@@ -467,3 +467,24 @@ body[data-perm-mode="bypassPermissions"] .mode-btn, body[data-perm-mode="acceptE
 .entry-actions .copy-btn:hover { border-color: var(--edge-light); }
 .entry:hover .entry-actions, .entry-actions:has(.done) { opacity: 1; }
 .entry.you .entry-actions { justify-content: flex-end; }
+
+/* La riga "sta lavorando": una stellina che gira, il verbo, tre puntini che si accendono uno dopo l'altro, i secondi */
+.item.working { display: flex; align-items: center; gap: 7px; margin: 6px 0 12px; font-size: 14px; color: var(--gold); }
+.w-spin { width: 11px; height: 11px; flex: none; background: currentColor; clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%); animation: w-spin 2.4s linear infinite; }
+@keyframes w-spin { to { transform: rotate(360deg); } }
+.w-dots { display: inline-flex; gap: 2px; margin-left: -3px; }
+.w-dots i { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: 0.2; animation: w-dot 1.2s ease-in-out infinite; }
+.w-dots i:nth-child(2) { animation-delay: 0.2s; }
+.w-dots i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes w-dot { 0%, 60%, 100% { opacity: 0.2; } 30% { opacity: 1; } }
+.w-time { color: var(--ink-soft); font-size: var(--small-size); margin-left: 4px; }
+
+/* Le risposte suggerite: un pulsante sotto l'ultima risposta; nella penna vuota il testo in grigio */
+.item.suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 14px; }
+.suggestion-chip {
+  cursor: pointer; font: inherit; font-size: 14px; text-align: left; color: var(--ink); background: var(--field);
+  border: var(--line) solid var(--edge-light); border-radius: 16px; padding: 5px 14px;
+}
+.suggestion-chip::before { content: '↳ '; color: var(--gold); }
+.suggestion-chip:hover { border-color: var(--gold); }
+[data-part="input"].has-suggestion::placeholder { font-style: italic; opacity: 0.85; }

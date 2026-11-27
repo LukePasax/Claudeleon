@@ -581,6 +581,7 @@ function wireConv(c) {
   })
   fwd('askClosed', 'perm:closed')
   fwd('todos', 'claude:todos')
+  fwd('suggestion', 'claude:suggestion')
   fwd('context', 'claude:context')
   // Claude riprende a lavorare da sé (un messaggio entrato mentre il turno finiva)
   fwd('busy', 'claude:busy')

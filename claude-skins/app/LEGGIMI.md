@@ -56,6 +56,16 @@ npm 11 altrimenti non arriva.
   mette a disposizione (letto all'avvio, poi ricordato), i livelli di ragionamento coi nomi dell'app desktop (Low,
   Medium, High, Extra, Max) e l'interruttore **Ultracode** (orchestrazione dinamica dei flussi di lavoro). Valgono
   subito, anche a conversazione accesa, e si ricordano (`model`, `effort`, `ultracode` in config.json). I modi dei permessi stanno in un menu a tendina, come nell'app desktop.
+- **La penna:** Invio spedisce, Maiusc+Invio va a capo. Su una riga di lista ("- …", "* …", "1. …", anche "- [ ] …")
+  Maiusc+Invio apre la voce dopo (coi numeri che crescono), e su una voce vuota la lista finisce; Tab e Maiusc+Tab
+  rientrano la voce; Ctrl+B e Ctrl+I mettono grassetto e corsivo. La casella cresce col testo. Tutto si annulla con
+  Ctrl+Z.
+- **Risposte suggerite:** dopo una risposta Claude Code prevede il prossimo messaggio (`promptSuggestions`): sotto la
+  risposta compare un pulsante che lo manda con un clic, e nella casella vuota il testo in grigio, che Tab scrive
+  nella casella. Non c'è al primo turno né in modo piano (lo decide Claude Code).
+- **Claude sta lavorando:** in fondo alla conversazione una riga con un verbo a caso ("Rimuginando", "Elucubrando"…;
+  in Terra di Mezzo lo scriba), i puntini che si accendono e i secondi, finché la risposta non è finita. I verbi sono
+  la scritta `workingVerbs` del tema, separati da `|`.
 - **Copiare:** ogni blocco di codice ha un pulsante "copia" nell'angolo (passandoci sopra) che copia solo il suo
   contenuto, per esempio una bozza da incollare in una mail; sotto ogni risposta e ogni domanda, passandoci sopra,
   "Copia" copia il messaggio intero (le risposte col loro markdown).

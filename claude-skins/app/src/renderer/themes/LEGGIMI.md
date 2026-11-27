@@ -205,6 +205,8 @@ dà l'indirizzo di un file della cartella del tema, per esempio `new Audio(ctx.a
 | `scene` | Notte ↔ giorno | `'notte'` o `'giorno'` |
 | `chapter` | Comincia un capitolo nuovo o si apre una cronaca (la conversazione nel log è cambiata) | — |
 
+Mentre Claude lavora, in fondo alla conversazione c'è `.item.working` (`.w-spin`, `.w-verb`, `.w-dots`, `.w-time`); una risposta suggerita è `.item.suggestions` con un `.suggestion-chip`.
+
 Il testo di una risposta ha la classe `long-start` quando il suo primo paragrafo è lungo: i temi che hanno un
 capolettera lo mettono solo lì (`.entry.claude .text.long-start > p:first-child::first-letter`).
 
