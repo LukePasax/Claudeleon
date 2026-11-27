@@ -79,7 +79,15 @@ npm 11 altrimenti non arriva.
   che riassume un gruppo di azioni, le azioni si raccolgono sotto di lei e si aprono con un clic.
 - **Configurazione:** `%APPDATA%\Claude Skins\config.json`: `workdir` (la cartella in cui nascono le
   conversazioni nuove; vuota, la cartella utente), posizione, dimensione per tema, scena, capitolo, sessione e sua
-  cartella, tema, modo dei permessi, sempre in primo piano. Al primo avvio riprende quella di `pergamena-app`.
+  cartella, tema, modo dei permessi, sempre in primo piano; `entrypoint` (come si presentano le sessioni a Claude
+  Code, normalmente `cli`: così compaiono nel `/resume` del terminale e negli elenchi delle altre app). Al primo
+  avvio riprende quella di `pergamena-app`.
+- **Hook dell'utente:** partono al primo messaggio di una conversazione nuova (`SessionStart` con origine `startup`,
+  poi `SessionEnd` a fine risposta); i messaggi successivi riprendono la sessione con un processo nuovo e non li
+  rifanno partire. Limite: `SessionEnd` gira dopo la prima risposta, non a fine conversazione.
+- **Titolo della conversazione:** l'app dà a Claude lo strumento `set_session_title` con lo stesso nome dell'app
+  desktop (`mcp__ccd_session_mgmt__set_session_title`, server MCP in-process); scrive la riga `custom-title` nel
+  transcript con `renameSession` dell'SDK, senza chiedere il permesso, e le cronache si ricaricano.
 - **Prove:** `node_modules\electron\dist\electron.exe . --cattura <file.png> [notte|giorno] [chat|cronache]
   [LxA] [--tema <id>]` (senza LxA, la misura del tema) disegna una conversazione finta (con una domanda di permesso) o l'elenco delle cronache, salva
   uno screenshot della finestra ed esce, senza chiamare Claude. Per guardare un tema senza Electron basta aprire

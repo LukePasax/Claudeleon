@@ -453,6 +453,9 @@
     const box = add('cmd-output', '')
     box.textContent = text
   })
+  // Claude ha dato un titolo alla conversazione: le cronache si ricaricano, se sono a vista
+  if (api.onTitle) api.onTitle(() => { if (part('sessions-list')) refreshSessions() })
+
   api.onCompacted(({ pre, post }) => {
     // Il punto delle migliaia sempre, anche sotto i 10.000 (toLocaleString in italiano lo toglie)
     const n = (x) => String(x).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
@@ -1237,7 +1240,7 @@
         fire('onDone', { durationMs: 2400 }, 900 + answer.length * 15 + 100)
         fire('onAsk', { id: 1, title: 'Claude vuole creare un file', description: '', detail: 'src/RouteFinder.h', change: FAKE_WRITE, canAlways: true }, 900 + answer.length * 15 + 200)
       },
-      onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'), onMode: on('onMode'), onToolSummary: on('onToolSummary'), onWindowState: on('onWindowState'), onWorkdir: on('onWorkdir'), onCommands: on('onCommands'), onCommandsError: on('onCommandsError'), onCommandOutput: on('onCommandOutput'), onCompacted: on('onCompacted'), onStatus: on('onStatus'),
+      onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'), onMode: on('onMode'), onToolSummary: on('onToolSummary'), onWindowState: on('onWindowState'), onWorkdir: on('onWorkdir'), onCommands: on('onCommands'), onCommandsError: on('onCommandsError'), onCommandOutput: on('onCommandOutput'), onCompacted: on('onCompacted'), onTitle: on('onTitle'), onStatus: on('onStatus'),
     }
   }
 })()

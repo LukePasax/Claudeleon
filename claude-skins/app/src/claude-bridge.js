@@ -14,6 +14,9 @@ const FALLBACK_PERSONA = [
   'Resta preciso e conciso. Usa markdown leggero (grassetto, `codice`, blocchi di codice, elenchi).',
 ].join(' ')
 
+// Il nome del server del titolo: lo stesso dell'app desktop, così istruzioni e skill scritte per lei funzionano qui
+const TITLE_SERVER = 'ccd_session_mgmt'
+
 // L'SDK è un modulo ES: si carica una volta sola
 let sdk = null
 async function loadSdk() {
@@ -276,10 +279,18 @@ class ClaudeBridge extends EventEmitter {
           pathToClaudeCodeExecutable: CLAUDE,
           permissionMode: this.mode,
           systemPrompt: { type: 'preset', preset: 'claude_code', append: this.persona || FALLBACK_PERSONA },
-          // Queste conversazioni non fanno partire gli hook dell'utente (log di sessione, backup)
-          settings: { disableAllHooks: true },
-          // Claude Code manda anche una frase che riassume ogni gruppo di azioni (come nell'app desktop)
-          env: Object.assign({}, process.env, { CLAUDE_CODE_EMIT_TOOL_USE_SUMMARIES: '1' }),
+          // Gli hook dell'utente partono una volta per conversazione, al primo messaggio: i successivi riprendono la
+          // sessione con un processo nuovo, e farli ripartire a ogni risposta moltiplicherebbe backup e log
+          settings: { disableAllHooks: !!resume },
+          env: Object.assign({}, process.env, {
+            // Claude Code manda anche una frase che riassume ogni gruppo di azioni (come nell'app desktop)
+            CLAUDE_CODE_EMIT_TOOL_USE_SUMMARIES: '1',
+            // Senza questa l'SDK segna la sessione come "programmatica" (sdk-ts) e gli elenchi delle sessioni di
+            // Claude (il /resume del terminale, le app) la nascondono
+            CLAUDE_CODE_ENTRYPOINT: this.entrypoint || 'cli',
+          }),
+          // Lo strumento con cui Claude dà un titolo alla conversazione, con lo stesso nome che ha nell'app desktop
+          mcpServers: { [TITLE_SERVER]: await this.titleServer() },
           includePartialMessages: true,
           resume: resume || undefined,
           canUseTool: (toolName, input, options) => this.ask(toolName, input, options),
@@ -348,8 +359,41 @@ class ClaudeBridge extends EventEmitter {
     }
   }
 
+  // Il server MCP in-process con set_session_title. Scrive la riga custom-title nel transcript (come fa il desktop),
+  // che listSessions legge come customTitle; poi la finestra ricarica le cronache
+  async titleServer() {
+    if (this.titles) return this.titles
+    const { createSdkMcpServer, tool, renameSession } = await loadSdk()
+    const { z } = require('zod')
+    this.titles = createSdkMcpServer({
+      name: TITLE_SERVER,
+      version: '1.0.0',
+      tools: [tool(
+        'set_session_title',
+        'Imposta il titolo della conversazione corrente, quello che compare nell\'elenco delle sessioni.',
+        { title: z.string().describe('Il titolo nuovo, breve'), session_id: z.string().optional().describe('"self" o assente: la sessione corrente') },
+        async ({ title, session_id }) => {
+          const id = session_id && session_id !== 'self' ? session_id : this.session.getSession()
+          const clean = String(title || '').replace(/\s+/g, ' ').trim().slice(0, 200)
+          if (!id || !clean) return { content: [{ type: 'text', text: 'Nessuna sessione o titolo vuoto.' }], isError: true }
+          try {
+            await renameSession(id, clean, this.sessionCwd ? { dir: this.sessionCwd } : {})
+              .catch(() => renameSession(id, clean))
+          } catch (err) {
+            return { content: [{ type: 'text', text: `Titolo non salvato: ${err.message}` }], isError: true }
+          }
+          this.emit('title', { id, title: clean })
+          return { content: [{ type: 'text', text: `Titolo impostato: ${clean}` }] }
+        },
+      )],
+    })
+    return this.titles
+  }
+
   // Una domanda di permesso: va alla finestra e si aspetta la risposta della persona
   ask(toolName, input, options) {
+    // Dare un titolo alla conversazione è innocuo: non si chiede
+    if (toolName === `mcp__${TITLE_SERVER}__set_session_title`) return Promise.resolve({ behavior: 'allow', updatedInput: input })
     const id = this.nextAsk++
     this.suggestions.set(id, options.suggestions)
     if (toolName === 'ExitPlanMode') return this.askPlan(id, input, options)

@@ -389,6 +389,7 @@ function registerIpc() {
   bridge.on('commandOutput', (text) => send('claude:commandOutput', text))
   bridge.on('toolSummary', (x) => send('claude:toolSummary', x))
   bridge.on('compacted', (c) => send('claude:compacted', c))
+  bridge.on('title', (x) => send('claude:title', x))
   bridge.on('status', (st) => send('claude:status', st))
   bridge.on('mode', (mode) => { config.permissionMode = mode; saveConfig(); send('mode:changed', mode) })
 }
@@ -461,6 +462,9 @@ app.whenReady().then(() => {
     getSession: () => config.sessionId,
     setSession: (id, cwd) => { config.sessionId = id; config.sessionCwd = cwd || null; saveConfig() },
   }, config.workdir, currentTheme().persona, config.permissionMode)
+  // Come si presentano le sessioni a Claude Code (cli: visibili nel /resume e nelle altre app). Si può cambiare in
+  // config.json, ad esempio "claude-desktop"
+  bridge.entrypoint = config.entrypoint || 'cli'
   bridge.sessionCwd = config.sessionCwd || null
   if (capture) bridge.send = () => {}
   registerIpc()

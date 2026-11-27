@@ -44,5 +44,6 @@ contextBridge.exposeInMainWorld('skins', {
   onCommandOutput: listen('claude:commandOutput'),
   onToolSummary: listen('claude:toolSummary'),
   onCompacted: listen('claude:compacted'),
+  onTitle: listen('claude:title'),
   onStatus: listen('claude:status'),
 })
