@@ -84,7 +84,7 @@
     findNext: 'Successiva (Invio)',
     findClose: 'Chiudi (Esc)',
     setKeys: 'Scorciatoie della finestra',
-    setKeysList: 'Ctrl+N nuova conversazione · Ctrl+K cerca negli annali · Ctrl+F cerca nella conversazione · Ctrl+Maiusc+C copia l\'ultima risposta · Ctrl+, impostazioni · Esc ferma Claude · F11 schermo intero',
+    setKeysList: 'Ctrl+N nuova conversazione · Ctrl+K cerca negli annali · Ctrl+F cerca nella conversazione · Ctrl+Maiusc+C copia l\'ultima risposta · Ctrl+Maiusc+P anteprima · Ctrl+, impostazioni · Esc ferma Claude · F11 schermo intero',
     // I messaggi precedenti di una cronaca
     olderLoad: 'Carica i messaggi precedenti ({n})',
     // Le estensioni
@@ -139,6 +139,18 @@
     reviewMany: '{n} commenti pronti per Claude',
     reviewSend: 'Manda a Claude',
     reviewClear: 'Togli tutti',
+    // Anteprima di un server locale
+    previewBtn: 'Anteprima · {x}',
+    previewTip: 'Apri {x} nella finestra (Ctrl+Maiusc+P)',
+    previewReload: 'Ricarica',
+    previewOpen: 'Apri nel browser',
+    previewShot: 'Foto per Claude',
+    previewShotTip: 'Allega al prossimo messaggio una foto di quello che si vede nell\'anteprima',
+    previewClose: 'Chiudi l\'anteprima',
+    previewAddress: 'Indirizzo o porta (es. 5173)',
+    previewEmpty: 'Nessun server locale da mostrare. Quando Claude ne avvia uno (npm run dev e simili) il suo indirizzo compare qui; oppure scrivilo sopra.',
+    previewGrip: 'Trascina per allargare o stringere l\'anteprima',
+    previewShotFail: 'La foto dell\'anteprima non è riuscita.',
     // Worktree
     wtTag: 'worktree',
     wtTagNew: 'worktree',

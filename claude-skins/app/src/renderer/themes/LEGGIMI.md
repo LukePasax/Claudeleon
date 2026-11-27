@@ -86,6 +86,8 @@ c'è.
 | `data-part="files"` | Il pulsante dei file modificati (`.files-btn`, nascosto finché non ce ne sono), che apre il pannello (`.theme-picker.files-panel`, righe `.file-row`) |
 | `data-part="git"` | Il pulsante di git (`.git-btn` col branch, `.dirty` se ci sono modifiche; nascosto fuori da un repo), che apre il pannello (`.theme-picker.git-panel`: branch, modifiche, commit, push, pull request). Se il tema non lo mette, il motore lo aggiunge dentro `data-part="folder"` |
 | (commenti) | Su ogni riga di una differenza il pulsante `.dl-cm` (compare al passaggio), il riquadro `.dl-edit`, il commento `.dl-note`; in attesa sono `.attachment.review` nella striscia degli allegati e `.review-bar` nei pannelli; nel messaggio mandato `.sent-comments` |
+| `data-part="preview"` | Facoltativo: dove va il pannello dell'anteprima (`.preview-pane`, con `.pv-bar`, `.pv-addr`, `.pv-frame`). Senza, il motore lo mette subito dopo il `<main>` del layout |
+| `data-part="preview-btn"` | Facoltativo: dove va il pulsante "Anteprima · localhost:…" (`.preview-btn`); senza, sta in `data-part="tasks"`. `data-action="preview"` apre e chiude il pannello |
 | `data-part="context"` | L'anello del contesto (`.context-btn`, `.warn` oltre l'80%), che apre il dettaglio (`.folder-menu.context-menu`) |
 | `data-part="model"` | Il pulsante del modello e del ragionamento (`.model-btn`), che apre il menu (`.folder-menu.model-menu`) |
 | `data-part="attachments"` | La striscia degli allegati (`.attachment.image`, `.attachment.file`, ognuno con `.attachment-remove`). Se manca, il motore la crea subito prima della `textarea`, nel suo contenitore |

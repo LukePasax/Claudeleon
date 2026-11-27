@@ -298,6 +298,18 @@ Nella pagina: `data-part="git"` (o dentro `data-part="folder"`), pannello `.git-
 conversazione, `refreshGit()` lo rilegge (cambio di cartella o di conversazione, fine risposta, focus della finestra).
 Prove: `test/unit/git.test.js` (un repo vero con un remoto nudo), e il pannello nelle prove della finestra.
 
+## Anteprima
+
+Il ponte riconosce gli indirizzi locali (`localUrls`, toglie i colori ANSI che Vite mette in mezzo all'indirizzo) nei
+`tool_result` (`toolDone.urls`) e nella coda (32 KB) del file d'uscita delle attività in background
+(`tasks[].urls`); la pagina anche nel testo della risposta a fine turno. `c.previewUrls` per conversazione, il più
+recente prima. Il pannello `.preview-pane` va in `data-part="preview"` o subito dopo il `<main>` del tema (o
+flottante a destra), con un `<iframe>`: la CSP della pagina permette `frame-src http: https:`, e main.js toglie
+`X-Frame-Options` e `frame-ancestors` dalle risposte ai sotto-riquadri di localhost/127.0.0.1/[::1]. La foto è
+`webContents.capturePage` del rettangolo dell'iframe (`preview:capture`), allegata come immagine. I link che
+l'anteprima apre in una finestra nuova vanno nel browser (`setWindowOpenHandler`). Un cambio di tema ricrea il
+pannello aperto.
+
 ## Worktree
 
 `config.worktree` (menu della cartella, impostazioni). In `chat:send` (main.js), se è acceso e la conversazione non

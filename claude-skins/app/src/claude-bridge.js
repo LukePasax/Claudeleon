@@ -192,6 +192,33 @@ function lineOf(text, needle) {
 }
 
 // Il testo semplice di un messaggio salvato: le parti di testo, senza azioni né risultati
+// Gli indirizzi di un server locale (npm run dev e simili) in un testo, per l'anteprima nella finestra: localhost,
+// 127.0.0.1, 0.0.0.0 (che diventa localhost) e [::1], con la porta. Senza doppioni, nell'ordine in cui compaiono
+const LOCAL_URL = /\bhttps?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]):\d{2,5}(?:\/[^\s"'`<>()\[\]{}\\]*)?/g
+function localUrls(text) {
+  const out = []
+  // I colori del terminale (\x1b[...m) spezzerebbero gli indirizzi
+  const clean = String(text || '').replace(/\x1b\[[0-9;]*m/g, '')
+  for (const m of clean.match(LOCAL_URL) || []) {
+    const u = m.replace('://0.0.0.0:', '://localhost:').replace(/[.,;:!?]+$/, '')
+    if (!out.includes(u)) out.push(u)
+  }
+  return out
+}
+// La coda del file d'uscita di un comando in background (dove un server scrive il suo indirizzo)
+function outputTail(file, max = 32768) {
+  try {
+    const fd = fs.openSync(file, 'r')
+    try {
+      const size = fs.fstatSync(fd).size
+      const len = Math.min(size, max)
+      const buf = Buffer.alloc(len)
+      fs.readSync(fd, buf, 0, len, size - len)
+      return buf.toString('utf8')
+    } finally { fs.closeSync(fd) }
+  } catch { return '' }
+}
+
 // Il primo messaggio come titolo, senza i blocchi che la pagina aggiunge in fondo (file allegati, commenti sulle
 // differenze); se resta solo quello, un titolo che lo dice
 function promptTitle(text) {
@@ -649,7 +676,8 @@ class ClaudeBridge extends EventEmitter {
           else this.todoCreated.delete(block.tool_use_id)
           continue
         }
-        this.emit('toolDone', { id: block.tool_use_id, error: !!block.is_error })
+        const text = typeof block.content === 'string' ? block.content : (Array.isArray(block.content) ? block.content.map((c) => c.text || '').join('\n') : '')
+        this.emit('toolDone', { id: block.tool_use_id, error: !!block.is_error, urls: block.is_error ? [] : localUrls(text) })
       }
     } else if (msg.type === 'result') {
       live.turn = { open: false }
@@ -755,7 +783,8 @@ class ClaudeBridge extends EventEmitter {
     this.emitTasks()
   }
   emitTasks() {
-    this.emit('tasks', [...(this.tasks || new Map()).values()].map((t) => Object.assign({}, t)))
+    // Un comando in background che è un server: il suo indirizzo, dalla coda della sua uscita
+    this.emit('tasks', [...(this.tasks || new Map()).values()].map((t) => Object.assign({}, t, t.output && t.type !== 'local_agent' ? { urls: localUrls(outputTail(t.output)) } : {})))
   }
   runningTasks() {
     return [...(this.tasks || new Map()).values()].filter((t) => t.status === 'running').length
@@ -1084,5 +1113,5 @@ function savedContextMax() {
 module.exports = {
   ClaudeBridge, MODES, intent, DEFAULT_CLAUDE: CLAUDE, loadContextMax, savedContextMax,
   // Per le prove (test/unit)
-  _internals: { promptTitle, applyTodo, settleTodo, withFiles, imagesOf, guessContextMax, Inbox },
+  _internals: { promptTitle, localUrls, applyTodo, settleTodo, withFiles, imagesOf, guessContextMax, Inbox },
 }

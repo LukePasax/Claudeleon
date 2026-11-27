@@ -213,6 +213,36 @@ for (const tema of TEMI) {
     assert.deepEqual(errors, [])
   })
 
+  test(`${tema}: anteprima di un server locale`, async () => {
+    await open(tema)
+    const srv = require('http').createServer((req, res) => { res.setHeader('Content-Type', 'text/html'); res.end('<h1 id="t">MapEditor web</h1>') }).listen(0)
+    const port = srv.address().port
+    try {
+      await page.evaluate((p) => anteprima.risposta(`Il server gira su http://localhost:${p}/ (Vite).`), port)
+      await page.waitForSelector('.preview-btn:not([hidden])')
+      assert.match(await page.textContent('.preview-btn'), new RegExp(`localhost:${port}`))
+      await page.click('.preview-btn')
+      await page.waitForSelector('.preview-pane:not([hidden]) .pv-frame')
+      await page.waitForFunction((p) => [...document.querySelectorAll('.pv-frame')].some((f) => f.src === `http://localhost:${p}/`), port)
+      const frame = await (await page.$('.pv-frame')).contentFrame()
+      await frame.waitForSelector('#t')
+      assert.equal(await frame.textContent('#t'), 'MapEditor web')
+      assert.ok(await page.isHidden('.preview-btn'))
+      // La foto va fra gli allegati; la barra dell'indirizzo accetta anche solo la porta
+      await page.click('.pv-shot')
+      await page.waitForSelector('.attachments .attachment.image')
+      await page.fill('.pv-addr', String(port))
+      await page.press('.pv-addr', 'Enter')
+      assert.equal(await page.inputValue('.pv-addr'), `http://localhost:${port}`)
+      // Ctrl+Maiusc+P chiude e riapre
+      await page.keyboard.press('Control+Shift+P')
+      assert.ok(await page.isHidden('.preview-pane'))
+      await page.keyboard.press('Control+Shift+P')
+      assert.ok(await page.isVisible('.preview-pane'))
+      assert.deepEqual(errors, [])
+    } finally { srv.close() }
+  })
+
   test(`${tema}: impostazioni, estensioni, contesto, cambio di tema che tiene la conversazione`, async () => {
     await open(tema)
     await send('Ciao')

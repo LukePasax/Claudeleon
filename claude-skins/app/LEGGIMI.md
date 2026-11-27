@@ -58,8 +58,8 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   (non sparisce fra le icone nascoste). Non sta sopra le altre finestre, a meno di accendere "Sempre in primo
   piano" dal vassoio. Una domanda di permesso fa lampeggiare l'icona nella barra se la finestra è ridotta o dietro.
 - **Scorciatoie:** Ctrl+N nuova conversazione, Ctrl+K cerca negli annali, Ctrl+F cerca nella conversazione (una barra
-  in alto: le corrispondenze si evidenziano, Invio e Maiusc+Invio avanti e indietro, Esc chiude), Ctrl+Maiusc+C
-  copia l'ultima risposta, Ctrl+B manda in background quello che Claude sta facendo, Ctrl+, impostazioni, Esc ferma Claude, F11 schermo intero. L'elenco è anche nelle
+  in alto: le corrispondenze si evidenziano, Invio e Maiusc+Invio avanti e indietro, Esc chiude), Ctrl+Maiusc+P anteprima, Ctrl+Maiusc+C
+  copia l'ultima risposta, Ctrl+Maiusc+P anteprima, Ctrl+B manda in background quello che Claude sta facendo, Ctrl+, impostazioni, Esc ferma Claude, F11 schermo intero. L'elenco è anche nelle
   impostazioni.
 - **Impostazioni:** l'ingranaggio in fondo alla barra laterale (Terra di Mezzo) o "Impostazioni" in fondo alla barra (Metrios e
   Dream), Ctrl+, o il vassoio. Tutto vale subito: tema e scena; sempre in primo piano, avvio con Windows, riporta al
@@ -130,6 +130,15 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   stato, da quanto, quanti strumenti ha usato, l'ultimo e il riassunto finale, con "Ferma" e "Uscita" (il file con
   l'uscita). Mentre Claude lavora, "Manda in background" (o Ctrl+B) sposta in background il comando o il sotto-agente
   in corso, come nel terminale, e Claude va avanti. Con attività in corso la conversazione non si spegne da sola.
+- **Anteprima di un server locale:** quando Claude avvia un server (npm run dev e simili), il suo indirizzo
+  (localhost, 127.0.0.1 con la porta) si riconosce nell'uscita dei comandi, delle attività in background e nelle
+  risposte, e nella riga della penna compare "Anteprima · localhost:5173". Un clic apre la pagina in un pannello
+  accanto alla conversazione: barra dell'indirizzo (basta anche la porta), ricarica, apri nel browser, chiudi, e
+  "Foto per Claude", che allega al prossimo messaggio una foto di quello che si vede. Il bordo sinistro si trascina
+  per cambiare la larghezza (si ricorda). I link a localhost nelle risposte si aprono lì (con Ctrl nel browser);
+  Ctrl+Maiusc+P apre e chiude il pannello. I server che vietano di farsi incorniciare lo permettono, solo per gli
+  indirizzi locali. Quando la colonna della chat si stringe, i selettori della riga della penna restano con la sola
+  icona.
 - **Copia separata per ogni conversazione (worktree):** nel menu della cartella (o nelle impostazioni) si accende
   "Una copia separata per ogni conversazione". Da lì, nei repo git, il primo messaggio di una conversazione nuova crea
   una copia del repo in `.claude/worktrees/<nome>` (nome dalle prime parole del messaggio) su un branch suo,

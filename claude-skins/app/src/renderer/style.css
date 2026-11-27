@@ -652,7 +652,9 @@ body.busy .entry .edit-btn { display: none; }
 
 /* Nella riga della penna i selettori (cartella, branch, modello) si stringono, col testo tagliato, prima di spingere
    fuori il pulsante per spedire */
-[data-part="folder"], [data-part="model"], [data-part="git"] { min-width: 0; flex: 0 1 auto; display: flex; }
+[data-part="folder"], [data-part="model"], [data-part="git"] { min-width: 0; flex: 0 1 auto; display: flex; overflow: hidden; border-radius: 20px; }
+[data-part="modes"][data-style="menu"] { min-width: 30px; flex: 0 1 auto; display: flex; overflow: hidden; border-radius: 20px; }
+[data-part="modes"][data-style="menu"] .mode-btn { min-width: 0; max-width: 100%; }
 /* Si stringe prima il modello, poi la cartella, per ultimo il branch */
 [data-part="model"] { flex-shrink: 4; }
 [data-part="folder"] { flex-shrink: 2; }
@@ -668,3 +670,31 @@ body.busy .entry .edit-btn { display: none; }
 .folder-item.wt-toggle .fi-text { display: flex; flex-direction: column; min-width: 0; }
 [data-part="folder"] .folder-btn .fb-name { min-width: 4ch; overflow: hidden; text-overflow: ellipsis; }
 .git-btn.worktree { color: var(--gold); border-color: var(--gold); }
+
+/* Anteprima di un server locale: il pulsante nella riga della penna e il pannello accanto alla conversazione */
+.preview-btn { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font: inherit; font-size: var(--small-size); color: var(--ink); background: none; border: var(--line) solid var(--gold); border-radius: 20px; padding: 2px 9px; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.preview-btn:hover { background: var(--code); }
+.preview-btn .pb-play { flex: none; width: 0; height: 0; border-left: 7px solid var(--gold); border-top: 4.5px solid transparent; border-bottom: 4.5px solid transparent; }
+.preview-btn .pb-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.preview-pane {
+  position: relative; flex: none; display: flex; flex-direction: column; min-width: 280px; margin: 10px 10px 10px 0;
+  background: var(--menu-bg, var(--bg)); color: var(--ink); border: var(--line) solid var(--edge-light); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+}
+.preview-pane[hidden] { display: none; }
+.preview-pane.floating { position: absolute; top: 10px; right: 10px; bottom: 10px; z-index: 30; margin: 0; }
+.pv-grip { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; cursor: ew-resize; z-index: 2; }
+.pv-grip:hover, .preview-pane.dragging .pv-grip { background: var(--edge-light); }
+.preview-pane.dragging .pv-frame { pointer-events: none; }
+.pv-bar { display: flex; align-items: center; gap: 4px; padding: 6px 8px 6px 12px; border-bottom: var(--line) solid var(--edge-light); }
+.pv-addr { flex: 1; min-width: 0; font-family: var(--font-code); font-size: var(--code-size); color: var(--ink); background: var(--field, var(--code)); border: var(--line) solid var(--edge-light); border-radius: var(--radius-small); padding: 3px 8px; outline: none; user-select: text; }
+.pv-addr:focus { border-color: var(--gold); }
+.pv-btn { flex: none; cursor: pointer; font: inherit; font-size: var(--small-size); color: var(--ink-soft); background: none; border: var(--line) solid transparent; border-radius: var(--radius-small); padding: 2px 7px; white-space: nowrap; }
+.pv-btn:hover { color: var(--ink); border-color: var(--edge-light); }
+.pv-reload, .pv-open, .pv-close { font-size: 15px; line-height: 1; padding: 3px 6px; }
+.pv-body { position: relative; flex: 1; min-height: 0; background: #fff; }
+.pv-frame { display: block; width: 100%; height: 100%; border: none; background: #fff; }
+.pv-frame[hidden] { display: none; }
+.pv-empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; font-size: var(--small-size); line-height: 1.5; color: var(--ink-soft); background: var(--menu-bg, var(--bg)); }
+.pv-empty[hidden] { display: none; }
+/* Stretti al massimo, cartella, modello e branch tengono almeno la loro icona */
+[data-part="folder"]:has(> button:not([hidden])), [data-part="model"]:has(> button:not([hidden])), [data-part="git"]:has(> button:not([hidden])) { min-width: 30px; }

@@ -123,6 +123,7 @@
     renderContext()
     renderChanged()
     renderTasks()
+    renderPreviewBtn()
     renderAttachments()
     renderFolder()
     renderGit()
@@ -1270,7 +1271,7 @@
     const panel = document.querySelector('.tasks-panel')
     if (panel && panel.fill) panel.fill()
   }
-  if (api.onTasks) api.onTasks((list) => { bgTasks = Array.isArray(list) ? list : []; renderTasks() })
+  if (api.onTasks) api.onTasks((list) => { bgTasks = Array.isArray(list) ? list : []; renderTasks(); addPreviewUrls(bgTasks.filter((x) => x.status === 'running').flatMap((x) => x.urls || [])) })
   function openTasks() {
     closeThemes()
     closeFolderMenu()
@@ -1971,6 +1972,9 @@
     renderGhost()
     renderUpdateBanner()
     renderChapterHead()
+    // L'anteprima aperta resta aperta col tema nuovo
+    if (preview && !preview.hidden) { preview = null; openPreview(previewUrl) } else preview = null
+    renderPreviewBtn()
     paint()
     scrollDown(true)
     if (sessionsPinned()) refreshSessions()
@@ -2296,6 +2300,137 @@
     const h = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('')
     return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`
   }
+
+  // ------------------------------------------------------------------ anteprima
+
+  // Come l'app desktop: quando Claude avvia un server locale (npm run dev e simili) il suo indirizzo si riconosce
+  // nell'uscita dei comandi, delle attività in background e nelle risposte; "Anteprima · localhost:5173" (nella
+  // riga della penna, in data-part="preview-btn" o accanto alle attività) apre la pagina in un pannello accanto alla
+  // conversazione (dentro data-part="preview" se il tema lo mette, altrimenti subito dopo il suo <main>), con la
+  // barra dell'indirizzo, ricarica, apri nel browser e "Foto per Claude" (una foto del pannello allegata al prossimo
+  // messaggio). I link a localhost nelle risposte si aprono lì (con Ctrl nel browser). Ctrl+Maiusc+P lo apre e chiude
+  const LOCAL_URL = /\bhttps?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]):\d{2,5}(?:\/[^\s"'`<>()[\]{}\\]*)?/g
+  const isLocal = (u) => /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?(\/|$)/i.test(u)
+  const urlsIn = (text) => [...new Set((String(text || '').match(LOCAL_URL) || []).map((u) => u.replace('://0.0.0.0:', '://localhost:').replace(/[.,;:!?]+$/, '')))]
+  const hostPort = (u) => { try { const x = new URL(u); return x.host + (x.pathname !== '/' ? x.pathname : '') } catch { return u } }
+  let preview = null
+  let previewUrl = ''
+  function addPreviewUrls(urls) {
+    const c = cur || active
+    if (!c || !urls || !urls.length) return
+    const list = (c.previewUrls || []).filter((u) => !urls.includes(u))
+    c.previewUrls = [...urls.slice().reverse(), ...list].slice(0, 8)
+    if (c === active) renderPreviewBtn()
+  }
+  function renderPreviewBtn() {
+    if (quiet) return
+    const urls = (active && active.previewUrls) || []
+    const own = all('[data-part="preview-btn"]')
+    for (const box of own.length ? own : all('[data-part="tasks"]')) {
+      let b = box.querySelector('.preview-btn')
+      if (!b) {
+        b = document.createElement('button')
+        b.className = 'preview-btn'
+        b.addEventListener('click', () => openPreview((active && active.previewUrls || [])[0]))
+        box.appendChild(b)
+      }
+      const u = urls[0]
+      b.hidden = !u || (preview && !preview.hidden && previewUrl === u)
+      if (!u) continue
+      b.innerHTML = '<span class="pb-play"></span><span class="pb-text"></span>'
+      b.querySelector('.pb-text').textContent = t('previewBtn', { x: hostPort(u) })
+      b.title = t('previewTip', { x: u })
+    }
+  }
+  function previewWidth(host) {
+    let w = 0
+    try { w = Number(localStorage.getItem('skins.previewWidth')) || 0 } catch {}
+    // La conversazione accanto resta larga almeno 520 pixel
+    const max = Math.max(320, host.clientWidth - 520)
+    return Math.min(max, Math.max(300, w || Math.round(host.clientWidth * 0.4)))
+  }
+  function buildPreview() {
+    const pane = document.createElement('div')
+    pane.className = 'preview-pane'
+    pane.innerHTML = '<div class="pv-grip"></div><div class="pv-bar"><button class="pv-btn pv-reload">↻</button><input class="pv-addr" spellcheck="false"><button class="pv-btn pv-shot"></button><button class="pv-btn pv-open">↗</button><button class="pv-btn pv-close">×</button></div><div class="pv-body"><iframe class="pv-frame" allow="clipboard-read; clipboard-write; fullscreen"></iframe><div class="pv-empty"></div></div>'
+    const own = part('preview')
+    const main = app.querySelector('main')
+    if (own) own.appendChild(pane)
+    else if (main) main.after(pane)
+    else { pane.classList.add('floating'); (app.querySelector('[data-solid]') || app).appendChild(pane) }
+    const frame = pane.querySelector('.pv-frame')
+    const addr = pane.querySelector('.pv-addr')
+    pane.querySelector('.pv-reload').title = t('previewReload')
+    pane.querySelector('.pv-open').title = t('previewOpen')
+    pane.querySelector('.pv-close').title = t('previewClose')
+    label(pane.querySelector('.pv-shot'), 'previewShot')
+    pane.querySelector('.pv-shot').title = t('previewShotTip')
+    pane.querySelector('.pv-grip').title = t('previewGrip')
+    addr.placeholder = t('previewAddress')
+    label(pane.querySelector('.pv-empty'), 'previewEmpty')
+    pane.querySelector('.pv-reload').addEventListener('click', () => { if (previewUrl) { frame.src = 'about:blank'; setTimeout(() => { frame.src = previewUrl }, 30) } })
+    pane.querySelector('.pv-open').addEventListener('click', () => { if (previewUrl) api.openLink(previewUrl) })
+    pane.querySelector('.pv-close').addEventListener('click', closePreview)
+    pane.querySelector('.pv-shot').addEventListener('click', async () => {
+      const r = frame.getBoundingClientRect()
+      const data = previewUrl && api.capturePreview ? await api.capturePreview({ x: r.left, y: r.top, width: r.width, height: r.height }).catch(() => null) : null
+      if (data) await addImage(data, 'image/png', `anteprima ${hostPort(previewUrl)}.png`)
+      else labelled('error', 'previewShotFail')
+    })
+    addr.addEventListener('keydown', (e) => {
+      // Le scorciatoie con Ctrl valgono anche da qui
+      if (!e.ctrlKey && !e.metaKey) e.stopPropagation()
+      if (e.key !== 'Enter') return
+      let v = addr.value.trim()
+      if (!v) return
+      if (/^\d{2,5}$/.test(v)) v = `http://localhost:${v}`
+      else if (!/^https?:\/\//i.test(v)) v = `http://${v}`
+      navigatePreview(v)
+    })
+    // Il bordo sinistro si trascina per cambiare la larghezza (l'iframe non deve rubare il mouse intanto)
+    pane.querySelector('.pv-grip').addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      const host = pane.parentElement
+      const x0 = e.clientX
+      const w0 = pane.offsetWidth
+      pane.classList.add('dragging')
+      const move = (ev) => { pane.style.width = `${Math.min(host.clientWidth - 360, Math.max(280, w0 + x0 - ev.clientX))}px` }
+      const up = () => {
+        pane.classList.remove('dragging')
+        document.removeEventListener('mousemove', move)
+        document.removeEventListener('mouseup', up)
+        try { localStorage.setItem('skins.previewWidth', String(pane.offsetWidth)) } catch {}
+      }
+      document.addEventListener('mousemove', move)
+      document.addEventListener('mouseup', up)
+    })
+    pane.style.width = `${previewWidth(pane.parentElement)}px`
+    return pane
+  }
+  function navigatePreview(url) {
+    previewUrl = url || ''
+    if (!preview) return
+    preview.querySelector('.pv-addr').value = previewUrl
+    const frame = preview.querySelector('.pv-frame')
+    frame.hidden = !previewUrl
+    preview.querySelector('.pv-empty').hidden = !!previewUrl
+    if (previewUrl && frame.src !== previewUrl) frame.src = previewUrl
+    renderPreviewBtn()
+  }
+  function openPreview(url) {
+    if (!preview || !preview.isConnected) preview = buildPreview()
+    preview.hidden = false
+    document.body.classList.add('has-preview')
+    navigatePreview(url || previewUrl || ((active && active.previewUrls) || [])[0] || '')
+    if (!previewUrl) preview.querySelector('.pv-addr').focus()
+    hook('preview', previewUrl)
+  }
+  function closePreview() {
+    if (preview) { preview.hidden = true; preview.querySelector('.pv-frame').src = 'about:blank' }
+    document.body.classList.remove('has-preview')
+    renderPreviewBtn()
+  }
+  const togglePreview = () => (preview && preview.isConnected && !preview.hidden ? closePreview() : openPreview())
 
   // ------------------------------------------------------------------ commenti sulle differenze
 
@@ -2802,7 +2937,7 @@
     row.dataset.statusKey = error ? 'toolFail' : 'toolOk'
     row.dataset.status = t(row.dataset.statusKey)
   }
-  api.onToolDone(({ id, error }) => { toolDone(id, error); hook('toolDone', { error: !!error }) })
+  api.onToolDone(({ id, error, urls }) => { toolDone(id, error); addPreviewUrls(urls); hook('toolDone', { error: !!error }) })
 
   // La frase che riassume un gruppo di azioni (come nell'app desktop): le loro righe, con le differenze, vanno dentro
   // un gruppo chiuso sotto quella frase; un clic lo apre. Nel titolo, il conto delle righe cambiate
@@ -2835,6 +2970,8 @@
   api.onDone(({ durationMs }) => {
     endThinking()
     renderReply()
+    // Un indirizzo locale nella risposta ("il server è su http://localhost:5173")
+    if (reply && reply.raw) addPreviewUrls(urlsIn(reply.raw))
     labelled('footnote', 'took', { s: Math.round((durationMs || 0) / 1000) })
     hook('done', { durationMs })
     reply = null
@@ -3512,6 +3649,7 @@
     'sessions-close': () => { if (part('sessions') && !sessionsPinned()) part('sessions').hidden = true },
     themes: openThemes,
     settings: openSettings,
+    preview: togglePreview,
     maximize: () => api.windowMode('max'),
     fullscreen: () => api.windowMode('full'),
     scene: () => { scene = scene === 'notte' ? 'giorno' : 'notte'; api.setScene(scene); paint(); hook('scene', scene) },
@@ -3519,7 +3657,12 @@
   document.addEventListener('click', (e) => {
     // I link delle risposte si aprono nel browser di sistema
     const a = e.target.closest('a[data-href]')
-    if (a) { e.preventDefault(); api.openLink(a.dataset.href); return }
+    if (a) {
+      e.preventDefault()
+      if (isLocal(a.dataset.href) && !e.ctrlKey && !e.metaKey && !e.shiftKey) openPreview(a.dataset.href)
+      else api.openLink(a.dataset.href)
+      return
+    }
     const m = e.target.closest('[data-perm-mode]')
     if (m && app.contains(m)) return chooseMode(m.dataset.permMode)
     const b = e.target.closest('[data-action]')
@@ -3536,6 +3679,7 @@
     if (mod && !e.shiftKey && k === 'k') { e.preventDefault(); focusSessionsSearch(); return }
     if (mod && !e.shiftKey && k === 'f') { e.preventDefault(); openFind(); return }
     if (mod && e.shiftKey && k === 'c') { e.preventDefault(); copyLastReply(); return }
+    if (mod && e.shiftKey && k === 'p') { e.preventDefault(); togglePreview(); return }
     if (mod && !e.shiftKey && k === 'b' && busy && !e.target.matches('[data-part="input"]')) { e.preventDefault(); api.backgroundNow(active && active.id); return }
     if (e.key === 'Escape' && find.bar) { closeFind(); return }
     if (e.key === 'Escape' && document.querySelector('.folder-menu')) { closeFolderMenu(); return }
@@ -3815,6 +3959,7 @@
       onModels: on('onModels'), onTodos: on('onTodos'), onContext: on('onContext'),
       onThinkingStart: on('onThinkingStart'), onSuggestion: on('onSuggestion'), onThinking: on('onThinking'), onThinkingEnd: on('onThinkingEnd'),
       openFile: async () => true,
+      capturePreview: async () => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
       gitStatus: async () => JSON.parse(JSON.stringify(fakeGit)),
       gitDiff: async (_c, f) => (f.endsWith('.cpp') ? { file: f, created: f.includes('Rivers'), hunks: [{ before: f.includes('Rivers') ? '' : 'void Draw(Map& map) {\n    DrawRoads(map);\n}\n', after: 'void Draw(Map& map) {\n    DrawRivers(map);\n    DrawRoads(map);\n}\n', line: 1 }] } : { file: f, deleted: true, hunks: [{ before: '# Vecchio\n', after: '', line: 1 }] }),
       gitBranches: async () => fakeBranches.slice(),

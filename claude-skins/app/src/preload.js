@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld('skins', {
   stop: (conv) => ipcRenderer.send('chat:stop', conv),
   openFile: (p, conv) => ipcRenderer.invoke('file:open', p, conv),
   revealFile: (p, conv) => ipcRenderer.invoke('file:reveal', p, conv),
+  capturePreview: (rect) => ipcRenderer.invoke('preview:capture', rect),
   gitStatus: (conv) => ipcRenderer.invoke('git:status', conv),
   gitDiff: (conv, file) => ipcRenderer.invoke('git:diff', conv, file),
   gitBranches: (conv) => ipcRenderer.invoke('git:branches', conv),

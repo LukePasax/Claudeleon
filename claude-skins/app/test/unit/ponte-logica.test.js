@@ -84,3 +84,9 @@ test('titolo dal primo messaggio: senza i blocchi dei file allegati e dei commen
   assert.equal(I.promptTitle('Ciao'), 'Ciao')
   assert.equal(I.promptTitle(''), '')
 })
+
+test('indirizzi dei server locali, anche coi colori del terminale', () => {
+  assert.deepEqual(I.localUrls('\x1b[32m  ➜  Local:   \x1b[1mhttp://localhost:\x1b[22m5173/\x1b[0m\n Network: http://0.0.0.0:3000/app, poi http://127.0.0.1:8000. e http://localhost:5173/'),
+    ['http://localhost:5173/', 'http://localhost:3000/app', 'http://127.0.0.1:8000'])
+  assert.deepEqual(I.localUrls('https://example.com:8080 e localhost:3000 senza schema'), [])
+})

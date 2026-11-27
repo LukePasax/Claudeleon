@@ -227,9 +227,27 @@ function createWindow() {
   win.on('blur', () => { lastBlur = Date.now() })
   win.on('minimize', refreshTray)
   win.on('restore', refreshTray)
-  // Nessun link si apre dentro la finestra
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  // Nessun link si apre dentro la finestra; quelli che l'anteprima vuole aprire in una finestra nuova vanno nel browser
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url).catch(() => {})
+    return { action: 'deny' }
+  })
   win.webContents.on('will-navigate', (e) => e.preventDefault())
+  // L'anteprima di un server locale sta in un riquadro della pagina: i server che vietano di farsi incorniciare
+  // (X-Frame-Options, frame-ancestors) lo permettono qui, solo per i loro indirizzi locali
+  win.webContents.session.webRequest.onHeadersReceived((details, done) => {
+    let local = false
+    try { local = details.resourceType === 'subFrame' && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(new URL(details.url).hostname) } catch {}
+    if (!local) return done({})
+    const headers = {}
+    for (const [k, v] of Object.entries(details.responseHeaders || {})) {
+      const key = k.toLowerCase()
+      if (key === 'x-frame-options') continue
+      if (key === 'content-security-policy') headers[k] = v.map((x) => x.split(';').filter((d) => !/^\s*frame-ancestors\b/i.test(d)).join(';'))
+      else headers[k] = v
+    }
+    done({ responseHeaders: headers })
+  })
 }
 
 // Spostare ('move') o ridimensionare ('resize'): dal clic sulla pagina si segue il cursore sullo schermo, così il
@@ -530,6 +548,14 @@ function registerIpc() {
   ipcMain.handle('settings:set', (_e, key, value) => applySetting(String(key), value))
   ipcMain.on('app:icon', (_e, dataUrl) => { if (!captureMode) setAppIcon(String(dataUrl || '')); else if (process.platform !== 'darwin') win.setIcon(nativeImage.createFromDataURL(String(dataUrl || ''))) })
   // Copiare negli appunti (i pulsanti "copia" di codice e risposte)
+  // Una foto dell'anteprima (il rettangolo del riquadro nella pagina), da allegare per Claude
+  ipcMain.handle('preview:capture', async (_e, r) => {
+    try {
+      const rect = { x: Math.max(0, Math.round(r.x)), y: Math.max(0, Math.round(r.y)), width: Math.max(1, Math.round(r.width)), height: Math.max(1, Math.round(r.height)) }
+      const img = await win.webContents.capturePage(rect)
+      return img.isEmpty() ? null : img.toDataURL()
+    } catch { return null }
+  })
   ipcMain.on('clipboard:write', (_e, text) => clipboard.writeText(String(text || '')))
   // La cartella delle conversazioni nuove, dalla finestra: dal dialogo di sistema o da una cartella recente
   ipcMain.handle('workdir:choose', () => chooseWorkdir())
