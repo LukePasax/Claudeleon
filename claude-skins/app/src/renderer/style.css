@@ -366,3 +366,29 @@ body.dropping [data-part="input"] { outline: 2px dashed var(--gold); outline-off
 .folder-item .fi-wrap { white-space: normal; font-size: var(--small-size); line-height: 1.35; }
 body[data-perm-mode="bypassPermissions"] .mode-btn, body[data-perm-mode="acceptEdits"] .mode-btn { color: var(--gold); border-color: var(--gold); }
 .effort-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 8px 6px; }
+
+/* Gli annali: ricerca, gruppi per giorno, il pulsante "⋯" di ogni riga (si vede passandoci sopra), la rinomina sul
+   posto, le archiviate in fondo */
+.sessions-search {
+  flex: none; display: block; width: 100%; margin: 0 0 6px; padding: 5px 10px; font: inherit; font-size: 14px; color: inherit;
+  background: var(--code); border: var(--line) solid transparent; border-radius: var(--radius-small); outline: none; user-select: text;
+}
+.sessions-search:focus { border-color: var(--edge-light); }
+.sessions-search::placeholder { color: var(--ink-soft); font-style: italic; }
+.session-group { padding: 12px 10px 4px; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); }
+.session-group:first-child { padding-top: 4px; }
+.session-row { position: relative; padding-right: 30px; }
+.session-row .title { white-space: nowrap; }
+.session-row .when { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session-row.archived .title { opacity: 0.7; }
+.session-more {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; padding: 0; cursor: pointer;
+  border: none; border-radius: var(--radius-small); background: none; color: inherit; font-size: 16px; line-height: 1; opacity: 0;
+}
+.session-row:hover .session-more, .session-row.current .session-more { opacity: 0.6; }
+.session-more:hover { opacity: 1 !important; background: var(--ctl-hover); }
+.session-rename { width: 100%; font: inherit; font-size: 14px; padding: 1px 4px; color: var(--ink); background: var(--field); border: var(--line) solid var(--gold); border-radius: 4px; outline: none; user-select: text; }
+.sessions-archived { display: block; margin: 10px 6px 6px; padding: 4px; background: none; border: none; cursor: pointer; font: inherit; font-size: 13px; font-style: italic; color: var(--ink-soft); }
+.sessions-archived:hover { color: var(--ink); }
+.session-menu { width: 200px; }
+.session-menu .folder-item.danger { color: var(--red); }

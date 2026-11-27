@@ -86,6 +86,7 @@ c'è.
 | `data-part="chapter-title"`, `data-part="chapter-date"` | Il titolo del capitolo, o della cronaca aperta, e la sua data |
 | `data-part="modes"` | Il selettore del modo dei permessi. Con `data-style="menu"` è un solo pulsante (`.mode-btn`) che apre il menu dei modi, come nell'app desktop; senza, il motore ci mette l'etichetta e un pulsante `.mode` per modo (`data-perm-mode`), quello attivo con `.active`. Anche `body[data-perm-mode]` dice il modo, per il CSS del tema |
 | `data-part="sessions"` | Il pannello delle cronache. Con `hidden` è in sovrimpressione: lo apre `data-action="sessions"`. Con `data-mode="always"` è sempre visibile, come la barra laterale dell'app desktop, e si aggiorna da solo |
+| `data-part="sessions-search"` | Il campo di ricerca degli annali (un `input`). Se manca, il motore ne crea uno (`.sessions-search`) subito sopra l'elenco |
 | `data-part="sessions-list"` | Dentro il pannello: l'elenco delle cronache |
 
 ### I comandi: `data-action`

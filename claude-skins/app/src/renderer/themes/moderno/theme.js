@@ -72,7 +72,6 @@
         <span class="side-title" data-s="title"></span>
       </div>
       <button class="new" data-action="new"><span class="plus">+</span><span data-s="newChapter"></span></button>
-      <div class="side-label" data-s="sessionsTitle"></div>
       <div class="sessions" data-part="sessions" data-mode="always">
         <div class="sessions-list" data-part="sessions-list"></div>
       </div>

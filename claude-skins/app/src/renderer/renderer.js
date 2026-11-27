@@ -517,7 +517,7 @@
   }
 
   document.addEventListener('mousedown', (e) => {
-    if (document.querySelector('.folder-menu') && !e.target.closest('.folder-menu, .folder-btn, .model-btn, .mode-btn')) closeFolderMenu()
+    if (document.querySelector('.folder-menu') && !e.target.closest('.folder-menu, .folder-btn, .model-btn, .mode-btn, .session-more')) closeFolderMenu()
   }, true)
 
   // ------------------------------------------------------------------ comandi con /
@@ -1374,34 +1374,178 @@
     list.querySelector('.when').textContent = t(key, vars)
   }
 
+  // Gli annali come la barra dell'app desktop: ricerca in cima, conversazioni raggruppate per giorno, un menu per
+  // ciascuna (rinomina, archivia, elimina, anche col tasto destro) e in fondo le archiviate, nascoste finché non si
+  // chiede di vederle. L'elenco si scarica una volta e la ricerca lo filtra sul posto
   let sessionsLoad = 0
+  let sessionsCache = []
+  let sessionsQuery = ''
+  let showArchived = false
   async function refreshSessions() {
     const list = part('sessions-list')
     if (!list) return
+    ensureSessionSearch()
     const mine = ++sessionsLoad
     if (!list.children.length) sessionNote(list, 'sessionsLoading')
     try {
       const sessions = await api.sessions()
       if (mine !== sessionsLoad || !list.isConnected) return
-      list.innerHTML = ''
-      for (const s of sessions) {
-        const row = document.createElement('div')
-        row.className = 'session-row'
-        row.dataset.id = s.id
-        row.innerHTML = '<div class="title"></div><div class="when"></div>'
-        row.querySelector('.title').textContent = s.title
-        // Quando e in che cartella: le cronache sono di tutte le cartelle, come nella barra dell'app desktop
-        const folder = s.cwd ? s.cwd.replace(/[\\/]+$/, '').split(/[\\/]/).pop() : ''
-        row.querySelector('.when').textContent = formatWhen(s.lastModified) + (folder ? ` · ${folder}` : '')
-        if (s.cwd) row.title = s.cwd
-        row.addEventListener('click', () => openSession(s))
-        list.appendChild(row)
-      }
-      if (!sessions.length) sessionNote(list, 'sessionsEmpty', { dir: workdir || 'cartella di lavoro' })
-      markCurrentSession()
+      sessionsCache = sessions
+      renderSessionList()
     } catch (err) {
       list.innerHTML = `<div class="error">${esc(String(err.message || err))}</div>`
     }
+  }
+
+  // Il campo di ricerca: in data-part="sessions-search" se il tema lo mette, altrimenti subito sopra l'elenco
+  function ensureSessionSearch() {
+    const list = part('sessions-list')
+    let input = app.querySelector('[data-part="sessions-search"]') || (list && list.parentElement.querySelector(':scope > .sessions-search'))
+    if (!input && list) {
+      input = document.createElement('input')
+      input.className = 'sessions-search'
+      list.before(input)
+    }
+    if (!input || input.dataset.ready) return
+    input.dataset.ready = '1'
+    input.type = 'search'
+    input.spellcheck = false
+    input.dataset.sPlaceholder = 'sessionsSearch'
+    input.placeholder = t('sessionsSearch')
+    input.value = sessionsQuery
+    input.addEventListener('input', () => { sessionsQuery = input.value; renderSessionList() })
+    input.addEventListener('keydown', (e) => { if (e.key === 'Escape') { input.value = ''; sessionsQuery = ''; renderSessionList() } })
+  }
+
+  // Oggi, ieri, ultimi 7 giorni, ultimi 30, più vecchie
+  function sessionGroup(ms) {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const t0 = today.getTime()
+    const day = 86400000
+    if (ms >= t0) return 'groupToday'
+    if (ms >= t0 - day) return 'groupYesterday'
+    if (ms >= t0 - 7 * day) return 'groupWeek'
+    if (ms >= t0 - 30 * day) return 'groupMonth'
+    return 'groupOlder'
+  }
+  // L'ora per oggi e ieri, altrimenti il giorno
+  function shortWhen(ms) {
+    const d = new Date(ms)
+    const g = sessionGroup(ms)
+    if (g === 'groupToday' || g === 'groupYesterday') return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}${d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : ''}`
+  }
+  const fold = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+
+  function renderSessionList() {
+    const list = part('sessions-list')
+    if (!list) return
+    const q = fold(sessionsQuery.trim())
+    const match = (s) => !q || fold(s.title).includes(q) || fold(s.cwd).includes(q) || fold(s.branch).includes(q)
+    // Le archiviate tutte in fondo, sotto la loro testata
+    const visible = sessionsCache.filter((s) => (showArchived || !s.archived) && match(s)).sort((x, y) => (x.archived ? 1 : 0) - (y.archived ? 1 : 0))
+    const archivedCount = sessionsCache.filter((s) => s.archived).length
+    list.innerHTML = ''
+    if (!sessionsCache.length) { sessionNote(list, 'sessionsEmpty', { dir: workdir || 'cartella di lavoro' }); return }
+    if (!visible.length) sessionNote(list, 'sessionsNoMatch', { q: sessionsQuery.trim() })
+    let group = null
+    for (const s of visible) {
+      const g = s.archived ? 'groupArchived' : sessionGroup(s.lastModified)
+      if (g !== group) {
+        group = g
+        const h = document.createElement('div')
+        h.className = 'session-group'
+        list.appendChild(label(h, g))
+      }
+      list.appendChild(sessionRow(s))
+    }
+    if (archivedCount) {
+      const more = document.createElement('button')
+      more.className = 'sessions-archived'
+      label(more, showArchived ? 'sessionsHideArchived' : 'sessionsArchived', { n: archivedCount })
+      more.addEventListener('click', () => { showArchived = !showArchived; renderSessionList() })
+      list.appendChild(more)
+    }
+    markCurrentSession()
+  }
+
+  function sessionRow(s) {
+    const row = document.createElement('div')
+    row.className = 'session-row' + (s.archived ? ' archived' : '')
+    row.dataset.id = s.id
+    row.innerHTML = '<div class="title"></div><div class="when"></div><button class="session-more" tabindex="-1">⋯</button>'
+    row.querySelector('.title').textContent = s.title
+    // Quando e in che cartella: le cronache sono di tutte le cartelle, come nella barra dell'app desktop
+    const folder = s.cwd ? s.cwd.replace(/[\\/]+$/, '').split(/[\\/]/).pop() : ''
+    row.querySelector('.when').textContent = shortWhen(s.lastModified) + (folder ? ` · ${folder}` : '') + (s.branch && s.branch !== 'HEAD' ? ` · ${s.branch}` : '')
+    row.title = `${s.title}\n${formatWhen(s.lastModified)}${s.cwd ? `\n${s.cwd}` : ''}`
+    const more = row.querySelector('.session-more')
+    more.title = t('sessionMenu')
+    more.addEventListener('click', (e) => { e.stopPropagation(); openSessionMenu(more, s) })
+    row.addEventListener('contextmenu', (e) => { e.preventDefault(); openSessionMenu(more, s) })
+    row.addEventListener('click', () => { if (!row.classList.contains('editing')) openSession(s) })
+    return row
+  }
+
+  function openSessionMenu(anchor, s) {
+    closeFolderMenu()
+    const menu = document.createElement('div')
+    menu.className = 'folder-menu session-menu'
+    const item = (key, fn, cls) => {
+      const it = document.createElement('div')
+      it.className = `folder-item${cls ? ` ${cls}` : ''}`
+      it.appendChild(label(document.createElement('span'), key))
+      it.addEventListener('click', () => { closeFolderMenu(); fn() })
+      menu.appendChild(it)
+    }
+    item('sessionRename', () => startRename(s))
+    item(s.archived ? 'sessionUnarchive' : 'sessionArchive', async () => {
+      await api.archiveSession(s.id, s.cwd || null, !s.archived)
+      refreshSessions()
+    })
+    item('sessionDelete', async () => {
+      const r = await api.deleteSession(s.id, s.cwd || null, s.title)
+      if (!r || !r.deleted) return
+      if (r.wasCurrent || (currentSession && currentSession.id === s.id)) await newChapter()
+      refreshSessions()
+    }, 'danger')
+    placeMenu(menu, anchor)
+  }
+
+  // La rinomina sul posto: il titolo diventa un campo; Invio (o un clic altrove) salva, Esc annulla
+  function startRename(s) {
+    const row = part('sessions-list') && part('sessions-list').querySelector(`.session-row[data-id="${CSS.escape(s.id)}"]`)
+    if (!row) return
+    const title = row.querySelector('.title')
+    const input = document.createElement('input')
+    input.className = 'session-rename'
+    input.value = s.title
+    input.spellcheck = false
+    row.classList.add('editing')
+    title.replaceWith(input)
+    input.focus()
+    input.select()
+    let done = false
+    const finish = async (save) => {
+      if (done) return
+      done = true
+      const value = input.value.trim()
+      row.classList.remove('editing')
+      if (save && value && value !== s.title) {
+        input.replaceWith(Object.assign(title, { textContent: value }))
+        s.title = value
+        if (currentSession && currentSession.id === s.id) { currentSession.title = value; renderChapterHead() }
+        await api.renameSession(s.id, value, s.cwd || null)
+        refreshSessions()
+      } else input.replaceWith(title)
+    }
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation()
+      if (e.key === 'Enter') { e.preventDefault(); finish(true) } else if (e.key === 'Escape') finish(false)
+    })
+    input.addEventListener('blur', () => finish(true))
+    input.addEventListener('click', (e) => e.stopPropagation())
   }
 
   function markCurrentSession() {
@@ -1648,6 +1792,15 @@
       permesso: () => fire('onAsk', { id: Date.now(), title: 'Claude vuole modificare un file', description: '', detail: 'src/MapView.cpp', canAlways: true }, 0),
     }
     const day = 86400000
+    const fakeSessions = [
+      { id: 's0', title: 'Allegati e domande con le opzioni', lastModified: Date.now() - 600000, cwd: 'C:/Workspace/Progetti/Claude-desktop-skins', branch: 'main' },
+      { id: 's1', title: 'Temi per Claude Skins', lastModified: Date.now() - 3600000, cwd: 'C:/Workspace/Progetti/Claude-desktop-skins', branch: 'main' },
+      { id: 's2', title: 'Il calcolo dei sentieri in RouteFinder', lastModified: Date.now() - day, cwd: 'C:/Workspace/MapEditor' },
+      { id: 's3', title: 'Mod desktop Signore degli Anelli', lastModified: Date.now() - 4 * day, cwd: 'C:/Workspace' },
+      { id: 's4', title: 'Profilo di Windows Terminal', lastModified: Date.now() - 9 * day, cwd: 'C:/Users/luca' },
+      { id: 's5', title: 'Backup delle note su Drive', lastModified: Date.now() - 45 * day, cwd: 'C:/Users/luca/Documenti' },
+      { id: 's6', title: 'Prova del vecchio rotolo', lastModified: Date.now() - 20 * day, cwd: 'C:/Workspace', archived: true },
+    ]
     return {
       // ?tema=<id>&scena=giorno nell'indirizzo per guardare un tema
       info: async () => {
@@ -1663,12 +1816,10 @@
       setWorkdir: async (d) => d,
       openLink: (url) => window.open(url, '_blank', 'noopener'),
       commands: async () => FAKE_COMMANDS,
-      sessions: async () => [
-        { id: 's1', title: 'Temi per Claude Skins', lastModified: Date.now() - 3600000, cwd: 'C:/Workspace/Progetti/Claude-desktop-skins' },
-        { id: 's2', title: 'Il calcolo dei sentieri in RouteFinder', lastModified: Date.now() - day, cwd: 'C:/Workspace/MapEditor' },
-        { id: 's3', title: 'Mod desktop Signore degli Anelli', lastModified: Date.now() - 4 * day, cwd: 'C:/Workspace' },
-        { id: 's4', title: 'Profilo di Windows Terminal', lastModified: Date.now() - 9 * day, cwd: 'C:/Users/luca' },
-      ],
+      sessions: async () => fakeSessions.map((s) => Object.assign({}, s)),
+      renameSession: async (id, title) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.title = title; return true },
+      archiveSession: async (id, cwd, on) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.archived = !!on; return true },
+      deleteSession: async (id) => { const k = fakeSessions.findIndex((x) => x.id === id); if (k >= 0 && confirm('Eliminare?')) { fakeSessions.splice(k, 1); return { deleted: true } } return { deleted: false } },
       openSession: async () => [
         { role: 'user', text: 'Aggiungi i fiumi alla mappa' },
         { role: 'assistant', text: 'Guardo prima come si disegna la mappa.' },

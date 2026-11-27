@@ -680,13 +680,37 @@ class ClaudeBridge extends EventEmitter {
   // desktop (le sue comprese, coi loro titoli); ognuna con la sua cartella, che serve per riprenderla
   async sessions() {
     const { listSessions } = await loadSdk()
-    const list = await listSessions({ limit: 80 })
+    const list = await listSessions({ limit: 300 })
     return list.map((s) => ({
       id: s.sessionId,
       title: s.customTitle || s.summary || s.firstPrompt || '(senza titolo)',
       lastModified: s.lastModified,
       cwd: s.cwd ? s.cwd.replace(/\\/g, '/') : null,
+      branch: s.gitBranch || null,
+      archived: !!s.archived,
     }))
+  }
+
+  // Le azioni sugli annali, come nel menu delle conversazioni dell'app desktop: rinomina (la riga custom-title nel
+  // transcript), archivia o ripristina (un segno accanto al transcript: la sessione resta, si nasconde dall'elenco),
+  // elimina (il transcript se ne va)
+  async renameSessionTitle(id, title, cwd) {
+    const { renameSession } = await loadSdk()
+    const clean = String(title || '').replace(/\s+/g, ' ').trim().slice(0, 200)
+    if (!clean) return false
+    await renameSession(id, clean, cwd ? { dir: cwd } : {}).catch(() => renameSession(id, clean))
+    return true
+  }
+  async archive(id, cwd, on) {
+    const sdk = await loadSdk()
+    const fn = on ? sdk.archiveSession : sdk.unarchiveSession
+    await fn(id, cwd ? { dir: cwd } : {}).catch(() => fn(id))
+  }
+  async remove(id, cwd) {
+    const { deleteSession } = await loadSdk()
+    // Se è la conversazione accesa, prima si spegne
+    if (this.live && this.live.sessionId === id) this.cancel()
+    await deleteSession(id, cwd ? { dir: cwd } : {}).catch(() => deleteSession(id))
   }
 
   // Una sessione salvata, nell'ordine in cui è andata: le domande della persona (anche i comandi con /), le risposte

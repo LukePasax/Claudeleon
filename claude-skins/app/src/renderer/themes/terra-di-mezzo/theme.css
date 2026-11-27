@@ -142,3 +142,14 @@ body:not(.giorno) .candle .glow { opacity: 0.9; }
   .composer { padding: 6px 20px 10px; }
   .candle { display: none; }
 }
+
+/* Gli annali sul legno: ricerca scura, gruppi e "⋯" nei colori della barra */
+.side .sessions-search { background: rgba(0, 0, 0, 0.22); color: var(--side-ink); margin: 0 2px 4px; width: calc(100% - 4px); }
+.side .sessions-search:focus { border-color: rgba(232, 200, 114, 0.45); }
+.side .sessions-search::placeholder { color: var(--side-soft); }
+.side .session-group { color: var(--side-soft); }
+.side .session-more { color: var(--side-ink); }
+.side .session-more:hover { background: rgba(244, 234, 210, 0.12); }
+.side .session-rename { color: var(--side-ink); background: rgba(0, 0, 0, 0.3); border-color: var(--brass); }
+.side .sessions-archived { color: var(--side-soft); }
+.side .sessions-archived:hover { color: var(--side-ink); }

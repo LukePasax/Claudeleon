@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld('skins', {
   readImage: (p) => ipcRenderer.invoke('file:image', p),
   stop: () => ipcRenderer.send('chat:stop'),
   setTrayIcon: (dataUrl) => ipcRenderer.send('tray:icon', dataUrl),
+  renameSession: (id, title, cwd) => ipcRenderer.invoke('session:rename', id, title, cwd),
+  archiveSession: (id, cwd, on) => ipcRenderer.invoke('session:archive', id, cwd, on),
+  deleteSession: (id, cwd, title) => ipcRenderer.invoke('session:delete', id, cwd, title),
   answer: (id, allow, always, answers) => ipcRenderer.send('perm:answer', { id, allow, always, answers }),
   // Modello e ragionamento
   models: () => ipcRenderer.invoke('models:get'),

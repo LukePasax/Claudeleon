@@ -82,7 +82,11 @@ npm 11 altrimenti non arriva.
 
   Le domande compaiono nella conversazione con Permetti, Sempre e Nega, e con le differenze se riguardano un file.
 - **Cronache (annali):** le sessioni di Claude Code di tutte le cartelle, le più recenti prima, come nella barra
-  laterale dell'app desktop (le sue comprese, coi loro titoli); accanto alla data c'è la cartella. Sono sempre
+  laterale dell'app desktop (le sue comprese, coi loro titoli), raggruppate per giorno (oggi, ieri, ultimi 7 e 30
+  giorni, più vecchie); accanto all'ora c'è la cartella e il branch git. In cima un campo di ricerca filtra per
+  titolo, cartella e branch. Ogni conversazione ha un menu ("⋯" passandoci sopra, o il tasto destro): **Rinomina**
+  (sul posto, Invio salva), **Archivia** (resta sul disco e sparisce dall'elenco; le archiviate si vedono in fondo)
+  ed **Elimina** (chiede conferma e cancella il transcript). Sono sempre
   visibili nella barra laterale. Aprendone una si vedono
   gli ultimi 40 messaggi con le azioni di Claude e il loro esito, le modifiche ai file (chiuse: si aprono con un
   clic sulla riga), i comandi con `/` e la loro uscita; i messaggi dopo la continuano nella sua cartella. Non aprire qui una sessione che è aperta

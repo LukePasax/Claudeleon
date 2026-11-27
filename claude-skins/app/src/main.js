@@ -412,6 +412,22 @@ function registerIpc() {
     if (bridge.commandList.length) return bridge.commandList
     try { return JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'commands.json'), 'utf8')) } catch { return [] }
   })
+  // Le azioni sugli annali. Eliminare chiede conferma; se era la conversazione in corso, si ricomincia da capo
+  ipcMain.handle('session:rename', async (_e, id, title, cwd) => bridge.renameSessionTitle(id, title, cwd))
+  ipcMain.handle('session:archive', async (_e, id, cwd, on) => { await bridge.archive(id, cwd, !!on); return true })
+  ipcMain.handle('session:delete', async (_e, id, cwd, title) => {
+    const r = await dialog.showMessageBox(win, {
+      type: 'warning', buttons: ['Elimina', 'Annulla'], defaultId: 1, cancelId: 1, noLink: true,
+      title: 'Eliminare la conversazione?',
+      message: `Eliminare «${String(title || '').slice(0, 80)}»?`,
+      detail: 'Il transcript di Claude Code viene cancellato dal disco e non si può recuperare, nemmeno dall\'app desktop. Per toglierla solo dall\'elenco c\'è "Archivia".',
+    })
+    if (r.response !== 0) return { deleted: false }
+    const wasCurrent = config.sessionId === id
+    await bridge.remove(id, cwd)
+    if (wasCurrent) { config.sessionId = null; config.sessionCwd = null; bridge.sessionCwd = null; saveConfig() }
+    return { deleted: true, wasCurrent }
+  })
   // Apre una sessione di Claude Code, anche dell'app desktop: i messaggi dopo continuano quella, nella sua cartella
   ipcMain.handle('session:open', async (_e, id, cwd) => {
     bridge.cancel()
