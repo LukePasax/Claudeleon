@@ -2,8 +2,9 @@
 
 Interfacce alternative per lavorare con Claude Code.
 
-Per aprire Claude Skins su Windows: doppio clic su `avvia.cmd` qui nella cartella principale. La prima volta installa
-da solo le dipendenze ed Electron (serve [Node.js](https://nodejs.org) LTS).
+Per installare Claude Skins su Windows come un'app: doppio clic su `crea-installer.cmd` qui nella cartella principale,
+poi sull'installer che crea (`claude-skins\app\dist\Claude Skins Setup <versione>.exe`). Per aprirla dal repo senza
+installare: doppio clic su `avvia.cmd`. Serve [Node.js](https://nodejs.org) LTS.
 
 - [`claude-skins/`](claude-skins/) — **Claude Skins**: un'app Electron a temi, grande come l'app desktop, che
   comanda Claude Code con l'Agent SDK. È a temi, ognuno con la sua forma: Terra di Mezzo (lo scrittoio di Casa Baggins,

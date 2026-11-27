@@ -13,19 +13,35 @@ aggiungono come cartelle in `src/renderer/themes/`, ognuno con il proprio schele
 Serve Windows con [Node.js](https://nodejs.org) LTS e Claude Code installato a parte, con il login fatto
 (`irm https://claude.ai/install.ps1 | iex`, poi `claude` e `/login`).
 
-Basta fare doppio clic su `avvia.cmd`, qui o quello nella cartella principale del repo, che fa lo stesso. La prima volta (e dopo ogni clone nuovo, perché `node_modules` non sta nel
-repo) installa da sola le dipendenze ed Electron, in qualche minuto; le volte dopo parte subito.
+### Come app installata (consigliato)
+
+Doppio clic su `crea-installer.cmd` (qui o nella cartella principale del repo). La prima volta scarica gli strumenti
+(electron-builder), poi crea `dist\Claude Skins Setup <versione>.exe` e apre la cartella. Si lancia l'installer:
+chiede dove installare (di partenza nella cartella dell'utente, senza diritti di amministratore), mette Claude Skins
+nel menu Start e sul desktop con la sua icona, e alla fine lo apre. Si disinstalla da Impostazioni → App.
+
+- L'installer non è firmato: Windows SmartScreen può dire "Windows ha protetto il PC". Si va avanti con
+  "Ulteriori informazioni" → "Esegui comunque".
+- Configurazione, temi scelti e conversazioni restano gli stessi della versione da `avvia.cmd`
+  (`%APPDATA%\Claude Skins`, e le sessioni sono quelle di Claude Code). Disinstallare non li cancella.
+- Per aggiornare dopo un `git pull`: di nuovo `crea-installer.cmd` e l'installer nuovo sopra quello vecchio.
+- Il pacchetto non contiene Claude Code: usa quello installato (`~/.local/bin/claude.exe`).
+
+### Dal repo, senza installare
+
+Doppio clic su `avvia.cmd`, qui o quello nella cartella principale del repo, che fa lo stesso. La prima volta (e dopo
+ogni clone nuovo, perché `node_modules` non sta nel repo) installa da sola le dipendenze ed Electron, in qualche
+minuto; le volte dopo parte subito.
 
 A mano: `npm install` nella cartella dell'app. Lo script `postinstall` scarica anche il binario di Electron, che con
-npm 11 altrimenti non arriva.
+npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o Wine per l'icona dell'eseguibile);
+`npm run pack` solo la cartella dell'app impacchettata.
 
 ## Uso
 
-- **Avvio:** doppio clic su `avvia.cmd`. La finestra compare al centro dello schermo, grande come l'app desktop
+- **Avvio:** dal menu Start o dal desktop (app installata), o doppio clic su `avvia.cmd`. La finestra compare al centro dello schermo, grande come l'app desktop
   (Terra di Mezzo 1180×780, Metrios e Dream 1100×760, mai oltre il 92% dello schermo).
-- **Il viaggio (Terra di Mezzo):** sulla pagina sinistra una mappa della Terra di Mezzo; a ogni tuo messaggio il
-  viandante avanza di una tappa, dalla Contea al Monte Fato, e un nuovo capitolo lo riporta a Hobbiville.
-- **Spostare e allargare:** si trascina dalla testata (la copertina del libro, la barra in alto di Metrios e Dream); la
+- **Spostare e allargare:** si trascina dalla testata (la trave in alto in Terra di Mezzo, la barra in alto di Metrios e Dream); la
   maniglia a gradini in basso a destra allarga e allunga. Posizione e dimensione restano, e la dimensione è
   ricordata per tema. Dal vassoio: "Riporta al centro" e "Dimensione iniziale".
 - **Bordi e ingrandimento:** la finestra si ridimensiona da tutti i lati e gli angoli, come una finestra normale. Il

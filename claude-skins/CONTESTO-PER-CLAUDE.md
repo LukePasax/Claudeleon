@@ -246,6 +246,18 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
   scrittura chiesta, negata dal ponte, file non creato; elenco delle sessioni coi titoli dell'app desktop.
 - Usata dall'utente: spostata e allargata, aperta una cronaca dell'app desktop.
 
+## Installer
+
+`electron-builder` (devDependency), configurato nel campo `build` di package.json: NSIS per Windows, per utente,
+cartella scelta, collegamenti nel menu Start e sul desktop, `appId` = `ClaudeSkins.App`, lo stesso AppUserModelId che
+main.js imposta (l'installer lo mette sui collegamenti: notifiche e icona della barra vanno da sé, e l'app impacchettata
+non scrive il suo collegamento). Icona dell'eseguibile in `build/icon.ico` (la porta tonda di Terra di Mezzo, otto
+misure da 256 a 16, disegnata dal `trayIcon({ size })` del tema e scritta come .ico coi PNG dentro). Nel pacchetto non
+entrano i binari di Claude Code che l'SDK porta per ogni sistema (`claude-agent-sdk-*`, ~380 MB l'uno): l'app usa
+quello installato. `crea-installer.cmd` (app e radice) fa `npm install` se serve e `npm run dist`. Da Linux la
+costruzione per Windows chiede Wine (rcedit per l'icona dell'eseguibile); `npm run pack -- --linux dir` dà la cartella
+per provarla con `--cattura`. L'installer non è firmato (SmartScreen).
+
 ## Prossimi passi possibili
 
 0. **Temi.**

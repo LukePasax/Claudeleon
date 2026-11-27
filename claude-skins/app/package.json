@@ -2,18 +2,69 @@
   "name": "claude-skins",
   "productName": "Claude Skins",
   "version": "0.1.0",
-  "description": "Claude in una finestra in pixel art, a temi",
+  "description": "Claude in una finestra a temi",
   "main": "src/main.js",
   "private": true,
   "scripts": {
     "start": "electron .",
-    "postinstall": "node node_modules/electron/install.js"
+    "postinstall": "node node_modules/electron/install.js",
+    "dist": "electron-builder --win nsis",
+    "pack": "electron-builder --dir"
   },
   "devDependencies": {
-    "electron": "^45.5.0"
+    "electron": "^45.5.0",
+    "electron-builder": "^26.18.0"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.332",
     "zod": "^4.6.7"
+  },
+  "author": "Claude Skins",
+  "build": {
+    "appId": "ClaudeSkins.App",
+    "productName": "Claude Skins",
+    "copyright": "Claude Skins",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      "!node_modules/@anthropic-ai/claude-agent-sdk-*{,/**}"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/@anthropic-ai/claude-agent-sdk/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Claude Skins",
+      "uninstallDisplayName": "Claude Skins",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "Claude Skins Setup ${version}.${ext}",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "linux": {
+      "target": "dir",
+      "icon": "build/icon.png"
+    }
   }
 }

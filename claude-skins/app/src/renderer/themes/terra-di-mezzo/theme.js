@@ -399,11 +399,23 @@
         c.height = size
         const g = c.getContext('2d')
         g.scale(size / 32, size / 32)
-        g.beginPath(); g.arc(16, 16, 15, 0, Math.PI * 2); g.fillStyle = '#5a3a1a'; g.fill()
-        g.beginPath(); g.arc(16, 16, 12.5, 0, Math.PI * 2); g.fillStyle = '#2e5c2a'; g.fill()
-        g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = 1
-        for (const x of [10, 16, 22]) { g.beginPath(); g.moveTo(x + 0.5, 4); g.lineTo(x + 0.5, 28); g.stroke() }
-        g.beginPath(); g.arc(16, 16, 2.6, 0, Math.PI * 2); g.fillStyle = '#e6c36a'; g.fill()
+        // La cornice di legno, con una luce in alto a sinistra
+        g.beginPath(); g.arc(16, 16, 15.2, 0, Math.PI * 2); g.fillStyle = '#6b4423'; g.fill()
+        g.lineWidth = 0.9; g.strokeStyle = '#3a2412'; g.stroke()
+        g.beginPath(); g.arc(16, 16, 13.9, Math.PI * 1.05, Math.PI * 1.6); g.lineWidth = 1; g.strokeStyle = 'rgba(255, 220, 160, 0.35)'; g.stroke()
+        // La porta verde, rotonda, con le assi dentro
+        const grad = g.createRadialGradient(13, 12, 2, 16, 16, 13)
+        grad.addColorStop(0, '#4a8a40'); grad.addColorStop(1, '#2a5426')
+        g.save()
+        g.beginPath(); g.arc(16, 16, 12.2, 0, Math.PI * 2); g.fillStyle = grad; g.fill(); g.clip()
+        g.strokeStyle = 'rgba(0, 0, 0, 0.28)'; g.lineWidth = 0.7
+        for (const x of [8.5, 12.3, 16.1, 19.9, 23.7]) { g.beginPath(); g.moveTo(x, 2); g.lineTo(x, 30); g.stroke() }
+        g.restore()
+        g.beginPath(); g.arc(16, 16, 12.2, 0, Math.PI * 2); g.lineWidth = 0.8; g.strokeStyle = '#1c3a1a'; g.stroke()
+        // Il pomello d'ottone al centro
+        g.beginPath(); g.arc(16, 16, 2.1, 0, Math.PI * 2); g.fillStyle = '#e6c36a'; g.fill()
+        g.lineWidth = 0.5; g.strokeStyle = '#8a6a20'; g.stroke()
+        g.beginPath(); g.arc(15.4, 15.3, 0.7, 0, Math.PI * 2); g.fillStyle = 'rgba(255, 250, 220, 0.8)'; g.fill()
         return c
       },
     },

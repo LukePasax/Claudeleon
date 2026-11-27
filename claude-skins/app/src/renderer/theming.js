@@ -79,6 +79,7 @@
     effort_max: 'Max',
     // La riga "sta lavorando": un verbo a caso, separati da |
     workingVerbs: 'Claudando|Rimuginando|Elucubrando|Architettando|Cogitando|Ponderando|Arzigogolando|Macinando|Districando|Combinando',
+    workingEsc: 'Esc per fermare',
     // Le risposte suggerite
     suggestionTip: 'Manda questa risposta (Tab la scrive nella casella)',
     // Il nome dell'app, per i temi che lo scrivono nella testata

@@ -1194,7 +1194,8 @@
     if (w) { log.appendChild(w); return }
     w = document.createElement('div')
     w.className = 'item working'
-    w.innerHTML = '<span class="w-spin"></span><span class="w-verb"></span><span class="w-dots"><i></i><i></i><i></i></span><span class="w-time"></span>'
+    w.innerHTML = '<span class="w-spin"></span><span class="w-verb"></span><span class="w-dots"><i></i><i></i><i></i></span><span class="w-time"></span><span class="w-esc"></span>'
+    label(w.querySelector('.w-esc'), 'workingEsc')
     const verbs = t('workingVerbs').split('|').map((x) => x.trim()).filter(Boolean)
     w.dataset.verb = String(Math.floor(Math.random() * Math.max(1, verbs.length)))
     w.querySelector('.w-verb').textContent = verbs[Number(w.dataset.verb)] || ''
@@ -2228,6 +2229,15 @@
     if (e.key === 'Escape' && document.querySelector('.folder-menu')) { closeFolderMenu(); return }
     // F11: schermo intero, e di nuovo per tornare
     if (e.key === 'F11') { e.preventDefault(); api.windowMode('full'); return }
+    // Esc ferma Claude, come nell'app desktop. Prima chiude il menu dei comandi, se è aperto; i campi che usano Esc
+    // per sé (ricerca negli annali, rinomina, risposta libera a una domanda) lo tengono
+    if (e.key === 'Escape' && busy) {
+      if (e.target.matches('[data-part="input"]') && menuKey(e)) { e.preventDefault(); return }
+      if (e.target.matches('.sessions-search, .session-rename, .q-other')) return
+      e.preventDefault()
+      actions.stop()
+      return
+    }
     if (!e.target.matches('[data-part="input"]')) return
     if (menuKey(e)) { e.preventDefault(); return }
     if (composerKey(e, e.target)) return

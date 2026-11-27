@@ -716,7 +716,7 @@ function setAppIcon(dataUrl) {
       appId: APP_ID,
       appIconPath: iconFile(),
       appIconIndex: 0,
-      relaunchCommand: `"${process.execPath}" "${app.getAppPath()}"`,
+      relaunchCommand: app.isPackaged ? `"${process.execPath}"` : `"${process.execPath}" "${app.getAppPath()}"`,
       relaunchDisplayName: 'Claude Skins',
     })
     iconLog('setAppDetails fatto, appId', APP_ID)
@@ -727,6 +727,8 @@ function setAppIcon(dataUrl) {
 // stesso AppUserModelId. Serve anche ad aprire Claude Skins dal menu Start. Nasce solo quando il file dell'icona
 // esiste già (lo scrive setAppIcon), così Windows non le lega mai l'icona di Electron
 function ensureStartMenuShortcut(iconChanged) {
+  // L'app installata ha già il suo collegamento, fatto dall'installer con lo stesso AppUserModelId (appId)
+  if (app.isPackaged) return
   if (process.platform !== 'win32' || !fs.existsSync(iconFile())) return
   try {
     const link = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Claude Skins.lnk')
@@ -734,6 +736,8 @@ function ensureStartMenuShortcut(iconChanged) {
     let same = false
     try {
       const cur = shell.readShortcutLink(link)
+      // Il collegamento dell'app installata (punta al suo .exe, non a electron.exe): la versione di sviluppo non lo tocca
+      if (cur.target && cur.target !== process.execPath && !/electron\.exe$/i.test(cur.target)) { iconLog('collegamento dell\'app installata: lasciato com\'è'); return }
       same = cur.target === want.target && cur.args === want.args && cur.appUserModelId === APP_ID && (cur.icon || '') === want.icon
     } catch {}
     let ok = true
