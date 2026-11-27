@@ -1,8 +1,9 @@
 {
   "name": "claudeleon",
   "productName": "Claudeleon",
-  "version": "0.1.0",
-  "description": "Claude in una finestra a temi",
+  "version": "1.0.0",
+  "description": "Claude Code in una finestra a temi",
+  "repository": "github:LukePasax/Claude-desktop-skins",
   "main": "src/main.js",
   "private": true,
   "scripts": {
@@ -21,6 +22,7 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.332",
+    "electron-updater": "^6.8.11",
     "zod": "^4.6.7"
   },
   "author": "Claudeleon",
@@ -62,7 +64,7 @@
       "uninstallDisplayName": "Claudeleon",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
-      "artifactName": "Claudeleon Setup ${version}.${ext}",
+      "artifactName": "Claudeleon-Setup-${version}.${ext}",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
     },
@@ -70,6 +72,13 @@
       "target": "dir",
       "icon": "build/icon.png"
     },
-    "publish": null
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "LukePasax",
+        "repo": "Claude-desktop-skins",
+        "releaseType": "release"
+      }
+    ]
   }
 }

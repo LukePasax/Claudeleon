@@ -5,6 +5,7 @@ const fs = require('fs')
 const path = require('path')
 const { ClaudeBridge, DEFAULT_CLAUDE, loadContextMax, savedContextMax } = require('./claude-bridge')
 const { Updater } = require('./updater')
+const { ReleaseUpdater } = require('./release-updater')
 const { listFiles, rankFiles } = require('./files')
 const gitOps = require('./git')
 const permissions = require('./permissions')
@@ -514,6 +515,8 @@ async function settingsState() {
     shortcut: TOGGLE_SHORTCUT.replace('Control', 'Ctrl'),
     autoUpdate: config.autoUpdate !== false,
     worktree: config.worktree === true,
+    updateSource: updateSource(),
+    updateSources: updateSources(),
   }
 }
 // Una scelta del pannello: si applica subito e si ricorda
@@ -522,6 +525,11 @@ async function applySetting(key, value) {
   else if (key === 'notify') { config.notify = !!value; saveConfig() }
   else if (key === 'autoUpdate') { config.autoUpdate = !!value; saveConfig() }
   else if (key === 'worktree') { config.worktree = !!value; saveConfig() }
+  else if (key === 'updateSource' && updateSources().includes(value)) {
+    config.updateSource = value
+    saveConfig()
+    if (updater) { makeUpdater(); send('update:state', updater.state); updater.check() }
+  }
   else if (key === 'openAtLogin') { try { app.setLoginItemSettings(Object.assign({ openAtLogin: !!value }, loginArgs())) } catch {} }
   else if (key === 'entrypoint') {
     config.entrypoint = value === 'claude-desktop' ? 'claude-desktop' : 'cli'
@@ -1113,6 +1121,42 @@ function setAppIcon(dataUrl) {
   } catch (err) { iconLog('errore:', err && err.message) }
 }
 
+// Da dove arrivano gli aggiornamenti: dalle release di GitHub (l'app installata dall'installer di una release) o dal
+// repo sul PC (quella lanciata dal repo, o installata da un installer fatto dal repo, che sa da quale clone viene).
+// L'app installata dal repo può scegliere anche le release (impostazioni, "Aggiornamenti da")
+let releaseUpdater = null
+function appMeta() {
+  try { return JSON.parse(fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8')) } catch { return {} }
+}
+function updateSources() {
+  const list = []
+  if (app.isPackaged) list.push('github')
+  if (!app.isPackaged || appMeta().skinsRepo) list.push('repo')
+  return list
+}
+function updateSource() {
+  const list = updateSources()
+  if (list.includes(config.updateSource)) return config.updateSource
+  return app.isPackaged && !appMeta().skinsRepo ? 'github' : 'repo'
+}
+function makeUpdater() {
+  if (updater) updater.removeAllListeners('state')
+  if (updateSource() === 'github') updater = releaseUpdater = releaseUpdater || new ReleaseUpdater(app)
+  else updater = new Updater(app)
+  updater.on('state', (s) => {
+    send('update:state', s)
+    // Una novità la dice anche una notifica, una volta sola per versione (o per numero di novità nel repo)
+    const key = s.version || s.count
+    if (s.state === 'available' && key !== updateNotified && config.notify !== false && Notification.isSupported()) {
+      updateNotified = key
+      const body = s.version ? `È uscita la versione ${s.version}${s.commits && s.commits[0] ? `: ${s.commits[0]}` : ''}` : s.commits && s.commits[0] ? `${s.count} novità, fra cui: ${s.commits[0]}` : `${s.count} novità`
+      const n = new Notification({ title: 'Claudeleon: aggiornamento disponibile', body, icon: trayImage || undefined })
+      n.on('click', () => { bringBack(); send('settings:open') })
+      n.show()
+    }
+  })
+}
+
 // Il collegamento nel menu Start: Windows mostra le notifiche di un'app non installata solo se ne esiste uno con lo
 // stesso AppUserModelId. Serve anche ad aprire Claudeleon dal menu Start. Ha l'icona dell'app, così Windows non le
 // lega mai quella di Electron
@@ -1239,17 +1283,8 @@ app.whenReady().then(() => {
     ensureStartMenuShortcut()
     // Gli aggiornamenti: un controllo poco dopo l'avvio e poi ogni 6 ore (si spengono dalle impostazioni). Una novità
     // la dice anche una notifica, una volta sola per numero di novità
-    updater = new Updater(app)
-    updater.on('state', (s) => {
-      send('update:state', s)
-      if (s.state === 'available' && s.count !== updateNotified && config.notify !== false && Notification.isSupported()) {
-        updateNotified = s.count
-        const n = new Notification({ title: 'Claudeleon: aggiornamento disponibile', body: s.commits && s.commits[0] ? `${s.count} novità, fra cui: ${s.commits[0]}` : `${s.count} novità`, icon: trayImage || undefined })
-        n.on('click', () => { bringBack(); send('settings:open') })
-        n.show()
-      }
-    })
-    const autoCheck = () => { if (config.autoUpdate !== false) updater.check() }
+    makeUpdater()
+    const autoCheck = () => { if (config.autoUpdate !== false && updater) updater.check() }
     setTimeout(autoCheck, 30000)
     setInterval(autoCheck, 6 * 3600 * 1000)
   }

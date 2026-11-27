@@ -1982,7 +1982,11 @@
         for (const c of u.commits.slice(0, 10)) { const li = document.createElement('li'); li.textContent = c; list.appendChild(li) }
         body.appendChild(list)
       }
-      toggle(row('updAuto', t('updAutoNote')), st.autoUpdate !== false, (v) => set('autoUpdate', v))
+      // Da dove: solo se ci sono tutte e due le strade (l'app installata da un installer fatto col repo)
+      if (Array.isArray(st.updateSources) && st.updateSources.length > 1) {
+        select(row('updSource', t('updSourceNote')), st.updateSources.map((x) => [x, t(`updSource_${x}`)]), st.updateSource, async (v) => { await set('updateSource', v); try { updateState = await api.updateState() } catch {} ; render() })
+      }
+      toggle(row('updAuto', t(st.updateSource === 'github' ? 'updAutoNoteGithub' : 'updAutoNote')), st.autoUpdate !== false, (v) => set('autoUpdate', v))
       // Informazioni
       section('setAbout')
       row('setVersion', `${st.version || '?'}${st.installed ? '' : ` · ${t('setFromRepo')}`}`)
@@ -2009,8 +2013,8 @@
     if (u.state === 'unavailable') return u.error || t('updUnavailable')
     if (u.state === 'checking') return t('updChecking')
     if (u.state === 'uptodate') return t('updUpToDate') + (u.checkedAt ? ` · ${formatWhen(u.checkedAt)}` : '')
-    if (u.state === 'available') return t('updAvailable', { n: u.count }) + (u.dirty ? ` · ${t('updDirty')}` : '')
-    if (u.state === 'updating') return t(`updStep_${u.step || 'pull'}`)
+    if (u.state === 'available') return u.version ? t('updAvailableVersion', { v: u.version }) : t('updAvailable', { n: u.count }) + (u.dirty ? ` · ${t('updDirty')}` : '')
+    if (u.state === 'updating') return t(`updStep_${u.step || 'pull'}`, { v: u.version || '', p: u.percent || 0 })
     return `${t('updError')}: ${u.error || '?'}`
   }
   // L'avviso dell'avvio sicuro, al posto di quello degli aggiornamenti finché non lo si chiude
@@ -2039,19 +2043,19 @@
     if (safeInfo) return renderSafeBanner()
     const u = updateState
     if (!u) return
-    const show = u.state === 'updating' || (u.state === 'available' && !u.dirty && bannerDismissed !== u.count) || (u.state === 'error' && u.step === null)
+    const show = u.state === 'updating' || (u.state === 'available' && !u.dirty && bannerDismissed !== (u.version || u.count)) || (u.state === 'error' && u.step === null)
     if (!show) return
     const host = app.querySelector('[data-solid]') || app
     if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
     const b = document.createElement('div')
     b.className = `update-banner ${u.state}`
     b.innerHTML = '<span class="ub-icon"></span><span class="ub-text"></span>'
-    b.querySelector('.ub-text').textContent = u.state === 'available' ? t('updBanner', { n: u.count }) : updateText(u)
+    b.querySelector('.ub-text').textContent = u.state === 'available' ? (u.version ? t('updBannerVersion', { v: u.version }) : t('updBanner', { n: u.count })) : updateText(u)
     const btn = (key, fn, cls) => { const x = document.createElement('button'); x.className = `btn small ${cls || ''}`; label(x, key); x.addEventListener('click', fn); b.appendChild(x) }
     if (u.state === 'available') {
       btn('updApply', () => api.applyUpdate())
       btn('updDetails', () => openSettings(), 'deny')
-      btn('updLater', () => { bannerDismissed = u.count; renderUpdateBanner() }, 'deny')
+      btn('updLater', () => { bannerDismissed = u.version || u.count; renderUpdateBanner() }, 'deny')
     } else if (u.state === 'error') {
       btn('updDetails', () => openSettings(), 'deny')
       btn('updLater', () => { updateState = Object.assign({}, u, { step: undefined }); renderUpdateBanner() }, 'deny')

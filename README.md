@@ -2,9 +2,11 @@
 
 Un'app a temi per lavorare con Claude Code: cambia pelle come un camaleonte, la conversazione resta quella.
 
-Per installare Claudeleon su Windows come un'app: doppio clic su `crea-installer.cmd` qui nella cartella principale,
-poi sull'installer che crea (`claude-skins\app\dist\Claudeleon Setup <versione>.exe`). Per aprirla dal repo senza
-installare: doppio clic su `avvia.cmd`. Serve [Node.js](https://nodejs.org) LTS.
+**Per installarla:** scarica `Claudeleon-Setup-<versione>.exe` dall'[ultima release](https://github.com/LukePasax/Claude-desktop-skins/releases/latest)
+e lancialo; poi si aggiorna da sola dalle release. Serve Claude Code installato, col login fatto.
+
+Dal repo: doppio clic su `avvia.cmd` per aprirla senza installare, o su `crea-installer.cmd` per farsi l'installer
+(`claude-skins\app\dist\Claudeleon-Setup-<versione>.exe`). Serve [Node.js](https://nodejs.org) LTS.
 
 - [`claude-skins/`](claude-skins/) — **Claudeleon**: un'app Electron a temi, grande come l'app desktop, che
   comanda Claude Code con l'Agent SDK. Di serie ha un tema pulito, chiaro o scuro come Windows; altri temi si creano

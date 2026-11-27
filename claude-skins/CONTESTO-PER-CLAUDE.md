@@ -51,8 +51,8 @@ laterale dell'app desktop), conversazione a destra.
 ## Com'è fatta
 
 **Claude Skins diventa Claudeleon (novembre 2026).** Nome scelto dall'utente (Claude + camaleonte), sapendo che
-"Claude" dentro il nome è un piccolo rischio di marchio. Cambiati: nome, productName, installer (`Claudeleon Setup
-<versione>.exe`), collegamenti, titoli, scritte. Restano apposta: l'AppUserModelId `ClaudeSkins.App`/`.Dev` (per
+"Claude" dentro il nome è un piccolo rischio di marchio. Cambiati: nome, productName, installer (`Claudeleon-Setup-
+<versione>.exe`, coi trattini per le release di GitHub), collegamenti, titoli, scritte. Restano apposta: l'AppUserModelId `ClaudeSkins.App`/`.Dev` (per
 Windows è la stessa app), il formato dei temi `claude-skins-theme`, il protocollo `skins-theme`, la cartella del repo
 `claude-skins/` (l'aggiornamento della versione vecchia la cerca lì). `scripts/dist.js` lascia anche una copia
 `Claude Skins Setup <versione>.exe`, che è quella che l'aggiornatore della versione vecchia cerca; quello nuovo
@@ -298,6 +298,22 @@ alfanumerico del cwd diventa -) e carica il ponte con `query()` sostituita da un
 (tempi ×0,05); un `goto` per prova, tre temi. Sotto Linux serve xvfb (`xvfb-run -a npm run test:ui`). Una prova che
 fallisce deve spegnere le conversazioni accese (`after`), altrimenti il processo non finisce. `listFiles`/`rankFiles`
 stanno in `src/files.js`, `plainSnippet` in `src/text.js`.
+
+## Release su GitHub
+
+`.github/workflows/release.yml`: a mano (Run workflow) o con un tag `v<versione>`; prove della logica su
+ubuntu-latest, poi su windows-latest `electron-builder --win nsis --publish never` e `softprops/action-gh-release@v2`
+(tag `v<versione>` sul commit, note generate da GitHub, file: installer, `.blockmap`, `latest.yml`). Si ferma se il
+tag non è la versione del package.json o se la release c'è già. package.json: versione 1.0.0 (la prima pubblica),
+`repository`, `build.publish` github (owner LukePasax, repo Claude-desktop-skins, releaseType release) che mette
+`app-update.yml` nell'app impacchettata; `artifactName` coi trattini (GitHub cambia gli spazi dei nomi dei file).
+`src/release-updater.js`: `ReleaseUpdater` con electron-updater (autoDownload spento; `update()` scarica, poi
+`quitAndInstall(true, true)`), stessa forma di stato di `Updater` più `version`, `percent`, `source: 'github'`;
+`noteLines` per le note, `friendly` per gli errori. main.js: `updateSources()` (github se impacchettata, repo se dal
+repo o costruita dal repo con `skinsRepo`), `updateSource()` (scelta in `config.updateSource`, se no github per chi
+ha installato dalla release), `makeUpdater()` (electron-updater una volta sola: è un singleton). Il repo deve essere
+pubblico. Se l'utente rinomina il repo su GitHub va cambiato `build.publish.repo` (GitHub reindirizza, ma meglio
+il nome giusto).
 
 ## Aggiornamento
 

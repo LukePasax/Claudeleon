@@ -25,7 +25,7 @@ if (r.status === 0) {
   const dist = path.join(appDir, 'dist')
   try {
     for (const f of fs.readdirSync(dist)) {
-      const m = /^Claudeleon Setup (.*\.exe)$/.exec(f)
+      const m = /^Claudeleon-Setup-(.*\.exe)$/.exec(f)
       if (m) fs.copyFileSync(path.join(dist, f), path.join(dist, `Claude Skins Setup ${m[1]}`))
     }
   } catch {}
