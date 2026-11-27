@@ -731,3 +731,7 @@ body.busy .entry .edit-btn { display: none; }
 .mem-view { flex: 1; min-height: 260px; height: 46vh; overflow-y: auto; box-sizing: border-box; padding: 4px 12px; border: var(--line) solid var(--edge-light); border-radius: var(--radius-small); user-select: text; }
 .mem-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
 .mem-state { font-size: var(--small-size); color: var(--gold); }
+
+/* Dettatura: il microfono accanto a "+" */
+.dictate-btn { display: inline-grid; place-items: center; }
+.dictate-btn.on { color: var(--btn-ink); background: var(--btn-bg); border-color: var(--btn-bg); }

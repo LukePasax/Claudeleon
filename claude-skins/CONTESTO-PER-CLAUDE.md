@@ -298,6 +298,15 @@ Nella pagina: `data-part="git"` (o dentro `data-part="folder"`), pannello `.git-
 conversazione, `refreshGit()` lo rilegge (cambio di cartella o di conversazione, fine risposta, focus della finestra).
 Prove: `test/unit/git.test.js` (un repo vero con un remoto nudo), e il pannello nelle prove della finestra.
 
+## Dettatura
+
+Solo Windows (`api.dictate` c'è solo se `process.platform === 'win32'` nel preload). `webkitSpeechRecognition` in
+Electron non funziona (manca il servizio di Google), quindi si accende la digitazione vocale di Windows premendo
+Win+H: Electron non preme tasti di sistema, e main.js tiene un PowerShell nascosto (`-Command -`, comandi da stdin)
+con un `Add-Type` che espone `keybd_event` (LWin giù, H giù, H su, LWin su); avviato alla prima dettatura, chiuso
+all'uscita. La pagina prima mette a fuoco la casella. Pulsante `.dictate-btn` dopo `data-action="attach"`, o
+`data-action="dictate"` del tema. Non provato qui (Linux): da verificare su Windows.
+
 ## Fissate ed esportazione
 
 `config.pinned` (id delle sessioni, la più recente prima): `sessions:list` aggiunge `pinned`, la pagina le mette nel

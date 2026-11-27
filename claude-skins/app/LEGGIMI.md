@@ -130,6 +130,10 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   stato, da quanto, quanti strumenti ha usato, l'ultimo e il riassunto finale, con "Ferma" e "Uscita" (il file con
   l'uscita). Mentre Claude lavora, "Manda in background" (o Ctrl+B) sposta in background il comando o il sotto-agente
   in corso, come nel terminale, e Claude va avanti. Con attività in corso la conversazione non si spegne da sola.
+- **Dettatura:** su Windows, accanto a "+" c'è un microfono: mette il cursore in fondo alla casella e accende la
+  digitazione vocale di Windows (la stessa di Win+H), che scrive quello che dici; un altro clic (o Win+H) la ferma.
+  La lingua è quella scelta in Windows (Impostazioni → Ora e lingua → Voce). Il riconoscimento vocale di Chromium
+  dentro Electron non funziona, per questo si usa quello del sistema.
 - **Conversazioni fissate ed esportazione:** nel menu di una conversazione negli annali (⋯ o clic destro) "Fissa in
   alto" la mette nel gruppo "Fissate", in cima (si ricorda; "Togli dalle fissate" la rimette al suo posto), ed
   "Esporta in Markdown…" la salva in un file .md (domande, risposte, una riga per ogni azione di Claude, file

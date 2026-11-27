@@ -1974,6 +1974,7 @@
     renderGhost()
     renderUpdateBanner()
     renderChapterHead()
+    renderDictate()
     // L'anteprima aperta resta aperta col tema nuovo
     if (preview && !preview.hidden) { preview = null; openPreview(previewUrl) } else preview = null
     renderPreviewBtn()
@@ -2931,6 +2932,35 @@
     }
     return box
   }
+  // ------------------------------------------------------------------ dettatura
+
+  // Il microfono accanto a "+" (o dove il tema mette data-action="dictate"): mette il cursore in fondo alla casella e
+  // accende la digitazione vocale di Windows (Win+H), che scrive lì. Solo dove c'è (api.dictate)
+  const MIC = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>'
+  function renderDictate() {
+    const own = all('[data-action="dictate"]')
+    for (const b of own) { b.hidden = !api.dictate; if (!b.title) b.title = t('dictateTip') }
+    if (own.length || !api.dictate) return
+    for (const attach of all('[data-action="attach"]')) {
+      if (attach.nextElementSibling && attach.nextElementSibling.classList.contains('dictate-btn')) continue
+      const b = document.createElement('button')
+      b.className = 'attach-btn dictate-btn'
+      b.dataset.action = 'dictate'
+      b.innerHTML = MIC
+      b.title = t('dictateTip')
+      attach.after(b)
+    }
+  }
+  async function dictate() {
+    const input = part('input')
+    if (!input || !api.dictate) return
+    input.focus()
+    input.setSelectionRange(input.value.length, input.value.length)
+    const b = app.querySelector('.dictate-btn, [data-action="dictate"]')
+    if (b) { b.classList.add('on'); setTimeout(() => b.classList.remove('on'), 1500) }
+    await api.dictate()
+  }
+
   function renderAttachments() {
     const box = attachBox()
     if (!box) return
@@ -3890,6 +3920,7 @@
     'sessions-close': () => { if (part('sessions') && !sessionsPinned()) part('sessions').hidden = true },
     themes: openThemes,
     settings: openSettings,
+    dictate: () => dictate(),
     preview: togglePreview,
     memory: () => openMemory(),
     maximize: () => api.windowMode('max'),
@@ -4230,6 +4261,7 @@
       readMemory: async (_c, f) => ({ ok: true, text: fakeMemory.get(f) || '', exists: fakeMemory.has(f) }),
       writeMemory: async (_c, f, text) => { fakeMemory.set(f, text); return { ok: true } },
       openMemory: async () => true,
+      dictate: async () => true,
       capturePreview: async () => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
       gitStatus: async () => JSON.parse(JSON.stringify(fakeGit)),
       gitDiff: async (_c, f) => (f.endsWith('.cpp') ? { file: f, created: f.includes('Rivers'), hunks: [{ before: f.includes('Rivers') ? '' : 'void Draw(Map& map) {\n    DrawRoads(map);\n}\n', after: 'void Draw(Map& map) {\n    DrawRivers(map);\n    DrawRoads(map);\n}\n', line: 1 }] } : { file: f, deleted: true, hunks: [{ before: '# Vecchio\n', after: '', line: 1 }] }),

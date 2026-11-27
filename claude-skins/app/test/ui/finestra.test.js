@@ -304,6 +304,16 @@ for (const tema of TEMI) {
     assert.deepEqual(errors, [])
   })
 
+  test(`${tema}: dettatura, il microfono mette il cursore nella casella`, async () => {
+    await open(tema)
+    await page.fill('[data-part="input"]', 'Ciao')
+    await page.click('.dictate-btn')
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.part), 'input')
+    assert.equal(await page.evaluate(() => document.activeElement.selectionStart), 4)
+    assert.ok(await page.$('.dictate-btn.on'))
+    assert.deepEqual(errors, [])
+  })
+
   test(`${tema}: impostazioni, estensioni, contesto, cambio di tema che tiene la conversazione`, async () => {
     await open(tema)
     await send('Ciao')

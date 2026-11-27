@@ -430,6 +430,7 @@
     sessionDelete: 'Elimina…',
     // Gli allegati
     attachTip: 'Allega file o immagini (anche incollando o trascinando)',
+    dictateTip: 'Detta: la digitazione vocale di Windows scrive nella casella (anche con Win+H; di nuovo per fermarla)',
     attachRemove: 'Togli',
     attachNoPath: '«{name}» non ha un percorso sul disco: trascinalo da Esplora file o sceglilo col pulsante +.',
     attachFailed: 'Non riesco a leggere l\'immagine «{name}».',

@@ -46,6 +46,8 @@ contextBridge.exposeInMainWorld('skins', {
   openFile: (p, conv) => ipcRenderer.invoke('file:open', p, conv),
   revealFile: (p, conv) => ipcRenderer.invoke('file:reveal', p, conv),
   capturePreview: (rect) => ipcRenderer.invoke('preview:capture', rect),
+  // Solo su Windows: la digitazione vocale del sistema (Win+H)
+  dictate: process.platform === 'win32' ? () => ipcRenderer.invoke('dictate:start') : undefined,
   permissions: (conv) => ipcRenderer.invoke('perms:get', conv),
   pinSession: (id, on) => ipcRenderer.invoke('session:pin', id, on),
   exportSession: (id, cwd, title) => ipcRenderer.invoke('session:export', id, cwd, title),

@@ -550,6 +550,8 @@ function registerIpc() {
   ipcMain.handle('settings:set', (_e, key, value) => applySetting(String(key), value))
   ipcMain.on('app:icon', (_e, dataUrl) => { if (!captureMode) setAppIcon(String(dataUrl || '')); else if (process.platform !== 'darwin') win.setIcon(nativeImage.createFromDataURL(String(dataUrl || ''))) })
   // Copiare negli appunti (i pulsanti "copia" di codice e risposte)
+  // La dettatura: la digitazione vocale di Windows (Win+H) nella casella, che la pagina ha appena messo a fuoco
+  ipcMain.handle('dictate:start', () => dictate())
   // Una foto dell'anteprima (il rettangolo del riquadro nella pagina), da allegare per Claude
   ipcMain.handle('preview:capture', async (_e, r) => {
     try {
@@ -1050,7 +1052,28 @@ app.whenReady().then(() => {
   win.webContents.once('did-finish-load', () => setTimeout(() => bridge.loadCommands(), 1500))
 })
 
+// Win+H da qui: Electron non preme tasti del sistema, quindi un PowerShell resta aperto (nascosto) con la funzione
+// che li preme (user32 keybd_event); si avvia alla prima dettatura e le volte dopo risponde subito
+let dictator = null
+function dictate() {
+  if (process.platform !== 'win32') return false
+  try {
+    if (!dictator || dictator.exitCode !== null || dictator.killed) {
+      dictator = require('child_process').spawn('powershell.exe', ['-NoProfile', '-NoLogo', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', '-'], { windowsHide: true, stdio: ['pipe', 'ignore', 'ignore'] })
+      dictator.on('error', () => { dictator = null })
+      dictator.stdin.on('error', () => {})
+      dictator.stdin.write("Add-Type -Namespace SkinsVoice -Name Keys -MemberDefinition '[DllImport(\"user32.dll\")] public static extern void keybd_event(byte v, byte s, uint f, System.UIntPtr e); public static void WinH() { keybd_event(0x5B,0,0,System.UIntPtr.Zero); keybd_event(0x48,0,0,System.UIntPtr.Zero); keybd_event(0x48,0,2,System.UIntPtr.Zero); keybd_event(0x5B,0,2,System.UIntPtr.Zero); }'\n")
+    }
+    dictator.stdin.write('[SkinsVoice.Keys]::WinH()\n')
+    return true
+  } catch {
+    dictator = null
+    return false
+  }
+}
+
 app.on('will-quit', () => {
+  if (dictator) { try { dictator.kill() } catch {} }
   globalShortcut.unregisterAll()
   for (const c of convs.values()) c.bridge.cancel()
 })
