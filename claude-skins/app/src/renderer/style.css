@@ -602,7 +602,7 @@ body.busy .entry .edit-btn { display: none; }
 .git-btn { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font: inherit; font-size: var(--small-size); color: var(--ink-soft); background: none; border: var(--line) solid var(--edge-light); border-radius: 20px; padding: 2px 9px; white-space: nowrap; max-width: 200px; }
 .git-btn:hover { color: var(--ink); border-color: var(--ink-soft); }
 .git-btn .gb-icon { font-size: 1.05em; line-height: 1; }
-.git-btn .gb-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.git-btn .gb-name { min-width: 5ch; overflow: hidden; text-overflow: ellipsis; }
 .git-btn .gb-n, .git-btn .gb-up { flex: none; }
 .git-btn .gb-n:empty, .git-btn .gb-up:empty { display: none; }
 .git-btn.dirty .gb-n { color: var(--ink); }
@@ -620,3 +620,42 @@ body.busy .entry .edit-btn { display: none; }
 .git-commit { display: flex; flex-direction: column; gap: 6px; }
 .git-msg { display: block; width: 100%; box-sizing: border-box; min-height: 48px; resize: vertical; font: inherit; font-size: 14px; color: var(--ink); background: var(--field); border: var(--line) solid var(--edge-light); border-radius: var(--radius-small); padding: 6px 8px; outline: none; user-select: text; }
 .git-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Commenti sulle differenze: il "+" sulla riga, il riquadro per scrivere, il commento, la barra nei pannelli */
+.dl { position: relative; }
+.dl-cm {
+  position: sticky; left: 2px; z-index: 1; flex: none; width: 16px; height: 16px; margin: 2px -16px 0 0; padding: 0; align-self: flex-start;
+  display: grid; place-items: center; font: 600 12px/1 var(--font-code); color: var(--btn-ink); background: var(--btn-bg);
+  border: none; border-radius: 4px; cursor: pointer; opacity: 0; user-select: none;
+}
+.dl:hover .dl-cm, .dl-cm:focus-visible { opacity: 1; }
+.dl-edit, .dl-note {
+  position: sticky; left: 0; box-sizing: border-box; width: 100%; max-width: 640px; margin: 4px 0; padding: 7px 10px;
+  font-family: var(--font-body, inherit); font-size: 14px; white-space: normal; color: var(--ink);
+  background: var(--field, var(--bg)); border: var(--line) solid var(--edge-light); border-left: 3px solid var(--gold); border-radius: var(--radius-small);
+}
+.dl-edit textarea { display: block; width: 100%; box-sizing: border-box; resize: vertical; min-height: 44px; font: inherit; color: var(--ink); background: none; border: none; outline: none; user-select: text; }
+.de-row, .dn-head { display: flex; align-items: center; gap: 6px; }
+.de-row { margin-top: 4px; }
+.de-hint { font-size: 12px; color: var(--ink-soft); }
+.dn-where { font-size: 12px; color: var(--ink-soft); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dn-code { margin: 3px 0; font-family: var(--font-code); font-size: var(--code-size); white-space: pre; overflow: hidden; text-overflow: ellipsis; color: var(--ink-soft); }
+.dn-text { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.sent-comments { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.sent-comments .dl-note { position: static; margin: 0; max-width: none; text-align: left; }
+.attachment.review { gap: 6px; padding: 4px 14px 4px 10px; font-size: var(--small-size); max-width: 240px; color: var(--ink); border-left: 3px solid var(--gold); }
+.attachment.review .rv-icon { flex: none; width: 10px; height: 8px; border: 1.5px solid currentColor; border-radius: 3px 3px 3px 0; opacity: 0.6; }
+.attachment.review .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-code); }
+.review-bar { position: sticky; bottom: 0; display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 2px 2px; border-top: var(--line) solid var(--edge-light); background: inherit; }
+.review-bar[hidden] { display: none; }
+.review-bar .rb-text { flex: 1; font-size: var(--small-size); color: var(--ink); }
+
+/* Nella riga della penna i selettori (cartella, branch, modello) si stringono, col testo tagliato, prima di spingere
+   fuori il pulsante per spedire */
+[data-part="folder"], [data-part="model"], [data-part="git"] { min-width: 0; flex: 0 1 auto; display: flex; }
+/* Si stringe prima il modello, poi la cartella, per ultimo il branch */
+[data-part="model"] { flex-shrink: 4; }
+[data-part="folder"] { flex-shrink: 2; }
+[data-part="folder"] .folder-btn, [data-part="git"] .git-btn { max-width: min(220px, 100%); min-width: 0; }
+[data-part="model"] .model-btn { max-width: min(320px, 100%); min-width: 0; }
+[data-part="folder"] .git-btn { flex: 0 1 auto; }

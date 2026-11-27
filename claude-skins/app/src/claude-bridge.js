@@ -192,6 +192,15 @@ function lineOf(text, needle) {
 }
 
 // Il testo semplice di un messaggio salvato: le parti di testo, senza azioni né risultati
+// Il primo messaggio come titolo, senza i blocchi che la pagina aggiunge in fondo (file allegati, commenti sulle
+// differenze); se resta solo quello, un titolo che lo dice
+function promptTitle(text) {
+  const s = String(text || '')
+  const clean = s.replace(/\s*<(attached_files|diff_comments)>[\s\S]*?(<\/\1>|$)/g, '').trim()
+  if (clean) return clean
+  return /<diff_comments>/.test(s) ? 'Commenti sulle modifiche' : /<attached_files>/.test(s) ? 'File allegati' : ''
+}
+
 // I file allegati: in fondo al testo, un percorso per riga dentro <attached_files>. La pagina li riconosce e li mostra
 // come etichette, nella conversazione e nelle cronache riaperte
 function withFiles(text, files) {
@@ -885,7 +894,7 @@ class ClaudeBridge extends EventEmitter {
     const list = await listSessions({ limit: 300 })
     return list.map((s) => ({
       id: s.sessionId,
-      title: s.customTitle || s.summary || s.firstPrompt || '(senza titolo)',
+      title: s.customTitle || s.summary || promptTitle(s.firstPrompt) || '(senza titolo)',
       lastModified: s.lastModified,
       cwd: s.cwd ? s.cwd.replace(/\\/g, '/') : null,
       branch: s.gitBranch || null,
@@ -1075,5 +1084,5 @@ function savedContextMax() {
 module.exports = {
   ClaudeBridge, MODES, intent, DEFAULT_CLAUDE: CLAUDE, loadContextMax, savedContextMax,
   // Per le prove (test/unit)
-  _internals: { applyTodo, settleTodo, withFiles, imagesOf, guessContextMax, Inbox },
+  _internals: { promptTitle, applyTodo, settleTodo, withFiles, imagesOf, guessContextMax, Inbox },
 }

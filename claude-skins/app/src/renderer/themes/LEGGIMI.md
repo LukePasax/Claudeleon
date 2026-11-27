@@ -85,6 +85,7 @@ c'è.
 | `data-part="tasks"` | Il pulsante delle attività in background (`.tasks-btn`, `.running` con la rotella), che apre il pannello (`.theme-picker.tasks-panel`, righe `.task-row`) |
 | `data-part="files"` | Il pulsante dei file modificati (`.files-btn`, nascosto finché non ce ne sono), che apre il pannello (`.theme-picker.files-panel`, righe `.file-row`) |
 | `data-part="git"` | Il pulsante di git (`.git-btn` col branch, `.dirty` se ci sono modifiche; nascosto fuori da un repo), che apre il pannello (`.theme-picker.git-panel`: branch, modifiche, commit, push, pull request). Se il tema non lo mette, il motore lo aggiunge dentro `data-part="folder"` |
+| (commenti) | Su ogni riga di una differenza il pulsante `.dl-cm` (compare al passaggio), il riquadro `.dl-edit`, il commento `.dl-note`; in attesa sono `.attachment.review` nella striscia degli allegati e `.review-bar` nei pannelli; nel messaggio mandato `.sent-comments` |
 | `data-part="context"` | L'anello del contesto (`.context-btn`, `.warn` oltre l'80%), che apre il dettaglio (`.folder-menu.context-menu`) |
 | `data-part="model"` | Il pulsante del modello e del ragionamento (`.model-btn`), che apre il menu (`.folder-menu.model-menu`) |
 | `data-part="attachments"` | La striscia degli allegati (`.attachment.image`, `.attachment.file`, ognuno con `.attachment-remove`). Se manca, il motore la crea subito prima della `textarea`, nel suo contenitore |

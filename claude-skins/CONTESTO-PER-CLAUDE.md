@@ -298,6 +298,17 @@ Nella pagina: `data-part="git"` (o dentro `data-part="folder"`), pannello `.git-
 conversazione, `refreshGit()` lo rilegge (cambio di cartella o di conversazione, fine risposta, focus della finestra).
 Prove: `test/unit/git.test.js` (un repo vero con un remoto nudo), e il pannello nelle prove della finestra.
 
+## Commenti sulle differenze
+
+`changeView` segna le righe vere (`data-ln`, `data-side` "+"/"-"/" ", `rawLine`) e mette il pulsante `.dl-cm` se la
+modifica ha un file (`.diff[data-file]`). I commenti in attesa (`reviews`, per conversazione, in save/load) sono
+etichette `.attachment.review` nella striscia degli allegati e una `.review-bar` nei pannelli dei file e di git.
+`sendMessage` li accoda al testo in un blocco `<diff_comments>` (una frase di spiegazione per Claude, poi
+`<comment file line side><code>…</code>testo</comment>`), che `fillYou` toglie dal testo e mostra come lista
+(`.sent-comments`), anche nelle cronache riaperte; la modifica di un messaggio lo conserva (`d.reviewBlock`). Il titolo
+di una sessione dal primo messaggio toglie questi blocchi e quelli dei file allegati (`promptTitle` nel ponte).
+Nella riga della penna cartella, branch e modello si stringono (prima il modello) invece di andare a capo.
+
 ## Prossimi passi possibili
 
 0. **Temi.**

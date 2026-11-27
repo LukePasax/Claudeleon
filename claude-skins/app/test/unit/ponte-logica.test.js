@@ -76,3 +76,11 @@ test('il titolo della conversazione non chiede il permesso', async () => {
   const r = await b.ask('mcp__ccd_session_mgmt__set_session_title', { title: 'x' }, {})
   assert.equal(r.behavior, 'allow')
 })
+
+test('titolo dal primo messaggio: senza i blocchi dei file allegati e dei commenti', () => {
+  assert.equal(I.promptTitle('Sistema questo\n\n<diff_comments>\nx\n</diff_comments>\n\n<attached_files>\na.txt\n</attached_files>'), 'Sistema questo')
+  assert.equal(I.promptTitle('<diff_comments>\n<comment file="a" line="1" side="+">\n<code>x</code>\nno\n</comment>\n</diff_comments>'), 'Commenti sulle modifiche')
+  assert.equal(I.promptTitle('<attached_files>\na.txt\n</attached_files>'), 'File allegati')
+  assert.equal(I.promptTitle('Ciao'), 'Ciao')
+  assert.equal(I.promptTitle(''), '')
+})

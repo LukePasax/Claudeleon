@@ -128,6 +128,17 @@
     taskStatus_completed: 'finita',
     taskStatus_failed: 'fallita',
     taskStatus_stopped: 'fermata',
+    // Commenti sulle differenze
+    reviewAddTip: 'Commenta questa riga',
+    reviewPlaceholder: 'Un commento per Claude su {x}',
+    reviewHint: 'Invio per aggiungere · parte col prossimo messaggio',
+    reviewAdd: 'Commenta',
+    reviewYours: 'Il tuo commento',
+    reviewRemove: 'Togli',
+    reviewOne: '1 commento pronto per Claude',
+    reviewMany: '{n} commenti pronti per Claude',
+    reviewSend: 'Manda a Claude',
+    reviewClear: 'Togli tutti',
     // Git
     gitTip: 'Git: branch {branch}. Modifiche, commit, push e pull request',
     gitTitle: 'Git · {x}',

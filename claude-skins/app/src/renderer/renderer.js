@@ -34,6 +34,7 @@
   let changed = new Map()
   // Le attività in background della conversazione (comandi, sotto-agenti), dal ponte
   let bgTasks = []
+  let reviews = []
 
   // ------------------------------------------------------------------ conversazioni
 
@@ -57,17 +58,17 @@
     if (part('log')) part('log').appendChild(el)
     const c = {
       id, el, reply: null, pending: false, tools: new Map(), busy: false, thinking: null, todos: [], todosOpen: true,
-      context: null, currentSession: null, convoDir: workdir, chapter, asks: new Map(), stick: true, suggestion: '', changed: new Map(), bgTasks: [],
+      context: null, currentSession: null, convoDir: workdir, chapter, asks: new Map(), stick: true, suggestion: '', changed: new Map(), bgTasks: [], reviews: [],
       sessionId: null, unread: false, attention: false,
     }
     convs.set(id, c)
     return c
   }
   function save(c) {
-    if (c) Object.assign(c, { reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick, suggestion, changed, bgTasks })
+    if (c) Object.assign(c, { reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick, suggestion, changed, bgTasks, reviews })
   }
   function load(c) {
-    ;({ reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick, suggestion, changed, bgTasks } = c)
+    ;({ reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick, suggestion, changed, bgTasks, reviews } = c)
   }
   function run(c, fn) {
     if (!c || c === cur) return fn()
@@ -120,6 +121,7 @@
     renderContext()
     renderChanged()
     renderTasks()
+    renderAttachments()
     renderFolder()
     renderGit()
     refreshGit()
@@ -1207,6 +1209,7 @@
     }
     if (!changed.size) { const n = document.createElement('div'); n.className = 'folder-note'; body.appendChild(label(n, 'filesNone')) }
     host.appendChild(panel)
+    renderReviews()
   }
 
   // ------------------------------------------------------------------ attività in background
@@ -1567,6 +1570,7 @@
     }
     panel.fill()
     host.appendChild(panel)
+    renderReviews()
     refreshGit()
   }
 
@@ -1911,6 +1915,7 @@
   function changeView(change) {
     const box = document.createElement('div')
     box.className = 'diff'
+    if (change.file) box.dataset.file = change.file
     const notes = []
     if (change.created) notes.push('diffNew')
     if (change.whole) notes.push('diffWhole')
@@ -1936,6 +1941,17 @@
       d.children[0].textContent = ln
       d.children[1].textContent = sign
       d.children[2].textContent = text
+      // Le righe vere si possono commentare (il "+" compare passandoci sopra)
+      if (change.file && (cls === 'add' || cls === 'del' || cls === 'ctx')) {
+        d.dataset.ln = ln
+        d.dataset.side = cls === 'add' ? '+' : cls === 'del' ? '-' : ' '
+        d.rawLine = text
+        const cm = document.createElement('button')
+        cm.className = 'dl-cm'
+        cm.textContent = '+'
+        cm.title = t('reviewAddTip')
+        d.prepend(cm)
+      }
       body.appendChild(d)
       count++
       return d
@@ -1959,6 +1975,11 @@
       box.appendChild(label(n, 'diffSame'))
     }
     if (count) box.appendChild(body)
+    // I commenti non ancora mandati su queste righe
+    if (change.file) for (const r of reviews) if (r.file === change.file) {
+      const d = [...body.children].find((x) => x.dataset.ln === r.line && x.dataset.side === r.side && x.rawLine === r.code)
+      if (d) d.after(reviewCard(r))
+    }
     if (count > DIFF_LIMIT) {
       const more = document.createElement('button')
       more.className = 'diff-more'
@@ -2158,7 +2179,10 @@
 
   function sendMessage() {
     const input = part('input')
-    const text = input ? input.value.trim() : ''
+    const typed = input ? input.value.trim() : ''
+    // I commenti sulle differenze partono con il messaggio (non con un comando)
+    const notes = typed.startsWith('/') ? [] : reviews
+    const text = (typed + reviewBlock(notes)).trim()
     if (!text && !attachments.length) return
     closeMenu()
     // Prima conversazione senza una cartella scelta: prima la cartella, poi il messaggio parte da sé
@@ -2169,6 +2193,7 @@
     }
     // /clear e /new: un nuovo capitolo, come il pulsante
     if (/^\/(clear|new)\s*$/i.test(text)) { input.value = ''; newChapter(); return }
+    if (notes.length) clearReviews()
     input.value = ''
     input.style.height = ''
     clearSuggestion()
@@ -2198,6 +2223,120 @@
     return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`
   }
 
+  // ------------------------------------------------------------------ commenti sulle differenze
+
+  // Come nell'app desktop: passando su una riga di una differenza (nella conversazione, nei file modificati, in git)
+  // compare un "+"; un clic apre un commento su quella riga. I commenti restano in attesa (etichette sopra la penna,
+  // una barra nei pannelli) e partono con il prossimo messaggio, in un blocco <diff_comments> in fondo al testo che
+  // Claude legge (file, riga, lato, codice, commento) e che qui torna una lista. Valgono per la conversazione in vista
+  let reviewSeq = 0
+  const REVIEW_INTRO = 'Commenti sulle righe delle modifiche: per ognuno il file, la riga (side "+" aggiunta, "-" tolta, " " invariata), il codice di quella riga e il commento.'
+  const attr = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+  const unattr = (x) => String(x).replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+  function reviewBlock(list) {
+    if (!list.length) return ''
+    const items = list.map((r) => `<comment file="${attr(r.file)}" line="${attr(r.line)}" side="${attr(r.side)}">\n<code>${r.code}</code>\n${r.text}\n</comment>`)
+    return `\n\n<diff_comments>\n${REVIEW_INTRO}\n${items.join('\n')}\n</diff_comments>`
+  }
+  function parseReviews(block) {
+    const out = []
+    const re = /<comment file="([^"]*)" line="([^"]*)" side="([^"]*)">\n<code>([\s\S]*?)<\/code>\n([\s\S]*?)\n<\/comment>/g
+    let m
+    while ((m = re.exec(block))) out.push({ file: unattr(m[1]), line: unattr(m[2]), side: unattr(m[3]), code: m[4], text: m[5] })
+    return out
+  }
+  // Il commento sotto la sua riga (o nella lista di un messaggio mandato, sent)
+  function reviewCard(r, sent) {
+    const card = document.createElement('div')
+    card.className = `dl-note${sent ? ' sent' : ''}`
+    if (r.id) card.dataset.review = r.id
+    card.innerHTML = '<div class="dn-head"><span class="dn-where"></span><span class="sp"></span></div><div class="dn-code"></div><div class="dn-text"></div>'
+    card.querySelector('.dn-where').textContent = sent ? `${r.file}${r.line ? `:${r.line}` : ''}` : t('reviewYours')
+    card.querySelector('.dn-where').title = r.file
+    if (sent && r.code.trim()) card.querySelector('.dn-code').textContent = `${r.side === '-' ? '−' : r.side === '+' ? '+' : ' '} ${r.code.trim()}`
+    else card.querySelector('.dn-code').remove()
+    card.querySelector('.dn-text').textContent = r.text
+    if (!sent) {
+      const x = document.createElement('button')
+      x.className = 'btn small deny'
+      label(x, 'reviewRemove')
+      x.addEventListener('click', () => removeReview(r))
+      card.querySelector('.dn-head').appendChild(x)
+    }
+    return card
+  }
+  function addReview(r) {
+    r.id = `r${++reviewSeq}`
+    reviews.push(r)
+    renderReviews()
+    return r
+  }
+  function removeReview(r) {
+    reviews = reviews.filter((x) => x !== r)
+    for (const el of document.querySelectorAll(`.dl-note[data-review="${r.id}"]`)) el.remove()
+    renderReviews()
+  }
+  function clearReviews() {
+    for (const r of reviews) for (const el of document.querySelectorAll(`.dl-note[data-review="${r.id}"]`)) el.remove()
+    reviews = []
+    renderReviews()
+  }
+  // Le etichette sopra la penna e la barra "Manda a Claude" nei pannelli dei file e di git
+  function renderReviews() {
+    if (quiet) return
+    renderAttachments()
+    for (const box of document.querySelectorAll('.files-panel .settings-box, .git-panel .settings-box')) {
+      let bar = box.querySelector(':scope > .review-bar')
+      if (!bar) {
+        bar = document.createElement('div')
+        bar.className = 'review-bar'
+        bar.innerHTML = '<span class="rb-text"></span><button class="btn small deny rb-clear"></button><button class="btn small rb-send"></button>'
+        label(bar.querySelector('.rb-clear'), 'reviewClear')
+        label(bar.querySelector('.rb-send'), 'reviewSend')
+        bar.querySelector('.rb-clear').addEventListener('click', clearReviews)
+        bar.querySelector('.rb-send').addEventListener('click', () => { closeThemes(); sendMessage() })
+        box.appendChild(bar)
+      }
+      bar.hidden = !reviews.length
+      label(bar.querySelector('.rb-text'), reviews.length === 1 ? 'reviewOne' : 'reviewMany', { n: reviews.length })
+    }
+  }
+  // Il riquadro per scrivere un commento, sotto la riga
+  function openReviewEditor(d) {
+    const box = d.closest('.diff')
+    if (!box || !box.dataset.file) return
+    const open = d.nextElementSibling
+    if (open && open.classList.contains('dl-edit')) { open.querySelector('textarea').focus(); return }
+    const ed = document.createElement('div')
+    ed.className = 'dl-edit'
+    ed.innerHTML = '<textarea rows="2" spellcheck="false"></textarea><div class="de-row"><span class="de-hint"></span><span class="sp"></span><button class="btn small deny de-cancel"></button><button class="btn small de-ok"></button></div>'
+    const area = ed.querySelector('textarea')
+    area.placeholder = t('reviewPlaceholder', { x: `${baseName(box.dataset.file)}${d.dataset.ln ? `:${d.dataset.ln}` : ''}` })
+    label(ed.querySelector('.de-hint'), 'reviewHint')
+    label(ed.querySelector('.de-cancel'), 'editCancel')
+    label(ed.querySelector('.de-ok'), 'reviewAdd')
+    const close = () => ed.remove()
+    const ok = () => {
+      const text = area.value.trim()
+      if (!text) { area.focus(); return }
+      const r = addReview({ file: box.dataset.file, line: d.dataset.ln || '', side: d.dataset.side || ' ', code: d.rawLine || '', text })
+      ed.replaceWith(reviewCard(r))
+    }
+    ed.querySelector('.de-cancel').addEventListener('click', close)
+    ed.querySelector('.de-ok').addEventListener('click', ok)
+    area.addEventListener('keydown', (e) => {
+      e.stopPropagation()
+      if (e.key === 'Escape') { e.preventDefault(); close() } else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ok() }
+    })
+    d.after(ed)
+    // Una riga fra quelle nascoste dal "mostra tutto" resta visibile col suo commento
+    area.focus()
+  }
+  document.addEventListener('click', (e) => {
+    const cm = e.target.closest && e.target.closest('.dl-cm')
+    if (cm) { e.preventDefault(); e.stopPropagation(); openReviewEditor(cm.parentElement) }
+  }, true)
+
   // ------------------------------------------------------------------ modificare un messaggio
 
   // Come nell'app desktop: "Modifica" sotto un tuo messaggio lo riapre sul posto; spedito, la conversazione riparte
@@ -2210,6 +2349,7 @@
     const images = box ? [...box.querySelectorAll('img')].map((i) => i.src) : []
     const files = box ? [...box.querySelectorAll('.attachment.file')].map((f) => f.title) : []
     const old = d.rawText || ''
+    const block = d.reviewBlock || ''
     d.classList.add('editing')
     const editor = document.createElement('div')
     editor.className = 'edit-box'
@@ -2227,7 +2367,7 @@
     area.addEventListener('input', () => autoGrow(area))
     const cancel = () => { editor.remove(); textEl.hidden = false; d.classList.remove('editing') }
     const send = () => {
-      const text = area.value.trim()
+      const text = (area.value.trim() + block).trim()
       if (!text && !images.length && !files.length) return
       if (busy) return
       const restore = editor.querySelector('.edit-restore input').checked
@@ -2274,8 +2414,22 @@
       files = files.length ? files : m[1].split('\n').map((x) => x.trim()).filter(Boolean)
       text = text.slice(0, m.index)
     }
+    const cm = /\s*<diff_comments>\n[\s\S]*?<\/diff_comments>\s*$/.exec(text || '')
+    let comments = []
+    d.reviewBlock = ''
+    if (cm) {
+      comments = parseReviews(cm[0])
+      d.reviewBlock = `\n\n${cm[0].trim()}`
+      text = text.slice(0, cm.index)
+    }
     const el = d.querySelector('.text')
     el.textContent = ''
+    if (comments.length) {
+      const box = document.createElement('div')
+      box.className = 'sent-comments'
+      for (const r of comments) box.appendChild(reviewCard(r, true))
+      el.appendChild(box)
+    }
     if (images.length || files.length) {
       const box = document.createElement('div')
       box.className = 'sent-attachments'
@@ -2342,7 +2496,21 @@
     const box = attachBox()
     if (!box) return
     box.innerHTML = ''
-    box.hidden = !attachments.length
+    box.hidden = !attachments.length && !reviews.length
+    for (const r of reviews) {
+      const chip = document.createElement('span')
+      chip.className = 'attachment review'
+      chip.innerHTML = '<span class="rv-icon"></span><span class="name"></span>'
+      chip.querySelector('.name').textContent = `${baseName(r.file)}${r.line ? `:${r.line}` : ''}`
+      chip.title = `${r.file}${r.line ? `:${r.line}` : ''}\n${r.text}`
+      const x = document.createElement('button')
+      x.className = 'attachment-remove'
+      x.textContent = '×'
+      x.title = t('reviewRemove')
+      x.addEventListener('click', () => removeReview(r))
+      chip.appendChild(x)
+      box.appendChild(chip)
+    }
     for (const a of attachments) {
       let chip
       if (a.kind === 'image') {
@@ -3608,7 +3776,7 @@
         const fire = (n, v, ms) => fireAll(n, v, ms, conv)
         // Una conversazione nuova riceve la sua sessione e compare negli annali
         if (conv && !fakeSessions.some((x) => x.conv === conv)) {
-          fakeSessions.unshift({ id: `fs-${conv}`, conv, title: (typeof msg === 'string' ? msg : msg.text || 'Allegati').slice(0, 40), lastModified: Date.now(), cwd: 'C:/Workspace' })
+          fakeSessions.unshift({ id: `fs-${conv}`, conv, title: (typeof msg === 'string' ? msg : msg.text.replace(/\s*<diff_comments>[\s\S]*$/, '') || 'Commenti sulle modifiche').slice(0, 40), lastModified: Date.now(), cwd: 'C:/Workspace' })
           fire('onConvSession', { id: `fs-${conv}`, cwd: 'C:/Workspace' }, 30)
         }
         const text = typeof msg === 'string' ? msg : msg.text || '(allegati)'

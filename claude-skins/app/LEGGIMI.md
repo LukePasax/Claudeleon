@@ -130,6 +130,11 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   stato, da quanto, quanti strumenti ha usato, l'ultimo e il riassunto finale, con "Ferma" e "Uscita" (il file con
   l'uscita). Mentre Claude lavora, "Manda in background" (o Ctrl+B) sposta in background il comando o il sotto-agente
   in corso, come nel terminale, e Claude va avanti. Con attività in corso la conversazione non si spegne da sola.
+- **Commenti sulle differenze:** passando su una riga di una differenza (nella conversazione, nei file modificati, nel
+  pannello di git) compare un "+": un clic apre un commento su quella riga (Invio per aggiungerlo). I commenti restano
+  in attesa come etichette sopra la penna (× per toglierne uno) e, nei pannelli, in una barra con "Manda a Claude";
+  partono con il prossimo messaggio, anche vuoto, con file, riga e codice, e nel messaggio mandato si vedono come una
+  lista. Valgono per la conversazione in cui li scrivi.
 - **Git:** se la cartella della conversazione è un repo, accanto alla cartella compare il branch (con il numero di
   file modificati e "↑N" per i commit non ancora mandati). Un clic apre il pannello: cambiare branch o crearne uno
   nuovo; le modifiche rispetto all'ultimo commit, file per file con le differenze; il commit di tutto (Ctrl+Invio nel
