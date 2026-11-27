@@ -136,7 +136,7 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   entro 20 secondi o si chiude da sola all'avvio, e dopo due avvii di fila andati male. Se `config.json` è rovinato
   l'app riparte da capo e lo mette da parte in `config.rotto.json`. Si può chiedere anche a mano, lanciando l'app con
   `--avvio-sicuro` (per esempio in un collegamento). Gli errori della pagina e del processo principale finiscono in
-  `errori.log`, nella cartella dei dati (Impostazioni → "Apri la cartella dei dati").
+  `errori.log`, nella cartella dei dati (Impostazioni → "Cartella dei dati").
 - **Editor dei temi:** nel selettore dei temi, "Crea un tema" apre un pannello a destra: nome, descrizione, "Parti
   da" (i colori di un altro tema moderno), nove colori (sfondo, barra laterale, casella e menu, testo, testo tenue,
   accento, testo sull'accento — automatico finché non lo cambi —, bordi, i tuoi messaggi), carattere, dimensione del
