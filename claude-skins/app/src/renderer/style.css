@@ -512,3 +512,9 @@ body.busy .entry .edit-btn { display: none; }
 .edit-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 .edit-restore { display: inline-flex; align-items: center; gap: 6px; font-size: var(--small-size); color: var(--ink-soft); cursor: pointer; }
 .entry.editing .entry-actions { display: none; }
+
+/* Il menu dei file con @: il nome in evidenza, la cartella in piccolo; le cartelle con la barra */
+.cmd-menu.files .cmd { display: flex; gap: 10px; align-items: baseline; }
+.cmd-menu.files .cmd-name { flex: none; font-family: var(--font-code); font-size: var(--code-size); }
+.cmd-menu.files .cmd-desc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; font-size: var(--small-size); color: var(--ink-soft); }
+.cmd-menu.files .cmd.dir .cmd-name { color: var(--gold); }

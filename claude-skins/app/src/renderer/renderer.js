@@ -853,7 +853,8 @@
   // L'elenco viene da Claude Code (skill, plugin, comandi del progetto e i suoi): all'avvio dalla cache, poi
   // aggiornato. Scrivendo / all'inizio della penna si apre il menu sopra di essa
   let commands = []
-  const menu = { el: null, items: [], index: 0 }
+  // kind: 'cmd' (comandi con /) o 'file' (file da citare con @)
+  const menu = { el: null, items: [], index: 0, kind: 'cmd' }
   // Se Claude Code non risponde (non installato, senza login) il menu lo dice invece di aspettare per sempre
   let commandsFailed = false
   api.onCommands((list) => { commands = list || []; commandsFailed = false; if (menu.el) updateMenu() })
@@ -875,10 +876,18 @@
     return [...starts.sort((a, b) => a.name.localeCompare(b.name)), ...contains].slice(0, 50)
   }
 
-  function updateMenu() {
-    const q = typedCommand()
-    if (q == null) return closeMenu()
+  // Il file che si sta citando: una @ all'inizio o dopo uno spazio, e il cursore ancora sulla parola
+  function typedMention() {
     const input = part('input')
+    if (!input || input.selectionStart !== input.selectionEnd) return null
+    const before = input.value.slice(0, input.selectionStart)
+    const m = /(^|\s)@([^\s@]*)$/.exec(before)
+    return m ? { start: before.length - m[2].length - 1, query: m[2] } : null
+  }
+  // I suggerimenti arrivano dal processo principale: si chiedono un attimo dopo l'ultimo tasto
+  let fileTimer = 0
+  let fileAsk = 0
+  function ensureMenuEl(input) {
     if (!menu.el || !menu.el.isConnected) {
       menu.el = document.createElement('div')
       menu.el.className = 'cmd-menu'
@@ -886,10 +895,70 @@
       if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
       host.appendChild(menu.el)
     }
-    // Sopra la penna, largo come lei
     menu.el.style.left = `${input.offsetLeft}px`
     menu.el.style.width = `${input.offsetWidth}px`
     menu.el.style.bottom = `${input.offsetParent === menu.el.offsetParent ? menu.el.parentElement.clientHeight - input.offsetTop + 6 : 6}px`
+  }
+  function updateFileMenu(mention) {
+    const input = part('input')
+    clearTimeout(fileTimer)
+    const mine = ++fileAsk
+    fileTimer = setTimeout(async () => {
+      let list = []
+      try { list = api.suggestFiles ? await api.suggestFiles(mention.query, active && active.id) : [] } catch {}
+      if (mine !== fileAsk || !typedMention()) return
+      if (menu.kind !== 'file') menu.index = 0
+      menu.kind = 'file'
+      ensureMenuEl(input)
+      menu.items = list
+      menu.index = Math.min(menu.index, Math.max(0, list.length - 1))
+      menu.el.innerHTML = ''
+      menu.el.classList.add('files')
+      if (!list.length) {
+        const empty = document.createElement('div')
+        empty.className = 'cmd-empty'
+        menu.el.appendChild(label(empty, 'fileNone'))
+        return
+      }
+      list.forEach((f, i) => {
+        const row = document.createElement('div')
+        row.className = 'cmd file' + (i === menu.index ? ' active' : '') + (f.endsWith('/') ? ' dir' : '')
+        row.innerHTML = '<span class="cmd-name"></span><span class="cmd-desc"></span>'
+        const parts = f.replace(/\/$/, '').split('/')
+        row.children[0].textContent = parts.pop() + (f.endsWith('/') ? '/' : '')
+        row.children[1].textContent = parts.join('/')
+        row.title = f
+        row.addEventListener('mousedown', (e) => { e.preventDefault(); completeFile(f) })
+        menu.el.appendChild(row)
+      })
+      menu.el.children[menu.index]?.scrollIntoView({ block: 'nearest' })
+    }, menu.kind === 'file' && menu.el ? 60 : 0)
+  }
+  // Mette il percorso al posto di quello scritto dopo @; una cartella lascia il menu aperto per scendere dentro
+  function completeFile(f) {
+    const input = part('input')
+    const m = typedMention()
+    if (!m) return closeMenu()
+    const end = input.selectionStart
+    const text = f.endsWith('/') ? `@${f}` : `@${f} `
+    input.setSelectionRange(m.start, end)
+    insertText(input, text)
+    input.focus()
+    if (f.endsWith('/')) updateMenu()
+    else closeMenu()
+  }
+
+  function updateMenu() {
+    const mention = typedMention()
+    if (mention) return updateFileMenu(mention)
+    const q = typedCommand()
+    if (q == null) return closeMenu()
+    if (menu.kind !== 'cmd' && menu.el) { menu.el.remove(); menu.el = null }
+    menu.kind = 'cmd'
+    const input = part('input')
+    // Sopra la penna, largo come lei
+    ensureMenuEl(input)
+    menu.el.classList.remove('files')
     menu.items = matchCommands(q)
     menu.index = Math.min(menu.index, Math.max(0, menu.items.length - 1))
     menu.el.innerHTML = ''
@@ -918,6 +987,8 @@
     menu.el = null
     menu.items = []
     menu.index = 0
+    menu.kind = 'cmd'
+    fileAsk++
   }
 
   // Completa il nome nella penna, con uno spazio per gli argomenti
@@ -940,10 +1011,18 @@
     }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       menu.index = (menu.index + (e.key === 'ArrowDown' ? 1 : -1) + menu.items.length) % menu.items.length
-      updateMenu()
+      // Il menu dei file si ridisegna solo nell'evidenziato, senza richiedere i suggerimenti
+      if (menu.kind === 'file') {
+        ;[...menu.el.children].forEach((r, i) => r.classList.toggle('active', i === menu.index))
+        menu.el.children[menu.index]?.scrollIntoView({ block: 'nearest' })
+      } else updateMenu()
       return true
     }
     if (e.key === 'Escape') { closeMenu(); return true }
+    if (menu.kind === 'file' && (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey))) {
+      completeFile(menu.items[menu.index])
+      return true
+    }
     if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
       const c = menu.items[menu.index]
       if (e.key === 'Enter' && typedCommand() === c.name.toLowerCase()) { closeMenu(); return false }
@@ -2561,6 +2640,7 @@
       onUsage: on('onUsage'),
       onModels: on('onModels'), onTodos: on('onTodos'), onContext: on('onContext'),
       onThinkingStart: on('onThinkingStart'), onSuggestion: on('onSuggestion'), onThinking: on('onThinking'), onThinkingEnd: on('onThinkingEnd'),
+      suggestFiles: async (q) => ['src/', 'src/MapView.cpp', 'src/MapView.h', 'src/MapLoader.cpp', 'src/RouteFinder.h', 'docs/', 'docs/specifiche.pdf', 'README.md', 'CMakeLists.txt'].filter((f) => f.toLowerCase().includes(q.toLowerCase())).slice(0, 15),
       edit(uuid, msg, restore, conv) {
         if (restore) fireAll('onRewound', { ok: true, files: ['src/MapView.cpp'], insertions: 2, deletions: 1 }, 50, conv)
         this.send(msg, conv)

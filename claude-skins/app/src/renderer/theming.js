@@ -84,6 +84,8 @@
     suggestionTip: 'Manda questa risposta (Tab la scrive nella casella)',
     // Il nome dell'app, per i temi che lo scrivono nella testata
     appTitle: 'Claude Skins',
+    // I file da citare con @
+    fileNone: 'Nessun file con questo nome nella cartella della conversazione.',
     // Modificare un messaggio
     editMessage: 'Modifica',
     editSend: 'Invia',

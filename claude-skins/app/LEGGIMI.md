@@ -80,6 +80,16 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   Maiusc+Invio apre la voce dopo (coi numeri che crescono), e su una voce vuota la lista finisce; Tab e Maiusc+Tab
   rientrano la voce; Ctrl+B e Ctrl+I mettono grassetto e corsivo. La casella cresce col testo. Tutto si annulla con
   Ctrl+Z.
+- **@ per citare un file:** scrivendo `@` (all'inizio o dopo uno spazio) sopra la casella compare l'elenco dei file
+  e delle cartelle della cartella della conversazione, filtrato da quello che si scrive dopo (prima il nome, poi il
+  percorso). Frecce per scegliere, Tab o Invio per mettere il percorso; una cartella lascia l'elenco aperto per
+  scendere dentro. L'elenco viene da `git ls-files` se la cartella è un repo (senza i file ignorati), altrimenti dalle
+  cartelle, senza quelle pesanti (`node_modules`, `bin`, `obj`…). Claude riceve `@percorso` come in Claude Code.
+- **Modificare un messaggio:** sotto un tuo messaggio, passandoci sopra, "Modifica" lo riapre sul posto. Spedito,
+  la conversazione riparte da prima di quel messaggio e quello che veniva dopo sparisce; la conversazione di prima
+  resta negli annali com'era (la nuova è una sessione biforcata). Con "Riporta anche i file a prima di questo
+  messaggio" Claude Code rimette i file com'erano a quel punto (vale per le modifiche fatte con l'app da ora in poi,
+  che salva una copia dei file prima di ogni modifica). Non si modifica mentre Claude lavora.
 - **Risposte suggerite:** dopo una risposta Claude Code prevede il prossimo messaggio (`promptSuggestions`): sotto la
   risposta compare un pulsante che lo manda con un clic, e nella casella vuota il testo in grigio, che Tab scrive
   nella casella. Non c'è al primo turno né in modo piano (lo decide Claude Code).
