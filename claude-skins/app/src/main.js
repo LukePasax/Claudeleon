@@ -3,7 +3,7 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, globalShortcut, shell, dialog, Notification, clipboard } = require('electron')
 const fs = require('fs')
 const path = require('path')
-const { ClaudeBridge, DEFAULT_CLAUDE } = require('./claude-bridge')
+const { ClaudeBridge, DEFAULT_CLAUDE, loadContextMax, savedContextMax } = require('./claude-bridge')
 const { listThemes, DEFAULT_THEME } = require('./themes')
 
 // La misura di partenza, simile a quella dell'app desktop, e la minima, per i temi che non dicono le loro
@@ -670,7 +670,14 @@ function wireConv(c) {
   fwd('suggestion', 'claude:suggestion')
   fwd('rewound', 'claude:rewound')
   b.on('usage', (u) => { lastUsage = u; send('claude:usage', u) })
-  fwd('context', 'claude:context')
+  b.on('context', (x) => {
+    send('claude:context', x, c.id)
+    // Un conto vero: la finestra del contesto di quel modello si ricorda per le stime delle cronache riaperte
+    if (x && !x.estimate) {
+      const saved = savedContextMax()
+      if (JSON.stringify(saved) !== JSON.stringify(config.contextMax || {})) { config.contextMax = saved; saveConfig() }
+    }
+  })
   // Claude riprende a lavorare da sé (un messaggio entrato mentre il turno finiva)
   fwd('busy', 'claude:busy')
   fwd('commandOutput', 'claude:commandOutput')
@@ -915,6 +922,7 @@ app.whenReady().then(() => {
   bridge.claudePath = config.claudePath || null
   bridge.setModel(config.model || null)
   captureMode = !!capture
+  loadContextMax(config.contextMax)
   registerIpc()
   // All'avvio una conversazione nuova, come l'app desktop: quella dell'ultima volta resta negli annali (se c'era, il
   // capitolo va avanti di uno)

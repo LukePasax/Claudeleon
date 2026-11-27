@@ -57,8 +57,15 @@ function settleTodo(todos, created, toolUseId, result) {
   return true
 }
 
-// La finestra del contesto dell'ultimo conto vero (per la stima di una cronaca appena aperta)
-let lastContextMax = 200000
+// La finestra del contesto per modello, dai conti veri (per la stima di una cronaca appena aperta). Un modello mai
+// visto: 200k, o 1M se i token usati superano già i 200k (ci sono modelli col contesto da un milione)
+const contextMax = new Map()
+function guessContextMax(model, used) {
+  const known = model && contextMax.get(String(model).replace(/\[.*\]$/, ''))
+  if (known && known >= used) return known
+  if (model && /\[1m\]/i.test(model)) return 1000000
+  return used > 200000 ? 1000000 : 200000
+}
 
 // Dopo quanto una conversazione ferma si spegne (si riaccende da sola al messaggio dopo)
 const IDLE_CLOSE_MS = 30 * 60 * 1000
@@ -655,7 +662,7 @@ class ClaudeBridge extends EventEmitter {
     if (!live || live.ended || !live.query.getContextUsage) return
     live.query.getContextUsage({ detail: 'summary' }).then((u) => {
       if (this.live !== live || !u) return
-      if (u.rawMaxTokens) lastContextMax = u.rawMaxTokens
+      if (u.rawMaxTokens && u.model) contextMax.set(String(u.model).replace(/\[.*\]$/, ''), u.rawMaxTokens)
       this.emit('context', {
         percentage: Math.round(u.percentage || 0),
         used: u.totalTokens || 0,
@@ -910,11 +917,20 @@ class ClaudeBridge extends EventEmitter {
       if (!u) continue
       const used = (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.output_tokens || 0)
       if (!used) continue
-      this.emit('context', { percentage: Math.round((used / lastContextMax) * 100), used, max: lastContextMax, categories: [], estimate: true })
+      const max = guessContextMax(m.message.model, used)
+      this.emit('context', { percentage: Math.round((used / max) * 100), used, max, categories: [], estimate: true })
       break
     }
     return items
   }
 }
 
-module.exports = { ClaudeBridge, MODES, intent, DEFAULT_CLAUDE: CLAUDE }
+// Le finestre del contesto ricordate fra un avvio e l'altro (le salva il processo principale in config.json)
+function loadContextMax(obj) {
+  for (const [k, v] of Object.entries(obj || {})) if (v > 0) contextMax.set(k, v)
+}
+function savedContextMax() {
+  return Object.fromEntries(contextMax)
+}
+
+module.exports = { ClaudeBridge, MODES, intent, DEFAULT_CLAUDE: CLAUDE, loadContextMax, savedContextMax }
