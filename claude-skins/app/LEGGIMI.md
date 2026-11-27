@@ -24,7 +24,14 @@ nel menu Start e sul desktop con la sua icona, e alla fine lo apre. Si disinstal
   "Ulteriori informazioni" → "Esegui comunque".
 - Configurazione, temi scelti e conversazioni restano gli stessi della versione da `avvia.cmd`
   (`%APPDATA%\Claude Skins`, e le sessioni sono quelle di Claude Code). Disinstallare non li cancella.
-- Per aggiornare dopo un `git pull`: di nuovo `crea-installer.cmd` e l'installer nuovo sopra quello vecchio.
+- **Aggiornamenti:** l'app installata sa da quale clone del repo è nata e a quale commit (li scrive `npm run dist`).
+  All'avvio e ogni 6 ore fa `git fetch` lì: se il branch ha novità, o il repo è più avanti dell'app installata (un
+  pull fatto senza reinstallare), compare un avviso in alto, con una notifica, e "Aggiorna" fa da sola `git pull`,
+  `npm install` se sono cambiate le dipendenze, l'installer nuovo, e lo lancia in silenzio: si installa sopra e
+  riapre l'app. Nelle impostazioni, "Aggiornamenti": lo stato, le novità, "Controlla ora" e l'interruttore del
+  controllo automatico. Con modifiche non salvate nel repo non aggiorna (si fa a mano). Il diario dell'ultimo
+  aggiornamento è in `%APPDATA%\Claude Skins\aggiornamento.log`. Lanciata da `avvia.cmd`, l'app fa il pull e si
+  riavvia.
 - Il pacchetto non contiene Claude Code: usa quello installato (`~/.local/bin/claude.exe`).
 
 ### Dal repo, senza installare

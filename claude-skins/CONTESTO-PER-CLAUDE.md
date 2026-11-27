@@ -259,6 +259,18 @@ quello installato. `crea-installer.cmd` (app e radice) fa `npm install` se serve
 costruzione per Windows chiede Wine (rcedit per l'icona dell'eseguibile); `npm run pack -- --linux dir` dà la cartella
 per provarla con `--cattura`. L'installer non è firmato (SmartScreen).
 
+## Aggiornamento
+
+Dal repo sul PC, non da release (il repo è privato: niente token). `scripts/dist.js` (`npm run dist`) passa a
+electron-builder `extraMetadata.skinsRepo` e `skinsCommit` (git toplevel e HEAD), che finiscono nel package.json
+dell'app impacchettata. `src/updater.js`: `check()` fa `git fetch` e conta `HEAD..@{u}` (novità remote) e
+`skinsCommit..HEAD` (repo più avanti dell'app installata); le modifiche locali tracciate (tranne package-lock.json)
+bloccano. `update()`: `git pull --ff-only`, `npm install` se sono cambiati package.json o package-lock.json (poi il lock
+torna com'era con `git checkout`), `npm run dist`, e l'installer in `dist` lanciato staccato con `/S --force-run`
+(NSIS di electron-builder: silenzioso, stessa cartella, riapre l'app), poi `app.quit()`. Dal repo (non installata):
+pull e `app.relaunch()`. Il processo principale controlla 30 s dopo l'avvio e ogni 6 ore (`config.autoUpdate`),
+notifica una volta per numero di novità; la pagina mostra un avviso (`.update-banner`) e la sezione nelle impostazioni.
+
 ## Prossimi passi possibili
 
 0. **Temi.**

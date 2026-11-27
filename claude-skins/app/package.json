@@ -8,7 +8,7 @@
   "scripts": {
     "start": "electron .",
     "postinstall": "node node_modules/electron/install.js",
-    "dist": "electron-builder --win nsis",
+    "dist": "node scripts/dist.js",
     "pack": "electron-builder --dir"
   },
   "devDependencies": {
@@ -65,6 +65,7 @@
     "linux": {
       "target": "dir",
       "icon": "build/icon.png"
-    }
+    },
+    "publish": null
   }
 }

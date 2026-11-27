@@ -559,3 +559,16 @@ body.busy .entry .edit-btn { display: none; }
 .ext-dot.pending { background: #d99a2b; opacity: 0.6; animation: thinking-pulse 1.2s ease-in-out infinite; }
 .ext-dot.disabled { background: none; border: 1.5px solid var(--ink-soft); }
 .ext-error { font-size: var(--small-size); color: var(--red); padding: 2px 0 6px 21px; overflow-wrap: anywhere; }
+
+/* L'aggiornamento: un avviso in alto al centro della finestra, e l'elenco delle novità nelle impostazioni */
+.update-banner {
+  position: absolute; top: 46px; left: 50%; transform: translateX(-50%); z-index: 19; display: flex; align-items: center; gap: 8px;
+  max-width: calc(100% - 40px); padding: 6px 8px 6px 12px; font-size: 14px; color: var(--ink); background: var(--menu-bg);
+  border: var(--line) solid var(--edge-light); border-radius: 18px; box-shadow: var(--shadow);
+}
+.update-banner .ub-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ub-icon { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--gold); }
+.update-banner.updating .ub-icon { background: none; border: 2px solid var(--gold); border-right-color: transparent; animation: w-spin 0.9s linear infinite; }
+.update-banner.error .ub-icon { background: var(--red); }
+.upd-commits { margin: 0 0 6px; padding: 4px 0 6px 18px; font-size: var(--small-size); color: var(--ink-soft); border-bottom: var(--line) solid var(--edge-light); }
+.upd-commits li { margin: 1px 0; }

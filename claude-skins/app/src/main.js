@@ -4,6 +4,7 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, globalShor
 const fs = require('fs')
 const path = require('path')
 const { ClaudeBridge, DEFAULT_CLAUDE, loadContextMax, savedContextMax } = require('./claude-bridge')
+const { Updater } = require('./updater')
 const { listThemes, DEFAULT_THEME } = require('./themes')
 
 // La misura di partenza, simile a quella dell'app desktop, e la minima, per i temi che non dicono le loro
@@ -25,6 +26,9 @@ let bridge = null
 const convs = new Map()
 let activeConv = null
 let nextConv = 1
+// L'aggiornamento dal repo sul PC (vedi updater.js)
+let updater = null
+let updateNotified = 0
 // L'ultimo utilizzo del piano saputo (sessione di 5 ore, settimana)
 let lastUsage = null
 let captureMode = false
@@ -404,12 +408,14 @@ async function settingsState() {
     installed: app.isPackaged,
     dataDir: app.getPath('userData'),
     shortcut: TOGGLE_SHORTCUT.replace('Control', 'Ctrl'),
+    autoUpdate: config.autoUpdate !== false,
   }
 }
 // Una scelta del pannello: si applica subito e si ricorda
 async function applySetting(key, value) {
   if (key === 'onTop') setOnTop(!!value)
   else if (key === 'notify') { config.notify = !!value; saveConfig() }
+  else if (key === 'autoUpdate') { config.autoUpdate = !!value; saveConfig() }
   else if (key === 'openAtLogin') { try { app.setLoginItemSettings(Object.assign({ openAtLogin: !!value }, loginArgs())) } catch {} }
   else if (key === 'entrypoint') {
     config.entrypoint = value === 'claude-desktop' ? 'claude-desktop' : 'cli'
@@ -491,6 +497,10 @@ function registerIpc() {
   }))
   ipcMain.on('theme:set', (_e, id) => setTheme(String(id)))
   ipcMain.handle('settings:get', () => settingsState())
+  // L'aggiornamento: lo stato, un controllo adesso, l'aggiornamento vero
+  ipcMain.handle('update:get', () => (updater ? updater.state : { state: 'unavailable' }))
+  ipcMain.handle('update:check', () => (updater ? updater.check() : null))
+  ipcMain.on('update:apply', () => { if (updater) updater.update() })
   // Le estensioni (server MCP e plugin): si chiede al Claude Code della conversazione in vista, o a uno temporaneo
   const extBridge = () => { const c = convOf(activeConv); return c && c.bridge.live && !c.bridge.live.ended ? c.bridge : bridge }
   ipcMain.handle('ext:get', async () => { try { return await extBridge().extensions() } catch (err) { return { ok: false, error: err.message, mcp: [], plugins: [], errors: [], enabled: {} } } })
@@ -966,6 +976,21 @@ app.whenReady().then(() => {
   if (!capture) {
     try { fs.writeFileSync(path.join(app.getPath('userData'), 'icona.log'), '') } catch {}
     ensureStartMenuShortcut()
+    // Gli aggiornamenti: un controllo poco dopo l'avvio e poi ogni 6 ore (si spengono dalle impostazioni). Una novità
+    // la dice anche una notifica, una volta sola per numero di novità
+    updater = new Updater(app)
+    updater.on('state', (s) => {
+      send('update:state', s)
+      if (s.state === 'available' && s.count !== updateNotified && config.notify !== false && Notification.isSupported()) {
+        updateNotified = s.count
+        const n = new Notification({ title: 'Claude Skins: aggiornamento disponibile', body: s.commits && s.commits[0] ? `${s.count} novità, fra cui: ${s.commits[0]}` : `${s.count} novità`, icon: trayImage || undefined })
+        n.on('click', () => { bringBack(); send('settings:open') })
+        n.show()
+      }
+    })
+    const autoCheck = () => { if (config.autoUpdate !== false) updater.check() }
+    setTimeout(autoCheck, 30000)
+    setInterval(autoCheck, 6 * 3600 * 1000)
   }
   if (capture) {
     win.webContents.once('did-finish-load', () => setTimeout(() => fakeConversation(capture), 600))

@@ -1297,16 +1297,79 @@
       button(where, 'setChange', () => set('chooseClaude'))
       if (!st.claudeDefault) button(where, 'setReset', () => set('claudePath', ''))
       select(row('setEntrypoint', t('setEntrypointNote')), [['cli', t('setEntryCli')], ['claude-desktop', t('setEntryDesktop')]], st.entrypoint || 'cli', (v) => set('entrypoint', v))
+      // Aggiornamenti
+      section('updTitle')
+      const u = updateState || {}
+      const status = row('updStatus', updateText(u))
+      if (u.state !== 'updating' && u.state !== 'unavailable') button(status, 'updCheck', async () => { updateState = await api.checkUpdate(); render() })
+      if (u.state === 'available' && !u.dirty) {
+        const b = document.createElement('button')
+        b.className = 'btn small'
+        label(b, 'updApply')
+        b.addEventListener('click', () => { api.applyUpdate(); closeThemes() })
+        status.appendChild(b)
+      }
+      if (u.state === 'available' && u.commits && u.commits.length) {
+        const list = document.createElement('ul')
+        list.className = 'upd-commits'
+        for (const c of u.commits.slice(0, 10)) { const li = document.createElement('li'); li.textContent = c; list.appendChild(li) }
+        body.appendChild(list)
+      }
+      toggle(row('updAuto', t('updAutoNote')), st.autoUpdate !== false, (v) => set('autoUpdate', v))
       // Informazioni
       section('setAbout')
       row('setVersion', `${st.version || '?'}${st.installed ? '' : ` · ${t('setFromRepo')}`}`)
       row('setShortcut', `${st.shortcut || ''} · ${t('setShortcutNote')}`)
       button(row('setData', st.dataDir || ''), 'setOpen', () => set('openData'))
     }
+    try { updateState = (await api.updateState()) || updateState } catch {}
     render()
     host.appendChild(panel)
+    settingsRender = () => { if (panel.isConnected) render() }
   }
   if (api.onSettingsOpen) api.onSettingsOpen(() => openSettings())
+
+  // ------------------------------------------------------------------ aggiornamenti
+
+  // Lo stato dell'aggiornamento dal repo (vedi updater.js): una riga nelle impostazioni e un avviso nella finestra
+  // quando c'è una novità o un aggiornamento in corso
+  let updateState = null
+  let settingsRender = null
+  let bannerDismissed = 0
+  function updateText(u) {
+    if (!u || !u.state || u.state === 'idle') return t('updIdle')
+    if (u.state === 'unavailable') return u.error || t('updUnavailable')
+    if (u.state === 'checking') return t('updChecking')
+    if (u.state === 'uptodate') return t('updUpToDate') + (u.checkedAt ? ` · ${formatWhen(u.checkedAt)}` : '')
+    if (u.state === 'available') return t('updAvailable', { n: u.count }) + (u.dirty ? ` · ${t('updDirty')}` : '')
+    if (u.state === 'updating') return t(`updStep_${u.step || 'pull'}`)
+    return `${t('updError')}: ${u.error || '?'}`
+  }
+  function renderUpdateBanner() {
+    for (const el of document.querySelectorAll('.update-banner')) el.remove()
+    const u = updateState
+    if (!u) return
+    const show = u.state === 'updating' || (u.state === 'available' && !u.dirty && bannerDismissed !== u.count) || (u.state === 'error' && u.step === null)
+    if (!show) return
+    const host = app.querySelector('[data-solid]') || app
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+    const b = document.createElement('div')
+    b.className = `update-banner ${u.state}`
+    b.innerHTML = '<span class="ub-icon"></span><span class="ub-text"></span>'
+    b.querySelector('.ub-text').textContent = u.state === 'available' ? t('updBanner', { n: u.count }) : updateText(u)
+    const btn = (key, fn, cls) => { const x = document.createElement('button'); x.className = `btn small ${cls || ''}`; label(x, key); x.addEventListener('click', fn); b.appendChild(x) }
+    if (u.state === 'available') {
+      btn('updApply', () => api.applyUpdate())
+      btn('updDetails', () => openSettings(), 'deny')
+      btn('updLater', () => { bannerDismissed = u.count; renderUpdateBanner() }, 'deny')
+    } else if (u.state === 'error') {
+      btn('updDetails', () => openSettings(), 'deny')
+      btn('updLater', () => { updateState = Object.assign({}, u, { step: undefined }); renderUpdateBanner() }, 'deny')
+    }
+    host.appendChild(b)
+  }
+  if (api.onUpdate) api.onUpdate((u) => { updateState = u; renderUpdateBanner(); if (settingsRender) settingsRender() })
+  if (api.updateState) api.updateState().then((u) => { updateState = u; renderUpdateBanner() }).catch(() => {})
 
   // ------------------------------------------------------------------ estensioni: server MCP e plugin
 
@@ -1457,6 +1520,7 @@
     renderContext()
     renderChanged()
     renderGhost()
+    renderUpdateBanner()
     renderChapterHead()
     paint()
     scrollDown(true)
@@ -2901,6 +2965,7 @@
       permesso: () => fire('onAsk', { id: Date.now(), title: 'Claude vuole modificare un file', description: '', detail: 'src/MapView.cpp', canAlways: true }, 0),
     }
     const day = 86400000
+    const fakeUpdate = { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/luca/Claude-desktop-skins', installed: true }
     const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '0.1.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claude Skins', shortcut: 'Ctrl+Alt+P' }
     const fakeSessions = [
       { id: 's0', title: 'Allegati e domande con le opzioni', lastModified: Date.now() - 600000, cwd: 'C:/Workspace/Progetti/Claude-desktop-skins', branch: 'main' },
@@ -2968,6 +3033,10 @@
         { name: 'notion', status: 'disabled', scope: 'project', source: 'project', tools: 0, error: '' },
       ], plugins: [{ name: 'engineering', version: '1.2.0', source: '' }], errors: [], enabled: { 'engineering@anthropic-plugins': true, 'cowork-plugin-management@anthropic-plugins': false } }),
       toggleMcp: async () => ({ ok: true }), reconnectMcp: async () => ({ ok: true }), togglePlugin: async () => ({ ok: true }),
+      updateState: async () => fakeUpdate,
+      checkUpdate: async () => fakeUpdate,
+      applyUpdate: () => { const steps = ['pull', 'deps', 'build', 'install']; steps.forEach((st, i) => fireAll('onUpdate', Object.assign({}, fakeUpdate, { state: 'updating', step: st }), 600 * (i + 1))) },
+      onUpdate: on('onUpdate'),
       settings: async () => fakeSettings,
       setSetting: async (k, v) => { if (k in fakeSettings) fakeSettings[k] = v; return fakeSettings },
       suggestFiles: async (q) => ['src/', 'src/MapView.cpp', 'src/MapView.h', 'src/MapLoader.cpp', 'src/RouteFinder.h', 'docs/', 'docs/specifiche.pdf', 'README.md', 'CMakeLists.txt'].filter((f) => f.toLowerCase().includes(q.toLowerCase())).slice(0, 15),
