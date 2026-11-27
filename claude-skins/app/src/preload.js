@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('skins', {
   setModel: (model, effort) => ipcRenderer.send('model:set', { model, effort }),
   onModels: listen('models:list'),
   onTodos: listen('claude:todos'),
+  onBusy: listen('claude:busy'),
   sessions: () => ipcRenderer.invoke('sessions:list'),
   commands: () => ipcRenderer.invoke('commands:get'),
   openSession: (id, cwd) => ipcRenderer.invoke('session:open', id, cwd),

@@ -56,6 +56,36 @@ function settleTodo(todos, created, toolUseId, result) {
   return true
 }
 
+// Dopo quanto una conversazione ferma si spegne (si riaccende da sola al messaggio dopo)
+const IDLE_CLOSE_MS = 30 * 60 * 1000
+
+// La coda dei messaggi della conversazione accesa: un flusso che resta aperto finché non si chiude
+class Inbox {
+  constructor() {
+    this.items = []
+    this.waiting = null
+    this.closed = false
+  }
+  push(m) {
+    if (this.closed) return
+    if (this.waiting) { const w = this.waiting; this.waiting = null; w({ value: m, done: false }) } else this.items.push(m)
+  }
+  close() {
+    this.closed = true
+    if (this.waiting) { const w = this.waiting; this.waiting = null; w({ value: undefined, done: true }) }
+  }
+  [Symbol.asyncIterator]() {
+    return {
+      next: () => {
+        if (this.items.length) return Promise.resolve({ value: this.items.shift(), done: false })
+        if (this.closed) return Promise.resolve({ value: undefined, done: true })
+        return new Promise((resolve) => { this.waiting = resolve })
+      },
+      return: () => { this.close(); return Promise.resolve({ value: undefined, done: true }) },
+    }
+  }
+}
+
 // Il nome del server del titolo: lo stesso dell'app desktop, così istruzioni e skill scritte per lei funzionano qui
 const TITLE_SERVER = 'ccd_session_mgmt'
 
@@ -159,15 +189,6 @@ function withFiles(text, files) {
   return `${text.trim()}\n\n<attached_files>\n${list.join('\n')}\n</attached_files>`.trimStart()
 }
 
-// Un messaggio con le immagini: un flusso di un solo messaggio, coi blocchi immagine prima del testo (come l'app desktop)
-function userMessage(text, images) {
-  const content = images.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mediaType, data: i.data } }))
-  if (text.trim()) content.push({ type: 'text', text })
-  return (async function* () {
-    yield { type: 'user', session_id: '', parent_tool_use_id: null, message: { role: 'user', content } }
-  })()
-}
-
 // Le immagini di un messaggio salvato, come indirizzi data: per le miniature
 function imagesOf(message) {
   const content = message && message.content
@@ -194,6 +215,9 @@ class ClaudeBridge extends EventEmitter {
     // La cartella della conversazione in corso: quella in cui è nata, perché Claude Code la riprende solo da lì.
     // Vuota per un capitolo nuovo, che nasce nella cartella di lavoro
     this.sessionCwd = null
+    // La conversazione accesa (vedi ensureLive)
+    this.live = null
+    this.starting = null
     // Modello e ragionamento (null: quelli di partenza di Claude Code)
     this.model = null
     this.effort = null
@@ -324,15 +348,10 @@ class ClaudeBridge extends EventEmitter {
   }
 
   // Ferma la risposta in corso; le domande di permesso aperte diventano un rifiuto
+  // Ferma e spegne: per un capitolo nuovo, una cronaca aperta, l'uscita
   cancel() {
-    for (const resolve of this.pending.values()) resolve({ behavior: 'deny', message: 'La persona ha fermato il messaggero.', interrupt: true })
-    this.pending.clear()
-    this.plans.clear()
-    if (this.query) {
-      const q = this.query
-      this.query = null
-      q.interrupt().catch(() => q.close())
-    }
+    this.stop()
+    this.closeLive()
   }
 
   // La risposta della finestra a una domanda di permesso
@@ -363,117 +382,208 @@ class ClaudeBridge extends EventEmitter {
   }
 
   // Il messaggio della persona: testo, immagini ({ mediaType, data } in base64) e file (percorsi, che Claude apre da
-  // sé con i suoi strumenti). Con le immagini il messaggio parte come blocchi di contenuto, altrimenti come testo
+  // sé con i suoi strumenti). Va alla conversazione accesa (la si accende se serve): mentre Claude lavora entra nel
+  // turno in corso, come nell'app desktop
   async send(payload) {
-    this.cancel()
     const msg = typeof payload === 'string' ? { text: payload } : payload || {}
     const images = (msg.images || []).filter((i) => i && i.data && /^image\/(png|jpeg|gif|webp)$/.test(i.mediaType))
     const text = withFiles(String(msg.text || ''), msg.files || [])
     if (!text.trim() && !images.length) return
-    const prompt = images.length ? userMessage(text, images) : text
-    let current = null
+    const content = images.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mediaType, data: i.data } }))
+    if (text.trim()) content.push({ type: 'text', text })
     this.suggestions = this.suggestions || new Map()
+    let live
     try {
-      const { query } = await loadSdk()
-      const resume = this.session.getSession()
-      // Una conversazione si riprende nella sua cartella; una nuova nasce nella cartella di lavoro
-      const cwd = (resume && this.sessionCwd) || this.workdir
-      current = query({
-        prompt,
-        options: {
-          cwd,
-          pathToClaudeCodeExecutable: CLAUDE,
-          permissionMode: this.mode,
-          model: this.model || undefined,
-          effort: this.effort || undefined,
-          systemPrompt: { type: 'preset', preset: 'claude_code', append: this.persona || FALLBACK_PERSONA },
-          // Gli hook dell'utente partono una volta per conversazione, al primo messaggio: i successivi riprendono la
-          // sessione con un processo nuovo, e farli ripartire a ogni risposta moltiplicherebbe backup e log
-          settings: { disableAllHooks: !!resume },
-          env: Object.assign({}, process.env, {
-            // Claude Code manda anche una frase che riassume ogni gruppo di azioni (come nell'app desktop)
-            CLAUDE_CODE_EMIT_TOOL_USE_SUMMARIES: '1',
-            // Senza questa l'SDK segna la sessione come "programmatica" (sdk-ts) e gli elenchi delle sessioni di
-            // Claude (il /resume del terminale, le app) la nascondono
-            CLAUDE_CODE_ENTRYPOINT: this.entrypoint || 'cli',
-          }),
-          // Lo strumento con cui Claude dà un titolo alla conversazione, con lo stesso nome che ha nell'app desktop
-          mcpServers: { [TITLE_SERVER]: await this.titleServer() },
-          includePartialMessages: true,
-          resume: resume || undefined,
-          canUseTool: (toolName, input, options) => this.ask(toolName, input, options),
-        },
-      })
-      this.query = current
-      // L'elenco dei comandi di questa conversazione (può cambiare con la cartella e i plugin)
-      current.supportedCommands().then((list) => { if (this.query === current) this.setCommands(list) }).catch(() => {})
-      let sawDelta = false
-      let wroteText = false
-      let sawOutput = false
-      for await (const msg of current) {
-        if (this.query !== current) break
-        if (msg.session_id) {
-          this.sessionCwd = cwd
-          this.session.setSession(msg.session_id, cwd)
-        }
-        // Claude Code dice in che modo è (all'inizio di ogni turno e quando cambia): la finestra si allinea
-        if (msg.type === 'system' && (msg.subtype === 'init' || msg.subtype === 'status') && msg.permissionMode) this.setMode(msg.permissionMode, true)
-        if (msg.type === 'system') {
-          if (msg.subtype === 'init' && Array.isArray(msg.terminal_slash_commands)) this.terminalOnly = new Set(msg.terminal_slash_commands)
-          else if (msg.subtype === 'commands_changed') this.setCommands(msg.commands)
-          else if (msg.subtype === 'local_command_output') { sawOutput = true; this.emit('commandOutput', plainOutput(msg.content)) }
-          else if (msg.subtype === 'compact_boundary') this.emit('compacted', { pre: msg.compact_metadata?.pre_tokens || 0, post: msg.compact_metadata?.post_tokens || 0 })
-          else if (msg.subtype === 'status') this.emit('status', msg.status || null)
-        }
-        // La frase che riassume le azioni appena fatte
-        if (msg.type === 'tool_use_summary' && msg.summary) this.emit('toolSummary', { summary: String(msg.summary), ids: msg.preceding_tool_use_ids || [] })
-        if (msg.type === 'stream_event') {
-          const ev = msg.event || {}
-          if (ev.type === 'content_block_start' && ev.content_block?.type === 'text' && wroteText) {
-            this.emit('delta', '\n\n')
-          } else if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
-            sawDelta = true
-            wroteText = true
-            this.emit('delta', ev.delta.text)
-          }
-        } else if (msg.type === 'assistant') {
-          for (const block of msg.message?.content || []) {
-            if (block.type === 'tool_use' && TODO_TOOLS.has(block.name)) {
-              if (applyTodo(this.todos, this.todoCreated, block.name, block.id, block.input)) this.emit('todos', this.todos)
-            } else if (block.type === 'tool_use') this.emit('tool', { id: block.id, name: block.name, summary: summary(block.input), intent: intent(block.name, block.input), change: this.change(block.name, block.input) })
-            else if (block.type === 'text' && !sawDelta && block.text) {
-              this.emit('delta', (wroteText ? '\n\n' : '') + block.text)
-              wroteText = true
-            }
-          }
-          sawDelta = false
-        } else if (msg.type === 'user') {
-          const out = localStdout(msg.message)
-          if (out != null && !sawOutput) { sawOutput = true; this.emit('commandOutput', plainOutput(out)) }
-          for (const block of Array.isArray(msg.message?.content) ? msg.message.content : []) {
-            if (block.type !== 'tool_result') continue
-            if (this.todoCreated.has(block.tool_use_id)) {
-              const text = typeof block.content === 'string' ? block.content : (Array.isArray(block.content) ? block.content.map((c) => c.text || '').join(' ') : '')
-              if (!block.is_error && settleTodo(this.todos, this.todoCreated, block.tool_use_id, msg.tool_use_result || text)) this.emit('todos', this.todos)
-              else this.todoCreated.delete(block.tool_use_id)
-              continue
-            }
-            this.emit('toolDone', { id: block.tool_use_id, error: !!block.is_error })
-          }
-        } else if (msg.type === 'result') {
-          if (msg.is_error || msg.subtype !== 'success') this.emit('error', msg.result || `Il messaggero si è fermato (${msg.subtype}).`)
-          else {
-            // Un comando che non ha fatto scrivere Claude né mandato un'uscita: il suo esito è nel risultato
-            if (!wroteText && !sawOutput && msg.result) this.emit('commandOutput', plainOutput(msg.result))
-            this.emit('done', { durationMs: msg.duration_ms || 0 })
-          }
-        }
+      live = await this.ensureLive()
+    } catch (err) {
+      this.emit('error', `Claude Code non risponde: ${err.message}`)
+      return
+    }
+    const busy = live.turn.open
+    if (!busy) this.openTurn(live)
+    clearTimeout(live.idle)
+    live.inbox.push(Object.assign({ type: 'user', session_id: '', parent_tool_use_id: null, message: { role: 'user', content } }, busy ? { priority: 'next' } : {}))
+  }
+
+  // La conversazione accesa: un solo processo di Claude Code per tutta la conversazione, con i messaggi che arrivano
+  // da una coda (prompt come flusso). Si riaccende da capo quando cambia la conversazione (capitolo nuovo, cronaca
+  // aperta), la cartella, il ragionamento o il tono del tema, che valgono solo all'avvio
+  ensureLive() {
+    // Due messaggi di fila mentre si accende: aspettano la stessa accensione
+    if (!this.starting) this.starting = this.startLive().finally(() => { this.starting = null })
+    return this.starting
+  }
+  async startLive() {
+    // Mentre Claude lavora si resta su questa: tema o ragionamento cambiati valgono dalla prossima accensione
+    if (this.live && !this.live.ended && this.live.turn.open) return this.live
+    const resume = this.session.getSession()
+    const cwd = (resume && this.sessionCwd) || this.workdir
+    const key = JSON.stringify([cwd, this.effort, this.persona])
+    const cur = this.live
+    if (cur && !cur.ended && cur.key === key && (cur.sessionId || null) === (resume || null)) return cur
+    if (cur && !cur.ended && cur.key === key && !cur.sessionId && !resume) return cur
+    this.closeLive()
+    const { query } = await loadSdk()
+    const inbox = new Inbox()
+    const live = { inbox, cwd, key, sessionId: resume || null, ended: false, idle: null, turn: { open: false } }
+    live.query = query({
+      prompt: inbox,
+      options: {
+        cwd,
+        pathToClaudeCodeExecutable: CLAUDE,
+        permissionMode: this.mode,
+        model: this.model || undefined,
+        effort: this.effort || undefined,
+        systemPrompt: { type: 'preset', preset: 'claude_code', append: this.persona || FALLBACK_PERSONA },
+        env: Object.assign({}, process.env, {
+          // Claude Code manda anche una frase che riassume ogni gruppo di azioni (come nell'app desktop)
+          CLAUDE_CODE_EMIT_TOOL_USE_SUMMARIES: '1',
+          // Senza questa l'SDK segna la sessione come "programmatica" (sdk-ts) e gli elenchi delle sessioni di
+          // Claude (il /resume del terminale, le app) la nascondono
+          CLAUDE_CODE_ENTRYPOINT: this.entrypoint || 'cli',
+        }),
+        // Lo strumento con cui Claude dà un titolo alla conversazione, con lo stesso nome che ha nell'app desktop
+        mcpServers: { [TITLE_SERVER]: await this.titleServer() },
+        includePartialMessages: true,
+        resume: resume || undefined,
+        canUseTool: (toolName, input, options) => this.ask(toolName, input, options),
+      },
+    })
+    this.live = live
+    this.query = live.query
+    // L'elenco dei comandi di questa conversazione (può cambiare con la cartella e i plugin)
+    live.query.supportedCommands().then((list) => { if (this.live === live) this.setCommands(list) }).catch(() => {})
+    this.pump(live)
+    return live
+  }
+
+  // Un turno comincia: Claude lavora finché non arriva il suo risultato
+  openTurn(live) {
+    live.turn = { open: true, stopped: false, sawDelta: false, wroteText: false, sawOutput: false }
+  }
+
+  // Legge tutto quello che arriva dalla conversazione accesa, turno dopo turno, finché il processo resta vivo
+  async pump(live) {
+    try {
+      for await (const msg of live.query) {
+        if (this.live !== live) break
+        this.handle(live, msg)
       }
     } catch (err) {
-      if (this.query === current) this.emit('error', `Claude Code non risponde: ${err.message}`)
+      if (this.live === live && live.turn.open && !live.turn.stopped) this.emit('error', `Claude Code non risponde: ${err.message}`)
     } finally {
-      if (this.query === current) this.query = null
+      live.ended = true
+      clearTimeout(live.idle)
+      if (this.live === live) {
+        // Il processo si è chiuso a metà di un turno: la finestra non resta in attesa
+        if (live.turn.open && !live.turn.stopped) this.emit('error', 'Claude Code si è chiuso.')
+        this.live = null
+        this.query = null
+      }
     }
+  }
+
+  handle(live, msg) {
+    const cwd = live.cwd
+    if (msg.session_id) {
+      live.sessionId = msg.session_id
+      this.sessionCwd = cwd
+      this.session.setSession(msg.session_id, cwd)
+    }
+    // Un turno fermato dalla persona: quello che arriva ancora fino al suo risultato si lascia cadere
+    if (live.turn.stopped) {
+      if (msg.type === 'result') live.turn = { open: false }
+      return
+    }
+    // Claude riprende a lavorare senza un messaggio appena spedito (un messaggio entrato quando il turno finiva): la
+    // finestra torna "occupata"
+    if (!live.turn.open && (msg.type === 'stream_event' || msg.type === 'assistant')) {
+      this.openTurn(live)
+      this.emit('busy', true)
+    }
+    const turn = live.turn
+    // Claude Code dice in che modo è (all'inizio di ogni turno e quando cambia): la finestra si allinea
+    if (msg.type === 'system' && (msg.subtype === 'init' || msg.subtype === 'status') && msg.permissionMode) this.setMode(msg.permissionMode, true)
+    if (msg.type === 'system') {
+      if (msg.subtype === 'init' && Array.isArray(msg.terminal_slash_commands)) this.terminalOnly = new Set(msg.terminal_slash_commands)
+      else if (msg.subtype === 'commands_changed') this.setCommands(msg.commands)
+      else if (msg.subtype === 'local_command_output') { turn.sawOutput = true; this.emit('commandOutput', plainOutput(msg.content)) }
+      else if (msg.subtype === 'compact_boundary') this.emit('compacted', { pre: msg.compact_metadata?.pre_tokens || 0, post: msg.compact_metadata?.post_tokens || 0 })
+      else if (msg.subtype === 'status') this.emit('status', msg.status || null)
+    }
+    // La frase che riassume le azioni appena fatte
+    if (msg.type === 'tool_use_summary' && msg.summary) this.emit('toolSummary', { summary: String(msg.summary), ids: msg.preceding_tool_use_ids || [] })
+    if (msg.type === 'stream_event') {
+      const ev = msg.event || {}
+      if (ev.type === 'content_block_start' && ev.content_block?.type === 'text' && turn.wroteText) {
+        this.emit('delta', '\n\n')
+      } else if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
+        turn.sawDelta = true
+        turn.wroteText = true
+        this.emit('delta', ev.delta.text)
+      }
+    } else if (msg.type === 'assistant') {
+      for (const block of msg.message?.content || []) {
+        if (block.type === 'tool_use' && TODO_TOOLS.has(block.name)) {
+          if (applyTodo(this.todos, this.todoCreated, block.name, block.id, block.input)) this.emit('todos', this.todos)
+        } else if (block.type === 'tool_use') this.emit('tool', { id: block.id, name: block.name, summary: summary(block.input), intent: intent(block.name, block.input), change: this.change(block.name, block.input) })
+        else if (block.type === 'text' && !turn.sawDelta && block.text) {
+          this.emit('delta', (turn.wroteText ? '\n\n' : '') + block.text)
+          turn.wroteText = true
+        }
+      }
+      turn.sawDelta = false
+    } else if (msg.type === 'user') {
+      const out = localStdout(msg.message)
+      if (out != null && !turn.sawOutput) { turn.sawOutput = true; this.emit('commandOutput', plainOutput(out)) }
+      for (const block of Array.isArray(msg.message?.content) ? msg.message.content : []) {
+        if (block.type !== 'tool_result') continue
+        if (this.todoCreated.has(block.tool_use_id)) {
+          const text = typeof block.content === 'string' ? block.content : (Array.isArray(block.content) ? block.content.map((c) => c.text || '').join(' ') : '')
+          if (!block.is_error && settleTodo(this.todos, this.todoCreated, block.tool_use_id, msg.tool_use_result || text)) this.emit('todos', this.todos)
+          else this.todoCreated.delete(block.tool_use_id)
+          continue
+        }
+        this.emit('toolDone', { id: block.tool_use_id, error: !!block.is_error })
+      }
+    } else if (msg.type === 'result') {
+      live.turn = { open: false }
+      if (msg.is_error || msg.subtype !== 'success') this.emit('error', msg.result || `Il messaggero si è fermato (${msg.subtype}).`)
+      else {
+        // Un comando che non ha fatto scrivere Claude né mandato un'uscita: il suo esito è nel risultato
+        if (!turn.wroteText && !turn.sawOutput && msg.result) this.emit('commandOutput', plainOutput(msg.result))
+        this.emit('done', { durationMs: msg.duration_ms || 0 })
+      }
+      // Una conversazione ferma da molto si spegne (gli hook di fine sessione partono allora); il prossimo messaggio la
+      // riaccende riprendendo la sessione
+      clearTimeout(live.idle)
+      live.idle = setTimeout(() => { if (this.live === live && !live.turn.open) this.closeLive() }, IDLE_CLOSE_MS)
+    }
+  }
+
+  // Ferma la risposta in corso: le domande aperte si chiudono e Claude Code interrompe il turno, ma resta acceso
+  stop() {
+    for (const resolve of this.pending.values()) resolve({ behavior: 'deny', message: 'La persona ha fermato il messaggero.', interrupt: true })
+    this.pending.clear()
+    this.plans.clear()
+    this.questions.clear()
+    const live = this.live
+    if (live && live.turn.open) {
+      live.turn.stopped = true
+      live.query.interrupt().catch(() => this.closeLive())
+    }
+  }
+
+  // Spegne la conversazione accesa (capitolo nuovo, cronaca aperta, uscita dall'app)
+  closeLive() {
+    const live = this.live
+    if (!live) return
+    this.live = null
+    this.query = null
+    live.ended = true
+    clearTimeout(live.idle)
+    live.inbox.close()
+    try { live.query.close() } catch {}
   }
 
   // Il server MCP in-process con set_session_title. Scrive la riga custom-title nel transcript (come fa il desktop),

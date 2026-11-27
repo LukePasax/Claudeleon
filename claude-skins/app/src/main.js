@@ -383,7 +383,7 @@ function registerIpc() {
       return { mediaType, data: fs.readFileSync(p).toString('base64') }
     } catch { return null }
   })
-  ipcMain.on('chat:stop', () => bridge.cancel())
+  ipcMain.on('chat:stop', () => bridge.stop())
   ipcMain.on('perm:answer', (_e, { id, allow, always, answers }) => bridge.answer(id, !!allow, !!always, answers))
   // Modello e ragionamento, ricordati per le prossime volte
   ipcMain.on('model:set', (_e, { model, effort }) => {
@@ -447,6 +447,8 @@ function registerIpc() {
     send('models:list', list)
   })
   bridge.on('todos', (list) => send('claude:todos', list))
+  // Claude riprende a lavorare da sé (un messaggio entrato mentre il turno finiva)
+  bridge.on('busy', (on) => send('claude:busy', on))
   bridge.on('commandOutput', (text) => send('claude:commandOutput', text))
   bridge.on('toolSummary', (x) => send('claude:toolSummary', x))
   bridge.on('compacted', (c) => send('claude:compacted', c))

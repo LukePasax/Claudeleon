@@ -99,9 +99,12 @@ npm 11 altrimenti non arriva.
   cartella, tema, modo dei permessi, sempre in primo piano; `entrypoint` (come si presentano le sessioni a Claude
   Code, normalmente `cli`: così compaiono nel `/resume` del terminale e negli elenchi delle altre app). Al primo
   avvio riprende quella di `pergamena-app`.
-- **Hook dell'utente:** partono al primo messaggio di una conversazione nuova (`SessionStart` con origine `startup`,
-  poi `SessionEnd` a fine risposta); i messaggi successivi riprendono la sessione con un processo nuovo e non li
-  rifanno partire. Limite: `SessionEnd` gira dopo la prima risposta, non a fine conversazione.
+- **Un solo Claude Code per conversazione:** resta acceso dal primo messaggio finché la conversazione cambia (capitolo
+  nuovo, cronaca aperta), si esce dall'app o resta ferma 30 minuti; poi il messaggio dopo lo riaccende riprendendo la
+  sessione. Le risposte partono prima, e si può scrivere mentre Claude lavora: il messaggio entra nel turno in corso,
+  come nell'app desktop. Gli hook dell'utente funzionano come altrove: `SessionStart` all'accensione, `SessionEnd`
+  allo spegnimento. "Ferma" interrompe la risposta senza spegnere. Tema e ragionamento cambiati valgono dalla
+  prossima accensione; modello e modo dei permessi subito.
 - **Titolo della conversazione:** l'app dà a Claude lo strumento `set_session_title` con lo stesso nome dell'app
   desktop (`mcp__ccd_session_mgmt__set_session_title`, server MCP in-process); scrive la riga `custom-title` nel
   transcript con `renameSession` dell'SDK, senza chiedere il permesso, e le cronache si ricaricano.

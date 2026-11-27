@@ -211,9 +211,13 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
 - **Gli strumenti propri dell'app desktop** (browser integrato, avvio di altre sessioni, pannelli) dal rotolo non ci
   sono: Claude ha quelli di base di Claude Code, più i server MCP e i plugin della configurazione dell'utente.
 
-- **Allegati:** con immagini, `send()` passa a `query()` un flusso di un solo `SDKUserMessage` (blocchi `image` base64
-  prima del testo); senza, una stringa (che questa versione dell'SDK scrive comunque come messaggio utente su stdin,
-  quindi i server MCP in-process funzionano anche così). I file vanno come percorsi in `<attached_files>` in fondo al
+- **Conversazione accesa:** `send()` non lancia più un `query()` per messaggio. `ensureLive()` tiene un `query()` con
+  il prompt come flusso (`Inbox`, una coda che resta aperta) e `pump()` legge tutto, turno dopo turno (`handle()`); il
+  turno si chiude col `result`. Si riaccende se cambiano sessione, cartella, ragionamento o tono (la chiave `key`),
+  ma mai a turno aperto. Un messaggio mandato a turno aperto va con `priority: 'next'`; se Claude riparte senza un
+  messaggio appena spedito, il ponte manda `busy`. `stop()` interrompe (`interrupt()`) e scarta il resto del turno;
+  `cancel()` interrompe e spegne. Dopo 30 minuti fermo si spegne da solo.
+- **Allegati:** le immagini vanno come blocchi `image` base64 prima del testo, nel messaggio della coda. I file vanno come percorsi in `<attached_files>` in fondo al
   testo, e la pagina li rimostra come etichette. Il percorso di un file trascinato o incollato viene da
   `webUtils.getPathForFile` nel preload (`File.path` non c'è più). Da verificare su Windows: con la finestra che lascia
   passare i clic (`setIgnoreMouseEvents`), il trascinamento da Esplora file potrebbe non arrivare se il cursore non è
@@ -221,9 +225,8 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
 - **Sessioni e app desktop** (dai report del 27/11, poi tolti): senza `CLAUDE_CODE_ENTRYPOINT` l'SDK segna le
   sessioni `sdk-ts`, e gli elenchi (il `/resume` del terminale, le app) le scartano come programmatiche: ora il ponte
   passa `cli` (configurabile con `entrypoint` in config.json). Le sessioni del desktop sono `claude-desktop`; se il
-  desktop mostrasse solo quelle, la prova successiva è `"entrypoint": "claude-desktop"`. Hook accesi solo al primo
-  messaggio (`disableAllHooks: !!resume`); la soluzione completa è un processo che resta vivo per la conversazione
-  (prompt come stream). Titolo con il server in-process `ccd_session_mgmt`. La CLI in `~/.local/bin` può essere di
+  desktop mostrasse solo quelle, la prova successiva è `"entrypoint": "claude-desktop"`. Hook: prima accesi solo al
+  primo messaggio; ora c'è un processo per conversazione (vedi sotto) e gli hook non si spengono più. Titolo con il server in-process `ccd_session_mgmt`. La CLI in `~/.local/bin` può essere di
   una versione diversa da quella del desktop.
 
 ## Verificato

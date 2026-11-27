@@ -353,6 +353,7 @@
     }
     box.appendChild(list)
   }
+  if (api.onBusy) api.onBusy((on) => setBusy(!!on))
   if (api.onTodos) api.onTodos((list) => {
     const before = todos.length
     todos = Array.isArray(list) ? list : []
@@ -849,7 +850,7 @@
   function sendMessage() {
     const input = part('input')
     const text = input ? input.value.trim() : ''
-    if ((!text && !attachments.length) || busy) return
+    if (!text && !attachments.length) return
     closeMenu()
     // Prima conversazione senza una cartella scelta: prima la cartella, poi il messaggio parte da sé
     const folderBtn = app.querySelector('[data-part="folder"] .folder-btn')
@@ -860,13 +861,17 @@
     // /clear e /new: un nuovo capitolo, come il pulsante
     if (/^\/(clear|new)\s*$/i.test(text)) { input.value = ''; newChapter(); return }
     input.value = ''
+    // Mentre Claude lavora il messaggio entra nel turno in corso: la risposta continua sotto di lui
+    if (busy) renderReply()
     reply = null
     const sent = attachments
     attachments = []
     renderAttachments()
     const images = sent.filter((a) => a.kind === 'image')
     const files = sent.filter((a) => a.kind === 'file').map((a) => a.path)
-    fillYou(entry('you'), text, images.map((a) => a.url), files)
+    const you = entry('you')
+    if (busy) you.classList.add('queued')
+    fillYou(you, text, images.map((a) => a.url), files)
     renderFolder()
     setBusy(true)
     api.send(sent.length ? { text, images: images.map((a) => ({ mediaType: a.mediaType, data: a.data })), files } : text)
