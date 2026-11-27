@@ -70,8 +70,13 @@ npm 11 altrimenti non arriva.
   gli ultimi 40 messaggi con le azioni di Claude e il loro esito, le modifiche ai file (chiuse: si aprono con un
   clic sulla riga), i comandi con `/` e la loro uscita; i messaggi dopo la continuano nella sua cartella. Non aprire qui una sessione che è aperta
   anche nell'app desktop.
-- **Cartella di lavoro:** dal vassoio, "Cartella di lavoro…": è dove nascono le conversazioni nuove (quelle riprese
-  restano nella loro cartella).
+- **Cartella di lavoro:** accanto ai permessi c'è la cartella della conversazione; un clic apre le cartelle recenti
+  (prese dalle cronache) e "Scegli un'altra cartella…". Cambiarla a conversazione iniziata apre un capitolo nuovo,
+  perché una conversazione resta nella sua cartella. Se non ne hai mai scelta una, il primo messaggio la chiede. C'è
+  anche nel vassoio, "Cartella di lavoro…".
+- **Che cosa fa Claude:** ogni azione si legge a parole ("Legge MapView.cpp", "Cerca «DrawRoads» nel codice", o la
+  descrizione che Claude ha scritto per un comando), col dettaglio tecnico accanto. Quando Claude Code manda la frase
+  che riassume un gruppo di azioni, le azioni si raccolgono sotto di lei e si aprono con un clic.
 - **Configurazione:** `%APPDATA%\Claude Skins\config.json`: `workdir` (la cartella in cui nascono le
   conversazioni nuove; vuota, la cartella utente), posizione, dimensione per tema, scena, capitolo, sessione e sua
   cartella, tema, modo dei permessi, sempre in primo piano. Al primo avvio riprende quella di `pergamena-app`.

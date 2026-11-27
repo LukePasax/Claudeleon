@@ -127,7 +127,10 @@
       <section class="page right" data-art-bg="paper">
         <div class="log" data-part="log"></div>
         <div class="quill">
-          <div class="modes" data-part="modes"></div>
+          <div class="quill-top">
+            <div class="modes" data-part="modes"></div>
+            <div class="folder" data-part="folder"></div>
+          </div>
           <textarea data-part="input" data-s-placeholder="placeholder" spellcheck="false"></textarea>
           <div class="quill-row">
             <canvas class="lamp" data-art="lamp" data-art-anim data-art-fit="natural"></canvas>

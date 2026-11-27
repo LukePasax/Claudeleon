@@ -224,7 +224,121 @@
     api.setMode(m)
   }
   api.onMode((m) => { mode = m; renderModes() })
-  api.onWorkdir((dir) => { workdir = dir })
+  // Dal vassoio o dalla finestra: vale per le conversazioni nuove (e per questa, se non è ancora cominciata)
+  api.onWorkdir((dir) => {
+    workdir = dir
+    workdirChosen = true
+    if (!chapterHasMessages() && !currentSession) convoDir = dir
+    renderFolder()
+  })
+
+  // ------------------------------------------------------------------ la cartella della conversazione
+
+  // data-part="folder": dove lavora Claude in questa conversazione (una cronaca ripresa resta nella sua cartella, un
+  // capitolo nuovo nasce nella cartella di lavoro). Un clic apre le cartelle recenti, prese dalle cronache, e il
+  // dialogo per sceglierne un'altra. Se la persona non ne ha mai scelta una, il primo messaggio la chiede
+  let convoDir = ''
+  let workdirChosen = true
+  let pendingSend = false
+  const baseName = (p) => String(p || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() || String(p || '')
+
+  function renderFolder() {
+    for (const box of all('[data-part="folder"]')) {
+      let b = box.querySelector('.folder-btn')
+      if (!b) {
+        b = document.createElement('button')
+        b.className = 'folder-btn'
+        b.addEventListener('click', () => openFolderMenu(b))
+        box.appendChild(b)
+      }
+      const unset = !workdirChosen && !currentSession && !chapterHasMessages()
+      b.classList.toggle('unset', unset)
+      b.textContent = unset ? t('folderPick') : baseName(convoDir || workdir)
+      b.title = unset ? t('folderPick') : (convoDir || workdir)
+    }
+  }
+
+  function chapterHasMessages() {
+    return all('[data-part="log"] .entry.you').length > 0
+  }
+
+  function closeFolderMenu() {
+    for (const m of document.querySelectorAll('.folder-menu')) m.remove()
+    pendingSend = false
+  }
+
+  // Il menu, sopra o sotto il pulsante a seconda dello spazio; first: è il primo messaggio e la cartella non c'è
+  async function openFolderMenu(anchor, first) {
+    const wasPending = first || pendingSend
+    closeFolderMenu()
+    pendingSend = !!wasPending
+    const menu = document.createElement('div')
+    menu.className = 'folder-menu'
+    const note = (key) => { const n = document.createElement('div'); n.className = 'folder-note'; menu.appendChild(label(n, key)) }
+    const headEl = document.createElement('div')
+    headEl.className = 'folder-head'
+    menu.appendChild(label(headEl, 'folderTitle'))
+    if (first) note('folderFirst')
+    else if (chapterHasMessages() || currentSession) note('folderNew')
+    const list = document.createElement('div')
+    list.className = 'folder-list'
+    menu.appendChild(list)
+    const other = document.createElement('div')
+    other.className = 'folder-item other'
+    menu.appendChild(label(other, 'folderOther'))
+    other.addEventListener('click', () => chooseFolder(null))
+    const host = app.querySelector('[data-solid]') || app
+    host.appendChild(menu)
+    // Posizione: allineato al pulsante, sopra se sotto non c'è posto
+    const r = anchor.getBoundingClientRect()
+    const hr = host.getBoundingClientRect()
+    menu.style.left = `${Math.max(8, Math.min(r.left - hr.left, hr.width - menu.offsetWidth - 8))}px`
+    if (r.top - hr.top > menu.offsetHeight + 12) menu.style.bottom = `${hr.bottom - r.top + 6}px`
+    else menu.style.top = `${r.bottom - hr.top + 6}px`
+    // Le cartelle recenti: quelle delle cronache, la più recente prima, senza doppioni
+    try {
+      const sessions = await api.sessions()
+      const seen = new Set()
+      const dirs = []
+      for (const x of [{ cwd: convoDir || workdir }, ...sessions]) {
+        const d = x.cwd
+        if (!d || seen.has(d.toLowerCase())) continue
+        seen.add(d.toLowerCase())
+        dirs.push(d)
+        if (dirs.length >= 8) break
+      }
+      for (const d of dirs) {
+        const it = document.createElement('div')
+        it.className = 'folder-item' + (d === (convoDir || workdir) && !(first) ? ' current' : '')
+        it.innerHTML = '<span class="fi-name"></span><span class="fi-path"></span>'
+        it.children[0].textContent = baseName(d)
+        it.children[1].textContent = d
+        it.addEventListener('click', () => chooseFolder(d))
+        list.appendChild(it)
+      }
+    } catch {}
+  }
+
+  async function chooseFolder(dir) {
+    const send = pendingSend
+    for (const m of document.querySelectorAll('.folder-menu')) m.remove()
+    pendingSend = false
+    // Una cartella diversa a conversazione iniziata: capitolo nuovo (una conversazione resta nella sua cartella)
+    const same = dir && dir === (convoDir || workdir) && workdirChosen
+    if (same) return send && sendMessage()
+    const res = dir ? await api.setWorkdir(dir) : await api.chooseWorkdir()
+    if (!res) return
+    workdir = res
+    workdirChosen = true
+    if (chapterHasMessages() || currentSession) await newChapter()
+    convoDir = res
+    renderFolder()
+    if (send) sendMessage()
+  }
+
+  document.addEventListener('mousedown', (e) => {
+    if (document.querySelector('.folder-menu') && !e.target.closest('.folder-menu, .folder-btn')) closeFolderMenu()
+  }, true)
 
   // ------------------------------------------------------------------ comandi con /
 
@@ -439,6 +553,7 @@
     setBusy(busy)
     setWindowState(winMode)
     renderModes()
+    renderFolder()
     renderChapterHead()
     paint()
     scrollDown()
@@ -551,11 +666,18 @@
     const text = input ? input.value.trim() : ''
     if (!text || busy) return
     closeMenu()
+    // Prima conversazione senza una cartella scelta: prima la cartella, poi il messaggio parte da sé
+    const folderBtn = app.querySelector('[data-part="folder"] .folder-btn')
+    if (folderBtn && !workdirChosen && !currentSession && !chapterHasMessages() && !text.startsWith('/')) {
+      openFolderMenu(folderBtn, true)
+      return
+    }
     // /clear e /new: un nuovo capitolo, come il pulsante
     if (/^\/(clear|new)\s*$/i.test(text)) { input.value = ''; newChapter(); return }
     input.value = ''
     reply = null
     entry('you').querySelector('.text').textContent = text
+    renderFolder()
     setBusy(true)
     api.send(text)
   }
@@ -565,18 +687,25 @@
     r.raw += d
     if (!pending) { pending = true; requestAnimationFrame(renderReply) }
   })
-  api.onTool(({ id, name, summary, change }) => {
+  api.onTool(({ id, name, summary, change, intent }) => {
     renderReply()
     reply = null
-    addTool(id, name, summary, change)
-    hook('tool', { name, craft: craftOf(name), summary, change })
+    const row = addTool(id, name, summary, change, intent)
+    hook('tool', { name, craft: craftOf(name), summary, change, intent: row.querySelector('.doing').textContent })
   })
 
   // Un'azione di Claude: icona del mestiere, nome, su che cosa; per le modifiche ai file il conto delle righe e le
   // differenze sotto (un clic sulla riga le chiude e le riapre). La usano la conversazione e le cronache riaperte
-  function addTool(id, name, summary, change) {
+  // La riga dice a parole che cosa fa Claude ("Legge MapView.cpp", o la descrizione che ha scritto lui), e accanto, più
+  // tenue, il dettaglio tecnico: lo strumento e il suo argomento
+  function addTool(id, name, summary, change, intent) {
     const craft = craftOf(name)
-    const row = add('tool', `<img alt=""><span>${esc(name)}</span><span class="what">${esc(summary || '')}</span>`)
+    const row = add('tool', `<img alt=""><span class="doing"></span><span class="what"></span>`)
+    const doing = row.querySelector('.doing')
+    if (intent && intent.text) doing.textContent = intent.text
+    else if (intent && intent.verb) label(doing, `tool_${intent.verb}`, { x: intent.target || name })
+    else doing.textContent = name
+    row.querySelector('.what').textContent = [name, summary].filter(Boolean).join(' · ')
     row.dataset.craft = craft
     setIcon(row.querySelector('img'), craft)
     tools.set(id, row)
@@ -584,6 +713,8 @@
     // riga le chiude e le riapre
     if (change) {
       const view = changeView(change)
+      row.dataset.added = view.added
+      row.dataset.removed = view.removed
       if (view.added || view.removed) {
         const counts = document.createElement('span')
         counts.className = 'counts'
@@ -607,6 +738,35 @@
     row.dataset.status = t(row.dataset.statusKey)
   }
   api.onToolDone(({ id, error }) => { toolDone(id, error); hook('toolDone', { error: !!error }) })
+
+  // La frase che riassume un gruppo di azioni (come nell'app desktop): le loro righe, con le differenze, vanno dentro
+  // un gruppo chiuso sotto quella frase; un clic lo apre. Nel titolo, il conto delle righe cambiate
+  api.onToolSummary(({ summary, ids }) => {
+    const rows = (ids || []).map((id) => tools.get(id)).filter((r) => r && r.isConnected && r.parentElement === part('log'))
+    if (!rows.length || !summary) return
+    const group = document.createElement('div')
+    group.className = 'item tool-group'
+    group.innerHTML = '<div class="tool-group-head"><span class="caret"></span><span class="tg-text"></span></div><div class="tool-group-body" hidden></div>'
+    group.querySelector('.tg-text').textContent = summary
+    rows[0].before(group)
+    const body = group.querySelector('.tool-group-body')
+    let added = 0
+    let removed = 0
+    for (const row of rows) {
+      const follow = []
+      let n = row.nextElementSibling
+      while (n && n.classList.contains('change')) { follow.push(n); n = n.nextElementSibling }
+      body.appendChild(row)
+      for (const f of follow) body.appendChild(f)
+      added += Number(row.dataset.added || 0)
+      removed += Number(row.dataset.removed || 0)
+      if (row.classList.contains('fail')) group.classList.add('fail')
+    }
+    const head = group.querySelector('.tool-group-head')
+    if (added || removed) head.insertAdjacentHTML('beforeend', `<span class="counts"><span class="plus">+${added}</span> <span class="minus">−${removed}</span></span>`)
+    head.addEventListener('click', () => { body.hidden = !body.hidden; group.classList.toggle('open', !body.hidden) })
+    scrollDown()
+  })
   api.onDone(({ durationMs }) => {
     renderReply()
     labelled('footnote', 'took', { s: Math.round((durationMs || 0) / 1000) })
@@ -632,6 +792,8 @@
     setBusy(false)
     setChapter(n)
     markCurrentSession()
+    convoDir = workdir
+    renderFolder()
     hook('chapter')
     if (part('input')) part('input').focus()
   }
@@ -809,6 +971,8 @@
     clearLog()
     reply = null
     currentSession = s
+    convoDir = s.cwd || workdir
+    renderFolder()
     renderChapterHead()
     markCurrentSession()
     const loading = labelled('footnote', 'copying')
@@ -826,7 +990,7 @@
         else if (m.role === 'assistant') setReplyText(entry('claude').querySelector('.text'), m.text)
         else if (m.role === 'output') add('cmd-output', '').textContent = m.text
         else if (m.role === 'tool') {
-          addTool(m.id, m.name, m.summary, m.change)
+          addTool(m.id, m.name, m.summary, m.change, m.intent)
           if (m.error !== null) toolDone(m.id, m.error)
         }
       }
@@ -867,6 +1031,7 @@
   })
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && document.querySelector('.theme-picker')) { closeThemes(); return }
+    if (e.key === 'Escape' && document.querySelector('.folder-menu')) { closeFolderMenu(); return }
     // F11: schermo intero, e di nuovo per tornare
     if (e.key === 'F11') { e.preventDefault(); api.windowMode('full'); return }
     if (!e.target.matches('[data-part="input"]')) return
@@ -931,6 +1096,8 @@
     workdir = info.workdir || ''
     chapter = info.chapter || 1
     mode = info.mode || 'auto'
+    workdirChosen = info.workdirChosen !== false
+    convoDir = info.sessionCwd || info.workdir || ''
     api.windowState().then(setWindowState).catch(() => {})
     // I comandi della cache; l'elenco aggiornato arriva poi da onCommands
     api.commands().then((list) => { if (!commands.length) commands = list || [] }).catch(() => {})
@@ -1020,13 +1187,15 @@
       // ?tema=<id>&scena=giorno nell'indirizzo per guardare un tema
       info: async () => {
         const q = new URLSearchParams(location.search)
-        return { scene: q.get('scena') || 'notte', chapter: n, theme: q.get('tema') || 'terra-di-mezzo', themes: ['terra-di-mezzo', 'moderno'], workdir: 'C:/Workspace', mode: q.get('modo') || 'auto' }
+        return { scene: q.get('scena') || 'notte', chapter: n, theme: q.get('tema') || 'terra-di-mezzo', themes: ['terra-di-mezzo', 'moderno'], workdir: 'C:/Workspace', workdirChosen: q.get('cartella') !== 'no', mode: q.get('modo') || 'auto' }
       },
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
       setMode: (m) => fire('onMode', m, 0),
       setTheme: (id) => fire('onTheme', id, 0),
       windowMode: (m) => { fakeWin = fakeWin === m ? 'normal' : m; fire('onWindowState', fakeWin, 0) },
       windowState: async () => fakeWin,
+      chooseWorkdir: async () => 'C:/Workspace/Nuovo progetto',
+      setWorkdir: async (d) => d,
       openLink: (url) => window.open(url, '_blank', 'noopener'),
       commands: async () => FAKE_COMMANDS,
       sessions: async () => [
@@ -1056,16 +1225,19 @@
           fire('onDone', { durationMs: 900 }, 800)
           return
         }
-        fire('onTool', { id: 't1', name: 'Read', summary: 'src/MapView.cpp' }, 300)
-        fire('onToolDone', { id: 't1', error: false }, 500)
-        fire('onTool', { id: 't2', name: 'Edit', summary: 'src/MapView.cpp', change: FAKE_EDIT }, 600)
+        fire('onTool', { id: 't0', name: 'Grep', summary: 'DrawRoads', intent: { verb: 'grep', target: 'DrawRoads' } }, 200)
+        fire('onToolDone', { id: 't0', error: false }, 260)
+        fire('onTool', { id: 't1', name: 'Read', summary: 'src/MapView.cpp', intent: { verb: 'read', target: 'MapView.cpp' } }, 300)
+        fire('onToolDone', { id: 't1', error: false }, 380)
+        fire('onToolSummary', { summary: 'Ha trovato dove si disegnano le strade', ids: ['t0', 't1'] }, 420)
+        fire('onTool', { id: 't2', name: 'Edit', summary: 'src/MapView.cpp', intent: { verb: 'edit', target: 'MapView.cpp' }, change: FAKE_EDIT }, 600)
         fire('onToolDone', { id: 't2', error: false }, 800)
         const answer = FAKE_ANSWER.replace('{text}', text)
         ;[...answer].forEach((ch, i) => fire('onDelta', ch, 900 + i * 15))
         fire('onDone', { durationMs: 2400 }, 900 + answer.length * 15 + 100)
         fire('onAsk', { id: 1, title: 'Claude vuole creare un file', description: '', detail: 'src/RouteFinder.h', change: FAKE_WRITE, canAlways: true }, 900 + answer.length * 15 + 200)
       },
-      onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'), onMode: on('onMode'), onWindowState: on('onWindowState'), onWorkdir: on('onWorkdir'), onCommands: on('onCommands'), onCommandsError: on('onCommandsError'), onCommandOutput: on('onCommandOutput'), onCompacted: on('onCompacted'), onStatus: on('onStatus'),
+      onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'), onMode: on('onMode'), onToolSummary: on('onToolSummary'), onWindowState: on('onWindowState'), onWorkdir: on('onWorkdir'), onCommands: on('onCommands'), onCommandsError: on('onCommandsError'), onCommandOutput: on('onCommandOutput'), onCompacted: on('onCompacted'), onStatus: on('onStatus'),
     }
   }
 })()

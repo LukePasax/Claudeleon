@@ -29,6 +29,35 @@ function summary(input) {
   return input.file_path && text.split(/[\\/]/).length > 3 ? text.split(/[\\/]/).slice(-2).join('/') : text
 }
 
+// L'intenzione di un'azione, da mostrare a parole invece del comando: { text } quando Claude l'ha scritta lui (il campo
+// description di Bash, Agent...), altrimenti { verb, target } che la pagina traduce con le scritte del tema
+// (tool_read: "Legge {x}" ecc.)
+function intent(name, input) {
+  const i = input && typeof input === 'object' ? input : {}
+  const base = (p) => String(p || '').split(/[\\/]/).filter(Boolean).pop() || String(p || '')
+  const short = (t, n = 48) => { const s = String(t || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s }
+  if (typeof i.description === 'string' && i.description.trim()) return { text: short(i.description, 90) }
+  switch (name) {
+    case 'Read': case 'NotebookRead': return { verb: 'read', target: base(i.file_path || i.notebook_path) }
+    case 'Edit': case 'MultiEdit': case 'NotebookEdit': return { verb: 'edit', target: base(i.file_path || i.notebook_path) }
+    case 'Write': return { verb: 'write', target: base(i.file_path) }
+    case 'Grep': return { verb: 'grep', target: short(i.pattern, 32) }
+    case 'Glob': return { verb: 'glob', target: short(i.pattern, 40) }
+    case 'Bash': case 'PowerShell': return { verb: 'run', target: short(i.command, 40) }
+    case 'WebFetch': { let h = ''; try { h = new URL(i.url).hostname } catch {} return { verb: 'fetch', target: h || short(i.url, 40) } }
+    case 'WebSearch': return { verb: 'search', target: short(i.query, 40) }
+    case 'TodoWrite': return { verb: 'todo', target: '' }
+    case 'Skill': return { verb: 'skill', target: String(i.skill || i.command || i.name || '') }
+    case 'Agent': case 'Task': return { verb: 'agent', target: '' }
+    case 'ExitPlanMode': return { verb: 'plan', target: '' }
+    default: {
+      // Gli strumenti dei server MCP si chiamano mcp__server__strumento
+      const m = /^mcp__(.+?)__(.+)$/.exec(name || '')
+      return m ? { verb: 'mcp', target: `${m[2]} (${m[1]})` } : { verb: 'other', target: name || '' }
+    }
+  }
+}
+
 // I modi dei permessi che la finestra offre. Fuori: 'bypassPermissions' (nessun controllo) e 'dontAsk' (nega tutto
 // quello che non è già permesso, inutile con una finestra che può chiedere)
 const MODES = ['auto', 'default', 'acceptEdits', 'plan']
@@ -249,6 +278,8 @@ class ClaudeBridge extends EventEmitter {
           systemPrompt: { type: 'preset', preset: 'claude_code', append: this.persona || FALLBACK_PERSONA },
           // Queste conversazioni non fanno partire gli hook dell'utente (log di sessione, backup)
           settings: { disableAllHooks: true },
+          // Claude Code manda anche una frase che riassume ogni gruppo di azioni (come nell'app desktop)
+          env: Object.assign({}, process.env, { CLAUDE_CODE_EMIT_TOOL_USE_SUMMARIES: '1' }),
           includePartialMessages: true,
           resume: resume || undefined,
           canUseTool: (toolName, input, options) => this.ask(toolName, input, options),
@@ -275,6 +306,8 @@ class ClaudeBridge extends EventEmitter {
           else if (msg.subtype === 'compact_boundary') this.emit('compacted', { pre: msg.compact_metadata?.pre_tokens || 0, post: msg.compact_metadata?.post_tokens || 0 })
           else if (msg.subtype === 'status') this.emit('status', msg.status || null)
         }
+        // La frase che riassume le azioni appena fatte
+        if (msg.type === 'tool_use_summary' && msg.summary) this.emit('toolSummary', { summary: String(msg.summary), ids: msg.preceding_tool_use_ids || [] })
         if (msg.type === 'stream_event') {
           const ev = msg.event || {}
           if (ev.type === 'content_block_start' && ev.content_block?.type === 'text' && wroteText) {
@@ -286,7 +319,7 @@ class ClaudeBridge extends EventEmitter {
           }
         } else if (msg.type === 'assistant') {
           for (const block of msg.message?.content || []) {
-            if (block.type === 'tool_use') this.emit('tool', { id: block.id, name: block.name, summary: summary(block.input), change: this.change(block.name, block.input) })
+            if (block.type === 'tool_use') this.emit('tool', { id: block.id, name: block.name, summary: summary(block.input), intent: intent(block.name, block.input), change: this.change(block.name, block.input) })
             else if (block.type === 'text' && !sawDelta && block.text) {
               this.emit('delta', (wroteText ? '\n\n' : '') + block.text)
               wroteText = true
@@ -382,7 +415,7 @@ class ClaudeBridge extends EventEmitter {
         if (text.trim()) items.push({ role: 'assistant', text })
         for (const b of blocks) {
           if (b.type !== 'tool_use') continue
-          const item = { role: 'tool', id: b.id, name: b.name, summary: summary(b.input), change: this.change(b.name, b.input, true), error: null }
+          const item = { role: 'tool', id: b.id, name: b.name, summary: summary(b.input), intent: intent(b.name, b.input), change: this.change(b.name, b.input, true), error: null }
           tools.set(b.id, item)
           items.push(item)
         }
@@ -416,4 +449,4 @@ class ClaudeBridge extends EventEmitter {
   }
 }
 
-module.exports = { ClaudeBridge, MODES }
+module.exports = { ClaudeBridge, MODES, intent }

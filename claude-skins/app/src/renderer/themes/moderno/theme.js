@@ -99,6 +99,7 @@
           <textarea data-part="input" data-s-placeholder="placeholder" spellcheck="false"></textarea>
           <div class="row">
             <div class="modes" data-part="modes"></div>
+            <div class="folder" data-part="folder"></div>
             <span class="activity"><span class="dot"></span><span class="activity-text"></span></span>
             <button class="btn send" data-action="send" data-s="send"></button>
             <button class="btn deny stop" data-action="stop" data-s="stop" hidden></button>
@@ -116,9 +117,9 @@
         const text = ctx.root.querySelector('.activity-text')
         if (text) text.textContent = on ? ctx.t('busyHint') : ''
       },
-      tool(ctx, { name, summary }) {
+      tool(ctx, { name, summary, intent }) {
         const text = ctx.root.querySelector('.activity-text')
-        if (text) text.textContent = summary ? `${name} · ${summary}` : name
+        if (text) text.textContent = intent || (summary ? `${name} · ${summary}` : name)
       },
       reply(ctx) {
         const text = ctx.root.querySelector('.activity-text')

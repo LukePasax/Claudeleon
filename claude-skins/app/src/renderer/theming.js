@@ -31,6 +31,28 @@
     themesTitle: 'Scegli il tema',
     themesCurrent: 'in uso',
     themesClose: 'Chiudi',
+    // Che cosa fa Claude, a parole ({x}: il file, la ricerca, il sito...); quando Claude scrive lui la descrizione
+    // (Bash, Agent) si usa quella
+    tool_read: 'Legge {x}',
+    tool_edit: 'Modifica {x}',
+    tool_write: 'Scrive {x}',
+    tool_grep: 'Cerca «{x}» nel codice',
+    tool_glob: 'Cerca i file {x}',
+    tool_run: 'Esegue un comando',
+    tool_fetch: 'Legge una pagina di {x}',
+    tool_search: 'Cerca sul web «{x}»',
+    tool_todo: 'Aggiorna la lista delle cose da fare',
+    tool_skill: 'Usa la skill {x}',
+    tool_agent: 'Affida un compito a un aiutante',
+    tool_plan: 'Propone un piano',
+    tool_mcp: 'Usa {x}',
+    tool_other: 'Usa {x}',
+    // La cartella della conversazione
+    folderPick: 'Scegli la cartella',
+    folderTitle: 'Dove lavora Claude',
+    folderFirst: 'In quale cartella lavoriamo? Scegline una e il messaggio parte.',
+    folderNew: 'Una conversazione resta nella sua cartella: sceglierne un\'altra apre un capitolo nuovo.',
+    folderOther: 'Scegli un\'altra cartella…',
     // I comandi con /
     cmdNone: 'Nessun comando con questo nome.',
     cmdLoading: 'Chiedo i comandi a Claude Code...',

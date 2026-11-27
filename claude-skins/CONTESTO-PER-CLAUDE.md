@@ -163,6 +163,15 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
   risposte, azioni con l'esito dal `tool_result`, comandi con `/` da `<command-name>`/`<command-args>`, uscite da
   `<local-command-stdout>`); i sottoagenti (`parent_tool_use_id`) restano fuori. Le differenze sono "del passato"
   (`change(..., true)`): di un `Write` il contenuto scritto allora, di un `Edit` la riga si cerca col testo nuovo.
+- **Che cosa fa Claude, a parole:** `intent()` nel messaggero traduce ogni azione in `{ text }` (il campo
+  `description` che Claude scrive per Bash, Agent...) o `{ verb, target }`, che la pagina rende con le scritte
+  `tool_<verbo>`. Con `CLAUDE_CODE_EMIT_TOOL_USE_SUMMARIES=1` nell'`env` della query, Claude Code manda messaggi
+  `tool_use_summary` (`summary`, `preceding_tool_use_ids`): la pagina raccoglie quelle azioni in un gruppo chiuso sotto
+  la frase. La variabile non è nei tipi pubblici dell'SDK (la si trova in `sdk.mjs`): se una versione non la onora,
+  restano le frasi per azione.
+- **La cartella della conversazione:** `data-part="folder"`, con il menu delle cartelle recenti (dalle cronache) e il
+  dialogo di sistema (`workdir:choose`, `workdir:set`). `workdirChosen` dice se la persona ne ha scelta una: se no, il
+  primo messaggio apre il menu e parte dopo la scelta.
 - **Comandi con `/`:** si eseguono spedendo il testo `/nome argomenti` come prompt. L'elenco viene da
   `Query.supportedCommands()` (nome, descrizione, `argumentHint`, alias, `builtin`), aggiornato dai messaggi
   `system` `commands_changed`; quelli di `terminal_slash_commands` (nel messaggio `init`) non si offrono. Per averlo

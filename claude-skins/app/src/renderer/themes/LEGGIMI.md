@@ -78,6 +78,7 @@ c'è.
 | `data-part="log"` | Dove scorre la conversazione. Il motore vi aggiunge le voci (classe `item`); il resto del contenuto (per esempio il titolo del capitolo) resta |
 | `data-part="input"` | La `textarea` dove si scrive. Invio spedisce, Maiusc+Invio va a capo |
 | `data-part="input"` (menu) | Scrivendo `/` il motore apre il menu dei comandi (`.cmd-menu`, righe `.cmd`) sopra la penna, dentro il suo contenitore: il tema può ridisegnarlo nel suo CSS |
+| `data-part="folder"` | La cartella della conversazione: il motore ci mette un pulsante (`.folder-btn`) che apre il menu delle cartelle (`.folder-menu`) |
 | `data-part="hint"` | Il suggerimento sotto la penna, che cambia mentre Claude lavora |
 | `data-part="chapter-title"`, `data-part="chapter-date"` | Il titolo del capitolo, o della cronaca aperta, e la sua data |
 | `data-part="modes"` | Il selettore del modo dei permessi: il motore ci mette l'etichetta e un pulsante `.mode` per modo (`data-perm-mode`), quello attivo con `.active`. Anche `body[data-perm-mode]` dice il modo, per il CSS del tema |

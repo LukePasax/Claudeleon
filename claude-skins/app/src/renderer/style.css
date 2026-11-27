@@ -122,6 +122,40 @@ button { font-family: inherit; color: inherit; }
 .footnote { font-size: var(--small-size); color: var(--ink-soft); text-align: right; margin: -8px 0 16px; }
 .error { color: var(--red); white-space: pre-wrap; margin: 0 0 14px; }
 
+/* Che cosa fa Claude: la frase, poi il dettaglio tecnico più tenue */
+.tool .doing { color: var(--ink); flex: none; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tool .what { opacity: 0.6; }
+/* Un gruppo di azioni sotto la frase che le riassume: chiuso, si apre con un clic */
+.tool-group { margin: 3px 0 6px; }
+.tool-group-head { display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--ink); font-size: 13px; }
+.tool-group-head .caret { width: 0; height: 0; border-left: 5px solid var(--ink-soft); border-top: 4px solid transparent; border-bottom: 4px solid transparent; transition: transform 0.12s; flex: none; }
+.tool-group.open .caret { transform: rotate(90deg); }
+.tool-group.fail .tg-text::after { content: ' ·'; color: var(--red); }
+.tool-group-head .counts { margin-left: 4px; }
+.tool-group-body { margin: 4px 0 0 13px; padding-left: 10px; border-left: var(--line) solid var(--edge-light); }
+
+/* La cartella della conversazione: un pulsante con una cartellina disegnata dal CSS, e il suo menu */
+.folder-btn {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 220px; cursor: pointer; font-size: var(--small-size);
+  padding: 2px 9px; color: var(--ink-soft); background: none; border: var(--line) solid var(--edge-light); border-radius: 20px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.folder-btn::before { content: ''; flex: none; width: 11px; height: 8px; border: 1.5px solid currentColor; border-radius: 1px; box-shadow: inset 4px 2px 0 -2px currentColor; }
+.folder-btn:hover { color: var(--ink); }
+.folder-btn.unset { color: var(--btn-ink); background: var(--btn-bg); border-color: var(--btn-bg); }
+.folder-menu {
+  position: absolute; z-index: 45; width: 340px; max-width: calc(100% - 16px); padding: 6px;
+  background: var(--menu-bg); color: var(--ink); border: var(--line) solid var(--edge-light); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.folder-head { font-weight: 600; color: var(--strong); padding: 4px 8px 2px; }
+.folder-note { font-size: var(--small-size); color: var(--ink-soft); padding: 0 8px 6px; line-height: 1.4; }
+.folder-list { max-height: 240px; overflow-y: auto; }
+.folder-item { display: flex; flex-direction: column; padding: 5px 8px; border-radius: var(--radius-small); cursor: pointer; }
+.folder-item:hover { background: var(--code); }
+.folder-item.current .fi-name { color: var(--gold); }
+.folder-item .fi-path { font-size: 11px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-item.other { color: var(--gold); margin-top: 4px; border-top: var(--line) solid var(--edge-light); border-radius: 0; padding-top: 8px; }
+
 /* Le modifiche ai file: il conto nella riga dello strumento (un clic chiude e riapre), le differenze sotto */
 .tool.has-change { cursor: pointer; }
 .tool .counts { flex: none; font-size: var(--small-size); }

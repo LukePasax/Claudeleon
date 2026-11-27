@@ -275,11 +275,17 @@ function trayMenu() {
 // La cartella in cui nascono le conversazioni nuove (quelle riprese restano nella loro)
 async function chooseWorkdir() {
   const r = await dialog.showOpenDialog(win, { title: 'Cartella di lavoro di Claude', defaultPath: bridge.workdir, properties: ['openDirectory'] })
-  if (r.canceled || !r.filePaths[0]) return
-  config.workdir = r.filePaths[0]
-  bridge.workdir = r.filePaths[0].replace(/\\/g, '/')
+  if (r.canceled || !r.filePaths[0]) return null
+  return setWorkdir(r.filePaths[0])
+}
+
+function setWorkdir(dir) {
+  if (!dir || !fs.existsSync(dir)) return null
+  config.workdir = dir
+  bridge.workdir = dir.replace(/\\/g, '/')
   saveConfig()
   send('workdir:changed', bridge.workdir)
+  return bridge.workdir
 }
 
 // Con una finestra grande come l'app desktop, stare sempre sopra le altre può dare fastidio: si sceglie dal vassoio
@@ -313,9 +319,15 @@ function registerIpc() {
     theme: currentTheme().id,
     themes: themes.map((t) => t.id),
     workdir: bridge.workdir,
+    // Se la cartella l'ha scelta la persona (altrimenti è la cartella utente, e al primo messaggio la si chiede)
+    workdirChosen: !!config.workdir,
+    sessionCwd: config.sessionId ? (config.sessionCwd || bridge.workdir) : null,
     mode: bridge.mode,
   }))
   ipcMain.on('theme:set', (_e, id) => setTheme(String(id)))
+  // La cartella delle conversazioni nuove, dalla finestra: dal dialogo di sistema o da una cartella recente
+  ipcMain.handle('workdir:choose', () => chooseWorkdir())
+  ipcMain.handle('workdir:set', (_e, dir) => setWorkdir(String(dir || '')))
   // Il modo dei permessi, scelto dalla finestra; il messaggero lo applica anche alla risposta in corso
   ipcMain.on('mode:set', (_e, mode) => bridge.setMode(String(mode)))
   // Un link di una risposta: nel browser di sistema, e solo se è http, https o mailto
@@ -375,6 +387,7 @@ function registerIpc() {
   })
   bridge.on('commandsError', () => send('commands:error'))
   bridge.on('commandOutput', (text) => send('claude:commandOutput', text))
+  bridge.on('toolSummary', (x) => send('claude:toolSummary', x))
   bridge.on('compacted', (c) => send('claude:compacted', c))
   bridge.on('status', (st) => send('claude:status', st))
   bridge.on('mode', (mode) => { config.permissionMode = mode; saveConfig(); send('mode:changed', mode) })

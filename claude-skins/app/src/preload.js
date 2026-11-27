@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld('skins', {
   gestureEnd: () => ipcRenderer.send('gesture:end'),
   hide: () => ipcRenderer.send('window:hide'),
   windowMode: (mode) => ipcRenderer.send('window:mode', mode),
+  chooseWorkdir: () => ipcRenderer.invoke('workdir:choose'),
+  setWorkdir: (dir) => ipcRenderer.invoke('workdir:set', dir),
   windowState: () => ipcRenderer.invoke('window:state'),
   quit: () => ipcRenderer.send('app:quit'),
   setScene: (scene) => ipcRenderer.send('scene:set', scene),
@@ -40,6 +42,7 @@ contextBridge.exposeInMainWorld('skins', {
   onCommands: listen('commands:list'),
   onCommandsError: listen('commands:error'),
   onCommandOutput: listen('claude:commandOutput'),
+  onToolSummary: listen('claude:toolSummary'),
   onCompacted: listen('claude:compacted'),
   onStatus: listen('claude:status'),
 })

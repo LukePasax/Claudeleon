@@ -146,6 +146,11 @@ body {
 }
 .ctl.max::before { width: 12px; height: 12px; }
 
+.folder-btn { border: none; border-radius: 0; box-shadow: inset 0 0 0 2px var(--edge-light); }
+.folder-btn.unset { box-shadow: inset -2px -2px 0 var(--btn-dark), inset 2px 2px 0 var(--btn-light); }
+.folder-menu { border: none; border-radius: 0; box-shadow: inset 0 0 0 3px var(--gold-dark), 0 4px 0 rgba(0, 0, 0, 0.35); padding: 8px; }
+.folder-item { border-radius: 0; }
+
 /* I pulsanti a gradino */
 .btn {
   padding: 6px 12px; font-size: 16px;
