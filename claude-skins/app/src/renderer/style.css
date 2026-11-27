@@ -501,3 +501,14 @@ body[data-perm-mode="bypassPermissions"] .mode-btn, body[data-perm-mode="acceptE
 .u-bar span { display: block; height: 100%; background: var(--gold); border-radius: 3px; }
 .usage-row.warn .u-bar span { background: var(--red); }
 .u-reset { color: var(--ink-soft); font-size: 11.5px; }
+
+/* Modificare un messaggio: il pulsante accanto a "Copia"; l'editor prende il posto del fumetto */
+.edit-btn::before { width: 9px; height: 9px; border: none; box-shadow: none; border-radius: 0; background: currentColor; clip-path: polygon(70% 0, 100% 30%, 35% 95%, 0 100%, 5% 65%); }
+.entry:not([data-uuid]) .edit-btn { display: none; }
+body.busy .entry .edit-btn { display: none; }
+.entry.you.editing { align-items: stretch; }
+.edit-box { width: 100%; max-width: 100%; background: var(--field); border: var(--line) solid var(--gold); border-radius: 12px; padding: 8px 10px; }
+.edit-box textarea { display: block; width: 100%; min-height: 52px; resize: none; border: none; outline: none; background: none; font: inherit; color: var(--ink); user-select: text; }
+.edit-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.edit-restore { display: inline-flex; align-items: center; gap: 6px; font-size: var(--small-size); color: var(--ink-soft); cursor: pointer; }
+.entry.editing .entry-actions { display: none; }

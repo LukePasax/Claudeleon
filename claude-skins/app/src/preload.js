@@ -32,6 +32,8 @@ contextBridge.exposeInMainWorld('skins', {
   chooseFiles: () => ipcRenderer.invoke('files:choose'),
   readImage: (p) => ipcRenderer.invoke('file:image', p),
   stop: (conv) => ipcRenderer.send('chat:stop', conv),
+  edit: (uuid, msg, restoreFiles, conv) => ipcRenderer.send('chat:edit', { uuid, msg, restoreFiles }, conv),
+  onRewound: listen('claude:rewound'),
   setTrayIcon: (dataUrl) => ipcRenderer.send('tray:icon', dataUrl),
   setAppIcon: (dataUrl) => ipcRenderer.send('app:icon', dataUrl),
   renameSession: (id, title, cwd) => ipcRenderer.invoke('session:rename', id, title, cwd),

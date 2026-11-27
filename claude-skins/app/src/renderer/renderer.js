@@ -8,7 +8,7 @@
   // giusta anche se non è quella in vista (vedi "conversazioni")
   const base = window.skins || fakeApi()
   const api = Object.assign({}, base)
-  const CONV_EVENTS = ['onDelta', 'onTool', 'onToolDone', 'onDone', 'onError', 'onAsk', 'onAskClosed', 'onCommandOutput', 'onToolSummary', 'onCompacted', 'onStatus', 'onTodos', 'onBusy', 'onContext', 'onThinkingStart', 'onThinking', 'onThinkingEnd', 'onSuggestion']
+  const CONV_EVENTS = ['onDelta', 'onTool', 'onToolDone', 'onDone', 'onError', 'onAsk', 'onAskClosed', 'onCommandOutput', 'onToolSummary', 'onCompacted', 'onStatus', 'onTodos', 'onBusy', 'onContext', 'onThinkingStart', 'onThinking', 'onThinkingEnd', 'onSuggestion', 'onRewound']
   for (const n of CONV_EVENTS) if (base[n]) api[n] = (fn) => base[n]((payload, id) => dispatch(id, n, () => fn(payload)))
   const app = document.getElementById('app')
   const t = Theming.t
@@ -1361,11 +1361,83 @@
     const files = sent.filter((a) => a.kind === 'file').map((a) => a.path)
     const you = entry('you')
     if (busy) you.classList.add('queued')
+    // L'id del messaggio: con questo si può modificare dopo
+    const uuid = newUuid()
+    you.dataset.uuid = uuid
     fillYou(you, text, images.map((a) => a.url), files)
     renderFolder()
     setBusy(true)
-    api.send(sent.length ? { text, images: images.map((a) => ({ mediaType: a.mediaType, data: a.data })), files } : text, active && active.id)
+    api.send({ text, uuid, images: images.map((a) => ({ mediaType: a.mediaType, data: a.data })), files }, active && active.id)
   }
+  function newUuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID()
+    const h = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('')
+    return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`
+  }
+
+  // ------------------------------------------------------------------ modificare un messaggio
+
+  // Come nell'app desktop: "Modifica" sotto un tuo messaggio lo riapre sul posto; spedito, la conversazione riparte
+  // da lì (in una sessione nuova: la vecchia resta negli annali) e quello che veniva dopo sparisce. A scelta anche i
+  // file tornano com'erano prima di quel messaggio
+  function startEdit(d) {
+    if (busy || !d.dataset.uuid || d.classList.contains('editing')) return
+    const textEl = d.querySelector('.text')
+    const box = d.querySelector('.sent-attachments')
+    const images = box ? [...box.querySelectorAll('img')].map((i) => i.src) : []
+    const files = box ? [...box.querySelectorAll('.attachment.file')].map((f) => f.title) : []
+    const old = d.rawText || ''
+    d.classList.add('editing')
+    const editor = document.createElement('div')
+    editor.className = 'edit-box'
+    editor.innerHTML = '<textarea spellcheck="false"></textarea><div class="edit-row"><label class="edit-restore"><input type="checkbox"><span></span></label><span class="sp"></span><button class="btn small deny edit-cancel"></button><button class="btn small edit-send"></button></div>'
+    const area = editor.querySelector('textarea')
+    area.value = old
+    label(editor.querySelector('.edit-restore span'), 'editRestore')
+    label(editor.querySelector('.edit-cancel'), 'editCancel')
+    label(editor.querySelector('.edit-send'), 'editSend')
+    textEl.hidden = true
+    textEl.after(editor)
+    area.focus()
+    area.setSelectionRange(area.value.length, area.value.length)
+    autoGrow(area)
+    area.addEventListener('input', () => autoGrow(area))
+    const cancel = () => { editor.remove(); textEl.hidden = false; d.classList.remove('editing') }
+    const send = () => {
+      const text = area.value.trim()
+      if (!text && !images.length && !files.length) return
+      if (busy) return
+      const restore = editor.querySelector('.edit-restore input').checked
+      const oldUuid = d.dataset.uuid
+      // Via questo messaggio e tutto quello che veniva dopo nella conversazione
+      let n = d
+      while (n) { const next = n.nextElementSibling; if (n.classList.contains('item')) n.remove(); n = next }
+      tools.clear()
+      reply = null
+      clearSuggestion()
+      stick = true
+      const you = entry('you')
+      const uuid = newUuid()
+      you.dataset.uuid = uuid
+      fillYou(you, text, images, files)
+      setBusy(true)
+      const pics = images.map((u) => { const m = /^data:([^;]+);base64,(.*)$/.exec(u); return m ? { mediaType: m[1], data: m[2] } : null }).filter(Boolean)
+      api.edit(oldUuid, { text, uuid, images: pics, files }, restore, active && active.id)
+    }
+    editor.querySelector('.edit-cancel').addEventListener('click', cancel)
+    editor.querySelector('.edit-send').addEventListener('click', send)
+    area.addEventListener('keydown', (e) => {
+      e.stopPropagation()
+      if (e.key === 'Escape') { e.preventDefault(); cancel() }
+      else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
+    })
+  }
+  // L'esito del ripristino dei file
+  if (api.onRewound) api.onRewound((r) => {
+    if (!r) return
+    if (r.ok) labelled('footnote', 'rewindOk', { n: r.files.length, plus: r.insertions, minus: r.deletions })
+    else labelled('error', 'rewindFail', { err: r.error || '?' })
+  })
 
   // Una domanda della persona nel log, con le miniature delle immagini e le etichette dei file. I file stanno anche
   // in fondo al testo, in <attached_files> (così li trova Claude): lì si tolgono e diventano etichette
@@ -1390,7 +1462,18 @@
       el.appendChild(box)
     }
     if (text) el.appendChild(document.createTextNode(text))
-    if (text && !d.querySelector('.entry-actions')) d.appendChild(entryActions('copyMessage', () => text))
+    d.rawText = text
+    if (!d.querySelector('.entry-actions')) {
+      const row = entryActions('copyMessage', () => d.rawText || '')
+      if (!text) row.firstChild.remove()
+      // Modifica: solo per i messaggi che hanno il loro id (quelli spediti da qui e quelli delle cronache)
+      const b = document.createElement('button')
+      b.className = 'copy-btn edit-btn'
+      label(b, 'editMessage')
+      b.addEventListener('click', (e) => { e.stopPropagation(); startEdit(d) })
+      row.appendChild(b)
+      d.appendChild(row)
+    }
   }
   function fileChip(p) {
     const chip = document.createElement('span')
@@ -2173,7 +2256,7 @@
         if (history[k].role !== 'tool' && ++texts === 40) { from = k; break }
       }
       for (const m of history.slice(from)) {
-        if (m.role === 'user') fillYou(entry('you'), m.text, m.images || [])
+        if (m.role === 'user') { const y = entry('you'); if (m.uuid) y.dataset.uuid = m.uuid; fillYou(y, m.text, m.images || []) }
         else if (m.role === 'assistant') setReplyText(entry('claude').querySelector('.text'), m.text)
         else if (m.role === 'thinking') {
           const box = thinkingBox(false)
@@ -2478,6 +2561,11 @@
       onUsage: on('onUsage'),
       onModels: on('onModels'), onTodos: on('onTodos'), onContext: on('onContext'),
       onThinkingStart: on('onThinkingStart'), onSuggestion: on('onSuggestion'), onThinking: on('onThinking'), onThinkingEnd: on('onThinkingEnd'),
+      edit(uuid, msg, restore, conv) {
+        if (restore) fireAll('onRewound', { ok: true, files: ['src/MapView.cpp'], insertions: 2, deletions: 1 }, 50, conv)
+        this.send(msg, conv)
+      },
+      onRewound: on('onRewound'),
       send(msg, conv) {
         const fire = (n, v, ms) => fireAll(n, v, ms, conv)
         // Una conversazione nuova riceve la sua sessione e compare negli annali

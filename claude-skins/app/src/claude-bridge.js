@@ -4,6 +4,7 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const { EventEmitter } = require('events')
+const crypto = require('crypto')
 
 const CLAUDE = path.join(os.homedir(), '.local', 'bin', process.platform === 'win32' ? 'claude.exe' : 'claude')
 
@@ -420,7 +421,37 @@ class ClaudeBridge extends EventEmitter {
     const busy = live.turn.open
     if (!busy) this.openTurn(live)
     clearTimeout(live.idle)
-    live.inbox.push(Object.assign({ type: 'user', session_id: '', parent_tool_use_id: null, message: { role: 'user', content } }, busy ? { priority: 'next' } : {}))
+    // L'id del messaggio lo dà la pagina (serve per modificarlo dopo): Claude Code lo usa nel transcript
+    const uuid = /^[0-9a-f-]{36}$/i.test(String(msg.uuid || '')) ? msg.uuid : crypto.randomUUID()
+    live.inbox.push(Object.assign({ type: 'user', session_id: '', parent_tool_use_id: null, uuid, message: { role: 'user', content } }, busy ? { priority: 'next' } : {}))
+  }
+
+  // Modificare un messaggio già mandato, come nell'app desktop: la conversazione riparte da prima di quel messaggio,
+  // in una sessione nuova (la vecchia resta negli annali com'era), e il messaggio nuovo prende il suo posto. Con
+  // restoreFiles anche i file tornano com'erano a quel punto (i salvataggi di Claude Code, enableFileCheckpointing)
+  async edit(uuid, payload, restoreFiles) {
+    const sessionId = (this.live && this.live.sessionId) || this.session.getSession()
+    if (!sessionId || !uuid) return this.send(payload)
+    const { getSessionMessages } = await loadSdk()
+    let messages = []
+    try { messages = await getSessionMessages(sessionId, this.sessionCwd ? { dir: this.sessionCwd } : {}) } catch {}
+    const k = messages.findIndex((m) => m.uuid === uuid)
+    if (k < 0) { this.emit('error', 'Non trovo il messaggio da modificare nella sessione salvata.'); return }
+    // I file: si chiede al Claude Code acceso su quella sessione di riportarli a prima del messaggio
+    if (restoreFiles) {
+      let report = { canRewind: false, error: 'Salvataggi dei file non disponibili.' }
+      try {
+        const live = await this.ensureLive()
+        if (live.query.rewindFiles) report = await live.query.rewindFiles(uuid)
+      } catch (err) { report = { canRewind: false, error: err.message } }
+      this.emit('rewound', { ok: !!report.canRewind && !report.error, error: report.error || null, files: report.filesChanged || [], insertions: report.insertions || 0, deletions: report.deletions || 0 })
+    }
+    // La sessione nuova: fino al messaggio prima di quello modificato (o da capo, se era il primo)
+    const before = k > 0 ? messages[k - 1].uuid : null
+    this.cancel()
+    this.forkFrom = before ? { session: sessionId, at: before } : null
+    if (!before) this.session.setSession(null, this.sessionCwd)
+    return this.send(payload)
   }
 
   // La conversazione accesa: un solo processo di Claude Code per tutta la conversazione, con i messaggi che arrivano
@@ -433,17 +464,21 @@ class ClaudeBridge extends EventEmitter {
   }
   async startLive() {
     // Mentre Claude lavora si resta su questa: tema o ragionamento cambiati valgono dalla prossima accensione
-    if (this.live && !this.live.ended && this.live.turn.open) return this.live
-    const resume = this.session.getSession()
+    if (this.live && !this.live.ended && this.live.turn.open && !this.forkFrom) return this.live
+    // Una ripartenza da un punto (messaggio modificato): una sessione nuova, biforcata da quella di prima
+    const fork = this.forkFrom
+    this.forkFrom = null
+    if (fork) this.closeLive()
+    const resume = fork ? fork.session : this.session.getSession()
     const cwd = (resume && this.sessionCwd) || this.workdir
     const key = JSON.stringify([cwd, this.persona])
     const cur = this.live
-    if (cur && !cur.ended && cur.key === key && (cur.sessionId || null) === (resume || null)) return cur
-    if (cur && !cur.ended && cur.key === key && !cur.sessionId && !resume) return cur
+    if (!fork && cur && !cur.ended && cur.key === key && (cur.sessionId || null) === (resume || null)) return cur
+    if (!fork && cur && !cur.ended && cur.key === key && !cur.sessionId && !resume) return cur
     this.closeLive()
     const { query } = await loadSdk()
     const inbox = new Inbox()
-    const live = { inbox, cwd, key, sessionId: resume || null, ended: false, idle: null, turn: { open: false } }
+    const live = { inbox, cwd, key, sessionId: fork ? null : resume || null, ended: false, idle: null, turn: { open: false } }
     live.query = query({
       prompt: inbox,
       options: {
@@ -469,6 +504,10 @@ class ClaudeBridge extends EventEmitter {
         // Dopo ogni risposta, una previsione del prossimo messaggio della persona (Tab o un clic per usarla)
         promptSuggestions: true,
         resume: resume || undefined,
+        resumeSessionAt: fork ? fork.at : undefined,
+        forkSession: fork ? true : undefined,
+        // I salvataggi dei file prima di ogni modifica: servono a riportarli indietro modificando un messaggio
+        enableFileCheckpointing: true,
         canUseTool: (toolName, input, options) => this.ask(toolName, input, options),
       },
     })
@@ -860,7 +899,7 @@ class ClaudeBridge extends EventEmitter {
       }
       // Promemoria di sistema e notifiche non sono della persona
       if (/^<(command|local-command|system-reminder|task-notification)/.test(text)) continue
-      items.push(pics.length ? { role: 'user', text, images: pics } : { role: 'user', text })
+      items.push(Object.assign({ role: 'user', text, uuid: m.uuid || null }, pics.length ? { images: pics } : {}))
     }
     // La cronaca riaperta continua con le sue attività
     this.resetTodos(todos)

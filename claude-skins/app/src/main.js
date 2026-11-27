@@ -469,6 +469,8 @@ function registerIpc() {
       return { mediaType, data: fs.readFileSync(p).toString('base64') }
     } catch { return null }
   })
+  // Un messaggio già mandato, modificato: la conversazione riparte da lì (e i file, se chiesto)
+  ipcMain.on('chat:edit', (_e, { uuid, msg, restoreFiles }, conv) => { const c = convOf(conv); if (c) c.bridge.edit(String(uuid || ''), msg, !!restoreFiles) })
   ipcMain.on('chat:stop', (_e, conv) => { const c = convOf(conv); if (c) { c.replyText = ''; c.bridge.stop() } })
   ipcMain.on('perm:answer', (_e, { id, allow, always, answers, conv }) => { const c = convOf(conv); if (c) c.bridge.answer(id, !!allow, !!always, answers) })
   // Modello e ragionamento, ricordati per le prossime volte
@@ -585,6 +587,7 @@ function wireConv(c) {
   fwd('askClosed', 'perm:closed')
   fwd('todos', 'claude:todos')
   fwd('suggestion', 'claude:suggestion')
+  fwd('rewound', 'claude:rewound')
   b.on('usage', (u) => { lastUsage = u; send('claude:usage', u) })
   fwd('context', 'claude:context')
   // Claude riprende a lavorare da sé (un messaggio entrato mentre il turno finiva)

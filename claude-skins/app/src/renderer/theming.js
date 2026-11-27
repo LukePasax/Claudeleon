@@ -84,6 +84,13 @@
     suggestionTip: 'Manda questa risposta (Tab la scrive nella casella)',
     // Il nome dell'app, per i temi che lo scrivono nella testata
     appTitle: 'Claude Skins',
+    // Modificare un messaggio
+    editMessage: 'Modifica',
+    editSend: 'Invia',
+    editCancel: 'Annulla',
+    editRestore: 'Riporta anche i file a prima di questo messaggio',
+    rewindOk: 'File riportati a prima del messaggio: {n} (+{plus} −{minus} righe).',
+    rewindFail: 'I file non si possono riportare indietro: {err}',
     // Copiare
     copy: 'Copia',
     copied: 'Copiato',
