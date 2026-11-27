@@ -544,6 +544,14 @@ function registerIpc() {
       return { mediaType, data: fs.readFileSync(p).toString('base64') }
     } catch { return null }
   })
+  // Un file toccato da Claude: aprirlo col programma di sistema, o mostrarlo nella sua cartella
+  const fileIn = (p, conv) => {
+    const c = convOf(conv)
+    const base = (c && c.cwd) || config.workdir || app.getPath('home')
+    return path.isAbsolute(String(p)) ? String(p) : path.join(base, String(p))
+  }
+  ipcMain.handle('file:open', async (_e, p, conv) => { const f = fileIn(p, conv); return fs.existsSync(f) ? (await shell.openPath(f)) || true : false })
+  ipcMain.handle('file:reveal', (_e, p, conv) => { const f = fileIn(p, conv); if (!fs.existsSync(f)) return false; shell.showItemInFolder(f); return true })
   // I file da citare con @, nella cartella della conversazione
   ipcMain.handle('files:suggest', async (_e, query, conv) => {
     const c = convOf(conv)

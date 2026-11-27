@@ -53,6 +53,16 @@
     folderFirst: 'In quale cartella lavoriamo? Scegline una e il messaggio parte.',
     folderNew: 'Una conversazione resta nella sua cartella: sceglierne un\'altra apre un capitolo nuovo.',
     folderOther: 'Scegli un\'altra cartella…',
+    // I file toccati
+    filesOne: '1 file',
+    filesMany: '{n} file',
+    filesTip: 'I file modificati da Claude in questa conversazione',
+    filesTitle: 'File modificati · {n} (+{plus} −{minus})',
+    filesNew: 'nuovo',
+    filesOpen: 'Apri',
+    filesReveal: 'Cartella',
+    filesMissing: 'Non c\'è più',
+    filesNone: 'Claude non ha ancora modificato file in questa conversazione.',
     // Le impostazioni
     settings: 'Impostazioni',
     settingsTip: 'Impostazioni (Ctrl+,)',

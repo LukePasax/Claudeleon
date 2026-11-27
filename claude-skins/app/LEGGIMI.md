@@ -107,6 +107,11 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   scorre sotto; finito, diventa "Ha ragionato per N s" e si riapre con un clic. Anche nelle cronache riaperte. Il
   testo è il riassunto che Claude Code chiede all'API (`showThinkingSummaries`): con un modello che non lo manda
   resta solo la riga.
+- **File modificati:** quando Claude modifica dei file, accanto al contesto compare "N file +a −r". Un clic apre
+  l'elenco dei file della conversazione, con le righe aggiunte e tolte e un segno per quelli nuovi; un clic su un file
+  mostra tutte le sue modifiche, e "Apri" e "Cartella" lo aprono col programma di sistema o in Esplora file. Vale per
+  le modifiche viste nella conversazione (anche nelle cronache riaperte); quelle fallite non contano, e modificando un
+  messaggio restano solo quelle di prima.
 - **Contesto:** accanto a "Spedisci" un anello dice quanto è pieno il contesto della conversazione (rosso oltre
   l'80%); passandoci sopra la percentuale e i token, con un clic il dettaglio per categoria (prompt di sistema,
   strumenti, memoria, conversazione, riserva, spazio libero) e "Compatta ora" (`/compact`). Si aggiorna a fine di

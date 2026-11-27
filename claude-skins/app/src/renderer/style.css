@@ -533,3 +533,20 @@ body.busy .entry .edit-btn { display: none; }
 .set-switch.on .switch { background: var(--btn-bg); }
 .set-switch.on .switch::after { transform: translateX(13px); }
 .set-select { font: inherit; font-size: 14px; color: var(--ink); background: var(--field); border: var(--line) solid var(--edge-light); border-radius: var(--radius-small); padding: 3px 6px; max-width: 220px; }
+
+/* I file toccati: il pulsante accanto al contesto e il pannello, una riga per file che si apre sulle sue modifiche */
+.files-btn { cursor: pointer; font: inherit; font-size: var(--small-size); color: var(--ink-soft); background: none; border: var(--line) solid var(--edge-light); border-radius: 20px; padding: 2px 9px; white-space: nowrap; }
+.files-btn:hover { color: var(--ink); border-color: var(--ink-soft); }
+.files-btn .plus, .file-row .plus { color: var(--plus); }
+.files-btn .minus, .file-row .minus { color: var(--minus); }
+.file-row { border-bottom: var(--line) solid var(--edge-light); }
+.fr-head { display: flex; align-items: center; gap: 8px; padding: 7px 2px; cursor: pointer; min-width: 0; }
+.fr-head .caret { width: 0; height: 0; border-left: 5px solid var(--ink-soft); border-top: 4px solid transparent; border-bottom: 4px solid transparent; transition: transform 0.12s; flex: none; }
+.file-row.open .fr-head .caret { transform: rotate(90deg); }
+.fr-name { font-family: var(--font-code); font-size: var(--code-size); color: var(--strong); flex: none; }
+.fr-dir { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--small-size); color: var(--ink-soft); direction: rtl; text-align: left; flex: 1; }
+.fr-new { flex: none; font-size: 11px; padding: 0 6px; border-radius: 8px; background: var(--add-bg); color: var(--plus); }
+.fr-counts { flex: none; font-family: var(--font-code); font-size: var(--small-size); }
+.fr-actions { flex: none; display: flex; gap: 4px; }
+.fr-diffs { padding: 0 0 10px 14px; }
+.fr-diffs .diff { margin-bottom: 8px; }

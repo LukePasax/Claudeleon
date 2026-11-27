@@ -30,6 +30,8 @@
   let mode = 'auto'
   const MODES = [['auto', 'modeAuto'], ['default', 'modeDefault'], ['acceptEdits', 'modeAcceptEdits'], ['plan', 'modePlan']]
   let tools = new Map()
+  // I file toccati da Claude nella conversazione: percorso → modifiche (id dell'azione → { change, added, removed })
+  let changed = new Map()
 
   // ------------------------------------------------------------------ conversazioni
 
@@ -53,17 +55,17 @@
     if (part('log')) part('log').appendChild(el)
     const c = {
       id, el, reply: null, pending: false, tools: new Map(), busy: false, thinking: null, todos: [], todosOpen: true,
-      context: null, currentSession: null, convoDir: workdir, chapter, asks: new Map(), stick: true, suggestion: '',
+      context: null, currentSession: null, convoDir: workdir, chapter, asks: new Map(), stick: true, suggestion: '', changed: new Map(),
       sessionId: null, unread: false, attention: false,
     }
     convs.set(id, c)
     return c
   }
   function save(c) {
-    if (c) Object.assign(c, { reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick, suggestion })
+    if (c) Object.assign(c, { reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick, suggestion, changed })
   }
   function load(c) {
-    ;({ reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick, suggestion } = c)
+    ;({ reply, pending, tools, busy, thinking, todos, todosOpen, context, currentSession, convoDir, chapter, asks, stick, suggestion, changed } = c)
   }
   function run(c, fn) {
     if (!c || c === cur) return fn()
@@ -113,6 +115,7 @@
     setBusy(b)
     renderTodos()
     renderContext()
+    renderChanged()
     renderFolder()
     renderChapterHead()
     renderGhost()
@@ -1097,6 +1100,107 @@
     for (const el of document.querySelectorAll('.theme-picker')) el.remove()
   }
 
+  // ------------------------------------------------------------------ file toccati
+
+  // Il riepilogo dei file che Claude ha modificato nella conversazione, come il pannello dell'app desktop: un pulsante
+  // "N file · +a −r" (in data-part="files") apre l'elenco, con le righe per file e le differenze di ogni modifica,
+  // e i pulsanti per aprire il file o mostrarlo nella sua cartella. Vale per le modifiche viste nella conversazione
+  // (anche nelle cronache riaperte); quelle fallite non contano
+  function recordChange(id, change, added, removed) {
+    if (!change || !change.file) return
+    const key = change.file.replace(/\\/g, '/')
+    if (!changed.has(key)) changed.set(key, new Map())
+    changed.get(key).set(id, { change, added, removed })
+    renderChanged()
+  }
+  function forgetChange(id) {
+    for (const [file, recs] of changed) if (recs.delete(id) && !recs.size) changed.delete(file)
+    renderChanged()
+  }
+  function changeTotals() {
+    let added = 0
+    let removed = 0
+    for (const recs of changed.values()) for (const r of recs.values()) { added += r.added; removed += r.removed }
+    return { files: changed.size, added, removed }
+  }
+  function renderChanged() {
+    if (quiet) return
+    const tot = changeTotals()
+    for (const box of all('[data-part="files"]')) {
+      let b = box.querySelector('.files-btn')
+      if (!b) {
+        b = document.createElement('button')
+        b.className = 'files-btn'
+        b.addEventListener('click', openChanged)
+        box.appendChild(b)
+      }
+      b.hidden = !tot.files
+      b.innerHTML = '<span class="fb-n"></span> <span class="plus"></span> <span class="minus"></span>'
+      b.querySelector('.fb-n').textContent = t(tot.files === 1 ? 'filesOne' : 'filesMany', { n: tot.files })
+      b.querySelector('.plus').textContent = `+${tot.added}`
+      b.querySelector('.minus').textContent = `−${tot.removed}`
+      b.title = t('filesTip')
+    }
+  }
+  function openChanged() {
+    closeThemes()
+    closeFolderMenu()
+    const host = app.querySelector('[data-solid]') || app
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+    const panel = document.createElement('div')
+    panel.className = 'theme-picker files-panel'
+    panel.innerHTML = '<div class="theme-picker-box settings-box"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="settings-body files-body"></div></div>'
+    const tot = changeTotals()
+    label(panel.querySelector('.theme-picker-head span'), 'filesTitle', { n: tot.files, plus: tot.added, minus: tot.removed })
+    const close = panel.querySelector('.theme-picker-head button')
+    label(close, 'themesClose')
+    close.addEventListener('click', closeThemes)
+    panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    const body = panel.querySelector('.files-body')
+    const conv = active && active.id
+    const base = (convoDir || workdir || '').replace(/\\/g, '/').replace(/\/$/, '')
+    for (const [file, recs] of changed) {
+      const shown = base && file.toLowerCase().startsWith(base.toLowerCase() + '/') ? file.slice(base.length + 1) : file
+      let added = 0
+      let removed = 0
+      let created = false
+      for (const r of recs.values()) { added += r.added; removed += r.removed; if (r.change.created) created = true }
+      const row = document.createElement('div')
+      row.className = 'file-row'
+      row.innerHTML = '<div class="fr-head"><span class="caret"></span><span class="fr-name"></span><span class="fr-dir"></span><span class="fr-new"></span><span class="fr-counts"><span class="plus"></span> <span class="minus"></span></span><span class="fr-actions"></span></div><div class="fr-diffs" hidden></div>'
+      const parts = shown.split('/')
+      row.querySelector('.fr-name').textContent = parts.pop()
+      row.querySelector('.fr-dir').textContent = parts.join('/')
+      if (created) label(row.querySelector('.fr-new'), 'filesNew')
+      else row.querySelector('.fr-new').remove()
+      row.querySelector('.plus').textContent = `+${added}`
+      row.querySelector('.minus').textContent = `−${removed}`
+      row.title = file
+      const actions = row.querySelector('.fr-actions')
+      for (const [key, fn] of [['filesOpen', api.openFile], ['filesReveal', api.revealFile]]) {
+        if (!fn) continue
+        const b = document.createElement('button')
+        b.className = 'btn small deny'
+        label(b, key)
+        b.addEventListener('click', async (e) => {
+          e.stopPropagation()
+          const ok = await fn(file, conv)
+          if (!ok) { label(b, 'filesMissing'); b.disabled = true }
+        })
+        actions.appendChild(b)
+      }
+      const diffs = row.querySelector('.fr-diffs')
+      row.querySelector('.fr-head').addEventListener('click', () => {
+        if (!diffs.children.length) for (const r of recs.values()) diffs.appendChild(changeView(r.change).box)
+        diffs.hidden = !diffs.hidden
+        row.classList.toggle('open', !diffs.hidden)
+      })
+      body.appendChild(row)
+    }
+    if (!changed.size) { const n = document.createElement('div'); n.className = 'folder-note'; body.appendChild(label(n, 'filesNone')) }
+    host.appendChild(panel)
+  }
+
   // ------------------------------------------------------------------ impostazioni
 
   // Il pannello delle impostazioni, sopra il layout come il selettore dei temi: aspetto, finestra, notifiche,
@@ -1253,6 +1357,7 @@
     renderTodos()
     renderModel()
     renderContext()
+    renderChanged()
     renderGhost()
     renderChapterHead()
     paint()
@@ -1596,6 +1701,10 @@
       let n = d
       while (n) { const next = n.nextElementSibling; if (n.classList.contains('item')) n.remove(); n = next }
       tools.clear()
+      // I file toccati: solo le modifiche rimaste nella conversazione
+      changed = new Map()
+      for (const r of logEl().querySelectorAll('.tool.has-change:not(.fail)')) if (r.changeRec) recordChange(r.changeRec.id, r.changeRec.change, r.changeRec.added, r.changeRec.removed)
+      renderChanged()
       reply = null
       clearSuggestion()
       stick = true
@@ -1896,6 +2005,8 @@
         counts.innerHTML = `<span class="plus">+${view.added}</span> <span class="minus">−${view.removed}</span>`
         row.insertBefore(counts, row.querySelector('.what').nextSibling)
       }
+      row.changeRec = { id, change, added: view.added, removed: view.removed }
+      recordChange(id, change, view.added, view.removed)
       const item = add('change', '')
       item.appendChild(view.box)
       row.classList.add('has-change')
@@ -1906,6 +2017,8 @@
   }
 
   function toolDone(id, error) {
+    // Una modifica fallita non conta fra i file toccati
+    if (error) forgetChange(id)
     const row = tools.get(id)
     if (!row) return
     row.classList.add(error ? 'fail' : 'done')
@@ -2748,6 +2861,8 @@
       onUsage: on('onUsage'),
       onModels: on('onModels'), onTodos: on('onTodos'), onContext: on('onContext'),
       onThinkingStart: on('onThinkingStart'), onSuggestion: on('onSuggestion'), onThinking: on('onThinking'), onThinkingEnd: on('onThinkingEnd'),
+      openFile: async () => true,
+      revealFile: async () => false,
       settings: async () => fakeSettings,
       setSetting: async (k, v) => { if (k in fakeSettings) fakeSettings[k] = v; return fakeSettings },
       suggestFiles: async (q) => ['src/', 'src/MapView.cpp', 'src/MapView.h', 'src/MapLoader.cpp', 'src/RouteFinder.h', 'docs/', 'docs/specifiche.pdf', 'README.md', 'CMakeLists.txt'].filter((f) => f.toLowerCase().includes(q.toLowerCase())).slice(0, 15),
