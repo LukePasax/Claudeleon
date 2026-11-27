@@ -251,8 +251,9 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
 `electron-builder` (devDependency), configurato nel campo `build` di package.json: NSIS per Windows, per utente,
 cartella scelta, collegamenti nel menu Start e sul desktop, `appId` = `ClaudeSkins.App`, lo stesso AppUserModelId che
 main.js imposta (l'installer lo mette sui collegamenti: notifiche e icona della barra vanno da sé, e l'app impacchettata
-non scrive il suo collegamento). Icona dell'eseguibile in `build/icon.ico` (la porta tonda di Terra di Mezzo, otto
-misure da 256 a 16, disegnata dal `trayIcon({ size })` del tema e scritta come .ico coi PNG dentro). Nel pacchetto non
+non scrive il suo collegamento). Icona dell'app in `build/icon.ico`, uguale per tutti i temi (tre carte sovrapposte
+con una stellina, otto misure da 256 a 16, scritta come .ico coi PNG dentro): eseguibile, installer, collegamenti,
+barra delle applicazioni (`setAppDetails`). Il tema dà solo l'icona del vassoio e della finestra. Nel pacchetto non
 entrano i binari di Claude Code che l'SDK porta per ogni sistema (`claude-agent-sdk-*`, ~380 MB l'uno): l'app usa
 quello installato. `crea-installer.cmd` (app e radice) fa `npm install` se serve e `npm run dist`. Da Linux la
 costruzione per Windows chiede Wine (rcedit per l'icona dell'eseguibile); `npm run pack -- --linux dir` dà la cartella

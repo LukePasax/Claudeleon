@@ -734,75 +734,44 @@ function rankFiles(files, query) {
   return scored.slice(0, 15).map((x) => x[2])
 }
 
-// L'icona dell'app, quella del tema in uso, a 256 pixel: va sulla finestra e, come file .ico, sul collegamento del
-// menu Start. Windows prende l'icona della barra delle applicazioni dal collegamento con lo stesso AppUserModelId:
-// senza un'icona sua, il collegamento mostrerebbe quella di Electron
-function iconFile() {
-  return path.join(app.getPath('userData'), 'claude-skins.ico')
-}
-// Un .ico con dentro i PNG a 256, 48, 32 e 16 pixel (Windows accetta i PNG dentro un .ico)
-function writeIco(img) {
-  const sizes = [256, 48, 32, 16]
-  const pngs = sizes.map((s) => img.resize({ width: s, height: s, quality: 'best' }).toPNG())
-  const head = Buffer.alloc(6 + 16 * sizes.length)
-  head.writeUInt16LE(0, 0)
-  head.writeUInt16LE(1, 2)
-  head.writeUInt16LE(sizes.length, 4)
-  let offset = head.length
-  sizes.forEach((s, i) => {
-    const e = 6 + 16 * i
-    head.writeUInt8(s >= 256 ? 0 : s, e)
-    head.writeUInt8(s >= 256 ? 0 : s, e + 1)
-    head.writeUInt16LE(1, e + 4)
-    head.writeUInt16LE(32, e + 6)
-    head.writeUInt32LE(pngs[i].length, e + 8)
-    head.writeUInt32LE(offset, e + 12)
-    offset += pngs[i].length
-  })
-  const data = Buffer.concat([head, ...pngs])
-  const file = iconFile()
-  let same = false
-  try { same = fs.readFileSync(file).equals(data) } catch {}
-  if (!same) fs.writeFileSync(file, data)
-  return !same
+// Le icone. Quella dell'app (menu Start, barra delle applicazioni, eseguibile, installer) è di Claude Skins e non
+// cambia col tema: build/icon.ico, che nell'app installata sta nell'eseguibile. Quella del tema va solo sulla finestra
+// (Alt+Tab) e nel vassoio
+function appIconFile() {
+  return app.isPackaged ? process.execPath : path.join(app.getAppPath(), 'build', 'icon.ico')
 }
 // Un diario di quello che l'app fa con icona e collegamento (userData/icona.log), per capire che cosa non va se
-// Windows mostra ancora l'icona sbagliata
+// Windows mostra l'icona sbagliata
 function iconLog(...parts) {
   try { fs.appendFileSync(path.join(app.getPath('userData'), 'icona.log'), `${new Date().toISOString()} ${parts.join(' ')}\n`) } catch {}
 }
 function setAppIcon(dataUrl) {
   const img = nativeImage.createFromDataURL(dataUrl)
-  iconLog('icona dal tema:', img.isEmpty() ? 'vuota' : JSON.stringify(img.getSize()))
-  if (img.isEmpty()) return
-  if (process.platform !== 'darwin') win.setIcon(img)
+  if (!img.isEmpty() && process.platform !== 'darwin') win.setIcon(img)
   if (process.platform !== 'win32') return
   try {
-    const changed = writeIco(img)
-    iconLog('file .ico:', iconFile(), changed ? 'scritto' : 'uguale a prima', fs.statSync(iconFile()).size, 'byte')
-    ensureStartMenuShortcut(changed)
     // Le proprietà della finestra che la barra delle applicazioni legge per l'icona (anche quando l'app è fissata)
     win.setAppDetails({
       appId: APP_ID,
-      appIconPath: iconFile(),
+      appIconPath: appIconFile(),
       appIconIndex: 0,
       relaunchCommand: app.isPackaged ? `"${process.execPath}"` : `"${process.execPath}" "${app.getAppPath()}"`,
       relaunchDisplayName: 'Claude Skins',
     })
-    iconLog('setAppDetails fatto, appId', APP_ID)
+    iconLog('setAppDetails fatto, appId', APP_ID, 'icona', appIconFile())
   } catch (err) { iconLog('errore:', err && err.message) }
 }
 
 // Il collegamento nel menu Start: Windows mostra le notifiche di un'app non installata solo se ne esiste uno con lo
-// stesso AppUserModelId. Serve anche ad aprire Claude Skins dal menu Start. Nasce solo quando il file dell'icona
-// esiste già (lo scrive setAppIcon), così Windows non le lega mai l'icona di Electron
-function ensureStartMenuShortcut(iconChanged) {
+// stesso AppUserModelId. Serve anche ad aprire Claude Skins dal menu Start. Ha l'icona dell'app, così Windows non le
+// lega mai quella di Electron
+function ensureStartMenuShortcut() {
   // L'app installata ha già il suo collegamento, fatto dall'installer con lo stesso AppUserModelId (appId)
   if (app.isPackaged) return
-  if (process.platform !== 'win32' || !fs.existsSync(iconFile())) return
+  if (process.platform !== 'win32' || !fs.existsSync(appIconFile())) return
   try {
     const link = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Claude Skins.lnk')
-    const want = { target: process.execPath, args: `"${app.getAppPath()}"`, appUserModelId: APP_ID, description: 'Claude Skins', cwd: app.getAppPath(), icon: iconFile(), iconIndex: 0 }
+    const want = { target: process.execPath, args: `"${app.getAppPath()}"`, appUserModelId: APP_ID, description: 'Claude Skins', cwd: app.getAppPath(), icon: appIconFile(), iconIndex: 0 }
     let same = false
     try {
       const cur = shell.readShortcutLink(link)
@@ -811,10 +780,10 @@ function ensureStartMenuShortcut(iconChanged) {
       same = cur.target === want.target && cur.args === want.args && cur.appUserModelId === APP_ID && (cur.icon || '') === want.icon
     } catch {}
     let ok = true
-    if (!same || iconChanged) ok = shell.writeShortcutLink(link, fs.existsSync(link) ? 'replace' : 'create', want)
+    if (!same) ok = shell.writeShortcutLink(link, fs.existsSync(link) ? 'replace' : 'create', want)
     let back = null
     try { back = shell.readShortcutLink(link) } catch {}
-    iconLog('collegamento:', link, same && !iconChanged ? 'già giusto' : ok ? 'scritto' : 'NON scritto', back ? `icona=${back.icon} appId=${back.appUserModelId}` : 'illeggibile')
+    iconLog('collegamento:', link, same ? 'già giusto' : ok ? 'scritto' : 'NON scritto', back ? `icona=${back.icon} appId=${back.appUserModelId}` : 'illeggibile')
   } catch (err) { iconLog('errore collegamento:', err && err.message) }
 }
 
