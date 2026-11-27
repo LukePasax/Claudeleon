@@ -130,6 +130,10 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   stato, da quanto, quanti strumenti ha usato, l'ultimo e il riassunto finale, con "Ferma" e "Uscita" (il file con
   l'uscita). Mentre Claude lavora, "Manda in background" (o Ctrl+B) sposta in background il comando o il sotto-agente
   in corso, come nel terminale, e Claude va avanti. Con attività in corso la conversazione non si spegne da sola.
+- **Conversazioni fissate ed esportazione:** nel menu di una conversazione negli annali (⋯ o clic destro) "Fissa in
+  alto" la mette nel gruppo "Fissate", in cima (si ricorda; "Togli dalle fissate" la rimette al suo posto), ed
+  "Esporta in Markdown…" la salva in un file .md (domande, risposte, una riga per ogni azione di Claude, file
+  allegati e commenti sulle differenze leggibili). `/export` nella casella esporta quella in vista.
 - **Memoria (CLAUDE.md):** nelle impostazioni "Memoria (CLAUDE.md)", oppure scrivendo `/memory`, apre i file di
   istruzioni che Claude legge all'avvio di ogni conversazione: personale (`~/.claude/CLAUDE.md`, per tutti i
   progetti), del progetto (`CLAUDE.md` nella cartella, o `.claude/CLAUDE.md`), solo tuo nel progetto

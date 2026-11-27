@@ -47,6 +47,8 @@ contextBridge.exposeInMainWorld('skins', {
   revealFile: (p, conv) => ipcRenderer.invoke('file:reveal', p, conv),
   capturePreview: (rect) => ipcRenderer.invoke('preview:capture', rect),
   permissions: (conv) => ipcRenderer.invoke('perms:get', conv),
+  pinSession: (id, on) => ipcRenderer.invoke('session:pin', id, on),
+  exportSession: (id, cwd, title) => ipcRenderer.invoke('session:export', id, cwd, title),
   memoryFiles: (conv) => ipcRenderer.invoke('memory:list', conv),
   readMemory: (conv, file) => ipcRenderer.invoke('memory:read', conv, file),
   writeMemory: (conv, file, text) => ipcRenderer.invoke('memory:write', conv, file, text),

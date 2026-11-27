@@ -219,6 +219,48 @@ function outputTail(file, max = 32768) {
   } catch { return '' }
 }
 
+// Una conversazione salvata in Markdown, da tenere o da mandare: le domande, le risposte, le azioni (una riga
+// ciascuna, col nome dello strumento e cosa ha toccato). I blocchi che la pagina aggiunge ai messaggi diventano
+// leggibili (file allegati, commenti sulle differenze); promemoria di sistema e sotto-agenti restano fuori
+function transcriptMarkdown(messages, meta = {}) {
+  const out = [`# ${meta.title || 'Conversazione'}`, '']
+  const when = meta.when ? new Date(meta.when).toLocaleString('it-IT', { dateStyle: 'long', timeStyle: 'short' }) : ''
+  out.push(`*Claude Code${when ? ` · ${when}` : ''}${meta.cwd ? ` · ${meta.cwd}` : ''}*`, '')
+  let last = ''
+  const head = (who) => { if (last !== who) { out.push('---', '', `## ${who}`, ''); last = who } }
+  const tidy = (text) => text
+    .replace(/<attached_files>\n([\s\S]*?)\n?<\/attached_files>/g, (_m, list) => `*File allegati:* ${list.split('\n').map((x) => `\`${x.trim()}\``).filter((x) => x !== '``').join(', ')}`)
+    .replace(/<diff_comments>[\s\S]*?<\/diff_comments>/g, (block) => {
+      const items = []
+      const re = /<comment file="([^"]*)" line="([^"]*)" side="[^"]*">\n<code>([\s\S]*?)<\/code>\n([\s\S]*?)\n<\/comment>/g
+      let m
+      while ((m = re.exec(block))) items.push(`- \`${m[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&')}${m[2] ? `:${m[2]}` : ''}\` — ${m[4]}`)
+      return `*Commenti sulle modifiche:*\n\n${items.join('\n')}`
+    })
+    .trim()
+  for (const m of messages) {
+    if ((m.type !== 'user' && m.type !== 'assistant') || m.parent_tool_use_id) continue
+    const content = m.message && m.message.content
+    const blocks = Array.isArray(content) ? content : [{ type: 'text', text: typeof content === 'string' ? content : '' }]
+    if (m.type === 'assistant') {
+      const text = plainText(m.message).trim()
+      const tools = blocks.filter((b) => b.type === 'tool_use' && !TODO_TOOLS.has(b.name))
+      if (!text && !tools.length) continue
+      head('Claude')
+      if (text) out.push(text, '')
+      if (tools.length) out.push(...tools.map((b) => { const what = summary(b.input).replace(/\s+/g, ' ').slice(0, 160); return `- *${b.name}*${what ? ` \`${what.replace(/`/g, "'")}\`` : ''}` }), '')
+      continue
+    }
+    const text = plainText(m.message).trim()
+    if (!text || /^<(local-command|system-reminder|task-notification)/.test(text)) continue
+    const name = /<command-name>\s*\/?([^<\s]+)\s*<\/command-name>/.exec(text)
+    if (/^<command/.test(text) && !name) continue
+    head('Tu')
+    if (name) { const args = /<command-args>([\s\S]*?)<\/command-args>/.exec(text); out.push(`\`/${name[1]}${args && args[1].trim() ? ` ${args[1].trim()}` : ''}\``, '') } else out.push(tidy(text), '')
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n'
+}
+
 // Il primo messaggio come titolo, senza i blocchi che la pagina aggiunge in fondo (file allegati, commenti sulle
 // differenze); se resta solo quello, un titolo che lo dice
 function promptTitle(text) {
@@ -929,6 +971,16 @@ class ClaudeBridge extends EventEmitter {
 
   // Le sessioni di Claude Code di tutte le cartelle, le più recenti prima, come nella barra laterale dell'app
   // desktop (le sue comprese, coi loro titoli); ognuna con la sua cartella, che serve per riprenderla
+  // Una sessione salvata in Markdown (vedi transcriptMarkdown), senza toccare la conversazione aperta
+  async exportMarkdown(sessionId, cwd, title) {
+    const { getSessionMessages, getSessionInfo } = await loadSdk()
+    const opts = cwd ? { dir: cwd } : {}
+    const messages = await getSessionMessages(sessionId, opts)
+    let info = null
+    try { info = await getSessionInfo(sessionId, opts) } catch {}
+    return transcriptMarkdown(messages, { title: title || (info && (info.customTitle || info.summary)) || '', when: info && info.lastModified, cwd: cwd || (info && info.cwd) || '' })
+  }
+
   async sessions() {
     const { listSessions } = await loadSdk()
     const list = await listSessions({ limit: 300 })
@@ -1124,5 +1176,5 @@ function savedContextMax() {
 module.exports = {
   ClaudeBridge, MODES, intent, DEFAULT_CLAUDE: CLAUDE, loadContextMax, savedContextMax,
   // Per le prove (test/unit)
-  _internals: { promptTitle, localUrls, applyTodo, settleTodo, withFiles, imagesOf, guessContextMax, Inbox },
+  _internals: { promptTitle, localUrls, transcriptMarkdown, applyTodo, settleTodo, withFiles, imagesOf, guessContextMax, Inbox },
 }

@@ -289,6 +289,21 @@ for (const tema of TEMI) {
     assert.deepEqual(errors, [])
   })
 
+  test(`${tema}: conversazioni fissate in cima ed esportazione`, async () => {
+    await open(tema)
+    await page.waitForSelector('.session-row[data-id="s2"]')
+    await page.click('.session-row[data-id="s2"]', { button: 'right' })
+    await page.click('.session-menu .folder-item:has-text("Fissa in alto")')
+    await page.waitForFunction(() => { const g = document.querySelector('.session-group'); return g && /Fissate/.test(g.textContent) && g.nextElementSibling.dataset.id === 's2' })
+    await page.click('.session-row[data-id="s2"]', { button: 'right' })
+    await page.click('.session-menu .folder-item:has-text("Esporta")')
+    await page.waitForSelector('.convo:not([hidden]) .item:has-text("esportata")')
+    await page.click('.session-row[data-id="s2"]', { button: 'right' })
+    await page.click('.session-menu .folder-item:has-text("Togli dalle fissate")')
+    await page.waitForFunction(() => !/Fissate/.test(document.querySelector('.session-group').textContent))
+    assert.deepEqual(errors, [])
+  })
+
   test(`${tema}: impostazioni, estensioni, contesto, cambio di tema che tiene la conversazione`, async () => {
     await open(tema)
     await send('Ciao')

@@ -698,7 +698,31 @@ function registerIpc() {
     const cached = (() => { try { return JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'models.json'), 'utf8')) } catch { return [] } })()
     return { models: bridge.modelList || cached, model: config.model || null, effort: config.effort || null, ultracode: !!config.ultracode }
   })
-  ipcMain.handle('sessions:list', () => bridge.sessions())
+  // Le cronache, con quelle fissate in cima (si ricordano nella configurazione)
+  ipcMain.handle('sessions:list', async () => {
+    const pinned = new Set(Array.isArray(config.pinned) ? config.pinned : [])
+    return (await bridge.sessions()).map((s) => (pinned.has(s.id) ? Object.assign(s, { pinned: true }) : s))
+  })
+  ipcMain.handle('session:pin', (_e, id, on) => {
+    const list = (Array.isArray(config.pinned) ? config.pinned : []).filter((x) => x !== id)
+    if (on) list.unshift(String(id))
+    config.pinned = list.slice(0, 50)
+    saveConfig()
+    return true
+  })
+  // Una conversazione in Markdown, salvata dove si sceglie (di solito Documenti)
+  ipcMain.handle('session:export', async (_e, id, cwd, title) => {
+    try {
+      const md = await bridge.exportMarkdown(String(id), cwd || null, String(title || ''))
+      const name = (String(title || 'Conversazione').replace(/[<>:"/\\|?*\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Conversazione') + '.md'
+      const r = await dialog.showSaveDialog(win, { title: 'Esporta la conversazione', defaultPath: path.join(app.getPath('documents'), name), filters: [{ name: 'Markdown', extensions: ['md'] }] })
+      if (r.canceled || !r.filePath) return { ok: false, canceled: true }
+      fs.writeFileSync(r.filePath, md)
+      return { ok: true, file: r.filePath }
+    } catch (err) {
+      return { ok: false, error: err.message }
+    }
+  })
   ipcMain.handle('commands:get', () => {
     if (bridge.commandList.length) return bridge.commandList
     try { return JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'commands.json'), 'utf8')) } catch { return [] }

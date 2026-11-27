@@ -90,3 +90,19 @@ test('indirizzi dei server locali, anche coi colori del terminale', () => {
     ['http://localhost:5173/', 'http://localhost:3000/app', 'http://127.0.0.1:8000'])
   assert.deepEqual(I.localUrls('https://example.com:8080 e localhost:3000 senza schema'), [])
 })
+
+test('esportazione in Markdown: domande, risposte, azioni, blocchi leggibili', () => {
+  const md = I.transcriptMarkdown([
+    { type: 'user', message: { content: 'Aggiungi i fiumi\n\n<diff_comments>\nIntro\n<comment file="src/a.cpp" line="3" side="+">\n<code>x</code>\nprima i laghi\n</comment>\n</diff_comments>\n\n<attached_files>\nC:/a.txt\n</attached_files>' } },
+    { type: 'assistant', message: { content: [{ type: 'text', text: 'Guardo.' }, { type: 'tool_use', name: 'Read', input: { file_path: 'C:/x/y/src/MapView.cpp' } }] } },
+    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: '1', content: '...' }] } },
+    { type: 'user', message: { content: '<system-reminder>niente</system-reminder>' } },
+    { type: 'assistant', message: { content: [{ type: 'text', text: 'Fatto.' }] } },
+    { type: 'assistant', parent_tool_use_id: 'x', message: { content: [{ type: 'text', text: 'sotto-agente' }] } },
+  ], { title: 'Fiumi', cwd: 'C:/MapEditor' })
+  assert.match(md, /^# Fiumi\n/)
+  assert.match(md, /## Tu\n\nAggiungi i fiumi\n\n\*Commenti sulle modifiche:\*\n\n- `src\/a\.cpp:3` — prima i laghi\n\n\*File allegati:\* `C:\/a\.txt`/)
+  assert.match(md, /## Claude\n\nGuardo\.\n\n- \*Read\* `src\/MapView\.cpp`\n\nFatto\.\n$/)
+  assert.doesNotMatch(md, /system-reminder|sotto-agente/)
+  assert.equal(md.match(/## Claude/g).length, 1)
+})

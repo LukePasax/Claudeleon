@@ -298,6 +298,13 @@ Nella pagina: `data-part="git"` (o dentro `data-part="folder"`), pannello `.git-
 conversazione, `refreshGit()` lo rilegge (cambio di cartella o di conversazione, fine risposta, focus della finestra).
 Prove: `test/unit/git.test.js` (un repo vero con un remoto nudo), e il pannello nelle prove della finestra.
 
+## Fissate ed esportazione
+
+`config.pinned` (id delle sessioni, la più recente prima): `sessions:list` aggiunge `pinned`, la pagina le mette nel
+gruppo "Fissate" in cima. `session:export` → `bridge.exportMarkdown` (getSessionMessages + `transcriptMarkdown`, pura,
+senza toccare la conversazione aperta) e dialogo di salvataggio in Documenti. `/export` nella penna esporta quella in
+vista.
+
 ## Memoria
 
 `src/memory.js`: `list(cwd)` (user = `CLAUDE_CONFIG_DIR` o `~/.claude/CLAUDE.md`; project = `CLAUDE.md` o, se c'è solo

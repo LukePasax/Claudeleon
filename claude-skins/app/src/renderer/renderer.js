@@ -2273,6 +2273,8 @@
     }
     // /clear e /new: un nuovo capitolo, come il pulsante
     if (/^\/(clear|new)\s*$/i.test(text)) { input.value = ''; newChapter(); return }
+    // /export: la conversazione in Markdown (quella di Claude Code chiederebbe dal terminale)
+    if (/^\/export\s*$/i.test(text) && api.exportSession) { input.value = ''; exportSession(active && (active.sessionId || (currentSession && currentSession.id)), convoDir || workdir || null, (part('chapter-title') && part('chapter-title').textContent) || ''); return }
     // /memory: il pannello della memoria (quello di Claude Code apre un editor da terminale)
     if (/^\/memory\s*$/i.test(text) && api.memoryFiles) { input.value = ''; openMemory(); return }
     if (notes.length) clearReviews()
@@ -3510,15 +3512,16 @@
     if (!list) return
     const q = fold(sessionsQuery.trim())
     const match = (s) => !q || fold(s.title).includes(q) || fold(s.cwd).includes(q) || fold(s.branch).includes(q)
-    // Le archiviate tutte in fondo, sotto la loro testata
-    const visible = sessionsCache.filter((s) => (showArchived || !s.archived) && match(s)).sort((x, y) => (x.archived ? 1 : 0) - (y.archived ? 1 : 0))
+    // Le fissate in cima, le archiviate tutte in fondo, ognuna sotto la sua testata
+    const rank = (s) => (s.archived ? 2 : s.pinned ? 0 : 1)
+    const visible = sessionsCache.filter((s) => (showArchived || !s.archived) && match(s)).sort((x, y) => rank(x) - rank(y))
     const archivedCount = sessionsCache.filter((s) => s.archived).length
     list.innerHTML = ''
     if (!sessionsCache.length) { sessionNote(list, 'sessionsEmpty', { dir: workdir || 'cartella di lavoro' }); return }
     if (!visible.length) sessionNote(list, 'sessionsNoMatch', { q: sessionsQuery.trim() })
     let group = null
     for (const s of visible) {
-      const g = s.archived ? 'groupArchived' : sessionGroup(s.lastModified)
+      const g = s.archived ? 'groupArchived' : s.pinned ? 'groupPinned' : sessionGroup(s.lastModified)
       if (g !== group) {
         group = g
         const h = document.createElement('div')
@@ -3539,7 +3542,7 @@
 
   function sessionRow(s) {
     const row = document.createElement('div')
-    row.className = 'session-row' + (s.archived ? ' archived' : '')
+    row.className = 'session-row' + (s.archived ? ' archived' : '') + (s.pinned && !s.archived ? ' pinned' : '')
     row.dataset.id = s.id
     row.innerHTML = '<div class="title"></div><div class="when"></div><button class="session-more" tabindex="-1">⋯</button>'
     row.querySelector('.title').textContent = s.title
@@ -3567,6 +3570,8 @@
       menu.appendChild(it)
     }
     item('sessionRename', () => startRename(s))
+    if (api.pinSession && !s.archived) item(s.pinned ? 'sessionUnpin' : 'sessionPin', async () => { await api.pinSession(s.id, !s.pinned); refreshSessions() })
+    if (api.exportSession) item('sessionExport', () => exportSession(s.id, s.cwd || null, s.title))
     item(s.archived ? 'sessionUnarchive' : 'sessionArchive', async () => {
       await api.archiveSession(s.id, s.cwd || null, !s.archived)
       refreshSessions()
@@ -3580,6 +3585,14 @@
       refreshSessions()
     }, 'danger')
     placeMenu(menu, anchor)
+  }
+
+  // Una conversazione in Markdown: si sceglie dove salvarla; l'esito come nota nella conversazione in vista
+  async function exportSession(id, cwd, title) {
+    if (!id) { labelled('footnote', 'exportNothing'); return }
+    const r = await api.exportSession(id, cwd, title).catch((err) => ({ ok: false, error: err.message }))
+    if (r && r.ok) labelled('footnote', 'exportDone', { x: r.file })
+    else if (r && !r.canceled) labelled('error', 'exportFail', { x: (r && r.error) || '?' })
   }
 
   // La rinomina sul posto: il titolo diventa un campo; Invio (o un clic altrove) salva, Esc annulla
@@ -4168,6 +4181,8 @@
       commands: async () => FAKE_COMMANDS,
       sessions: async () => fakeSessions.map((s) => Object.assign({}, s)),
       renameSession: async (id, title) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.title = title; return true },
+      pinSession: async (id, on) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.pinned = !!on; return true },
+      exportSession: async (id, cwd, title) => (id ? { ok: true, file: `C:/Users/luca/Documents/${title || 'Conversazione'}.md` } : { ok: false, error: 'nessuna sessione' }),
       archiveSession: async (id, cwd, on) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.archived = !!on; return true },
       deleteSession: async (id) => { const k = fakeSessions.findIndex((x) => x.id === id); if (k >= 0 && confirm('Eliminare?')) { fakeSessions.splice(k, 1); return { deleted: true } } return { deleted: false } },
       // Una cronaca lunga (Backup delle note): 120 messaggi, per provare "Carica i messaggi precedenti"
