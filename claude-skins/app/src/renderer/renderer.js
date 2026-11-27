@@ -557,6 +557,7 @@
     setWindowState(winMode)
     renderModes()
     renderFolder()
+    renderAttachments()
     renderChapterHead()
     paint()
     scrollDown()
@@ -667,7 +668,7 @@
   function sendMessage() {
     const input = part('input')
     const text = input ? input.value.trim() : ''
-    if (!text || busy) return
+    if ((!text && !attachments.length) || busy) return
     closeMenu()
     // Prima conversazione senza una cartella scelta: prima la cartella, poi il messaggio parte da sé
     const folderBtn = app.querySelector('[data-part="folder"] .folder-btn')
@@ -679,11 +680,190 @@
     if (/^\/(clear|new)\s*$/i.test(text)) { input.value = ''; newChapter(); return }
     input.value = ''
     reply = null
-    entry('you').querySelector('.text').textContent = text
+    const sent = attachments
+    attachments = []
+    renderAttachments()
+    const images = sent.filter((a) => a.kind === 'image')
+    const files = sent.filter((a) => a.kind === 'file').map((a) => a.path)
+    fillYou(entry('you'), text, images.map((a) => a.url), files)
     renderFolder()
     setBusy(true)
-    api.send(text)
+    api.send(sent.length ? { text, images: images.map((a) => ({ mediaType: a.mediaType, data: a.data })), files } : text)
   }
+
+  // Una domanda della persona nel log, con le miniature delle immagini e le etichette dei file. I file stanno anche
+  // in fondo al testo, in <attached_files> (così li trova Claude): lì si tolgono e diventano etichette
+  function fillYou(d, text, images = [], files = []) {
+    const m = /\s*<attached_files>\n([\s\S]*?)\n?<\/attached_files>\s*$/.exec(text || '')
+    if (m) {
+      files = files.length ? files : m[1].split('\n').map((x) => x.trim()).filter(Boolean)
+      text = text.slice(0, m.index)
+    }
+    const el = d.querySelector('.text')
+    el.textContent = ''
+    if (images.length || files.length) {
+      const box = document.createElement('div')
+      box.className = 'sent-attachments'
+      for (const u of images) {
+        const img = document.createElement('img')
+        img.src = u
+        img.alt = ''
+        box.appendChild(img)
+      }
+      for (const f of files) box.appendChild(fileChip(f))
+      el.appendChild(box)
+    }
+    if (text) el.appendChild(document.createTextNode(text))
+  }
+  function fileChip(p) {
+    const chip = document.createElement('span')
+    chip.className = 'attachment file'
+    chip.title = p
+    const name = document.createElement('span')
+    name.className = 'name'
+    name.textContent = String(p).split(/[\\/]/).filter(Boolean).pop() || p
+    chip.appendChild(name)
+    return chip
+  }
+
+  // ------------------------------------------------------------------ allegati
+
+  // Immagini (incollate, trascinate, scelte dal disco) e file (per percorso: Claude li apre da sé) che partono col
+  // prossimo messaggio. La striscia sta in data-part="attachments" se il tema la mette, altrimenti il motore la crea
+  // subito sopra la penna
+  let attachments = []
+  const IMAGE_TYPES = /^image\/(png|jpeg|gif|webp)$/
+  const IMAGE_EXT = /\.(png|jpe?g|gif|webp)$/i
+  // Oltre questo lato il modello rimpicciolisce comunque le immagini: si risparmia peso prima
+  const MAX_SIDE = 1568
+  const MAX_DATA = 4_500_000
+
+  function attachBox() {
+    let box = part('attachments')
+    if (box) return box
+    const input = part('input')
+    if (!input) return null
+    box = [...input.parentElement.children].find((c) => c.classList.contains('attachments'))
+    if (!box) {
+      box = document.createElement('div')
+      box.className = 'attachments'
+      input.parentElement.insertBefore(box, input)
+    }
+    return box
+  }
+  function renderAttachments() {
+    const box = attachBox()
+    if (!box) return
+    box.innerHTML = ''
+    box.hidden = !attachments.length
+    for (const a of attachments) {
+      let chip
+      if (a.kind === 'image') {
+        chip = document.createElement('span')
+        chip.className = 'attachment image'
+        const img = document.createElement('img')
+        img.src = a.url
+        img.alt = ''
+        chip.appendChild(img)
+        chip.title = a.name
+      } else chip = fileChip(a.path)
+      const x = document.createElement('button')
+      x.className = 'attachment-remove'
+      x.textContent = '×'
+      x.title = t('attachRemove')
+      x.addEventListener('click', () => { attachments = attachments.filter((b) => b !== a); renderAttachments() })
+      chip.appendChild(x)
+      box.appendChild(chip)
+    }
+  }
+
+  const readDataUrl = (blob) => new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onload = () => resolve(r.result)
+    r.onerror = reject
+    r.readAsDataURL(blob)
+  })
+  const loadImage = (src) => new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = reject
+    img.src = src
+  })
+  // Un'immagine pronta per Claude: tipo e dati in base64, rimpicciolita se è molto grande o pesante
+  async function prepareImage(dataUrl, mediaType) {
+    const img = await loadImage(dataUrl)
+    let url = dataUrl
+    let type = mediaType
+    const k = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight))
+    if (k < 1 || url.length > MAX_DATA || !IMAGE_TYPES.test(type)) {
+      const c = document.createElement('canvas')
+      c.width = Math.max(1, Math.round(img.naturalWidth * k))
+      c.height = Math.max(1, Math.round(img.naturalHeight * k))
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
+      type = type === 'image/jpeg' ? 'image/jpeg' : 'image/png'
+      url = c.toDataURL(type, 0.9)
+      if (url.length > MAX_DATA) { type = 'image/jpeg'; url = c.toDataURL(type, 0.85) }
+    }
+    return { url, mediaType: type, data: url.slice(url.indexOf(',') + 1) }
+  }
+  async function addImage(dataUrl, mediaType, name) {
+    try {
+      attachments.push(Object.assign({ kind: 'image', name }, await prepareImage(dataUrl, mediaType)))
+      renderAttachments()
+    } catch {
+      labelled('error', 'attachFailed', { name })
+    }
+  }
+  function addPath(p) {
+    if (!p || attachments.some((a) => a.path === p)) return
+    attachments.push({ kind: 'file', path: p })
+    renderAttachments()
+  }
+  // File trascinati o incollati: le immagini come immagini, il resto per percorso
+  async function addFiles(files) {
+    for (const f of files) {
+      if (f.type && f.type.startsWith('image/')) await addImage(await readDataUrl(f), f.type, f.name || 'immagine')
+      else {
+        const p = api.pathForFile ? api.pathForFile(f) : ''
+        if (p) addPath(p)
+        else labelled('error', 'attachNoPath', { name: f.name || '?' })
+      }
+    }
+    if (part('input')) part('input').focus()
+  }
+  // Percorsi scelti dal disco: le immagini si leggono per mandarle come immagini
+  async function addPaths(paths) {
+    for (const p of paths || []) {
+      const img = IMAGE_EXT.test(p) && api.readImage ? await api.readImage(p) : null
+      if (img) await addImage(`data:${img.mediaType};base64,${img.data}`, img.mediaType, String(p).split(/[\\/]/).pop())
+      else addPath(p)
+    }
+    if (part('input')) part('input').focus()
+  }
+
+  // Incollare un'immagine (uno screenshot) o dei file copiati in Esplora file; il testo si incolla come sempre
+  document.addEventListener('paste', (e) => {
+    if (!e.target.matches || !e.target.matches('[data-part="input"]')) return
+    const files = [...((e.clipboardData && e.clipboardData.files) || [])]
+    if (!files.length) return
+    e.preventDefault()
+    addFiles(files)
+  })
+  // Trascinare file sulla finestra
+  const dragsFiles = (e) => e.dataTransfer && [...e.dataTransfer.types].includes('Files')
+  document.addEventListener('dragover', (e) => {
+    if (!dragsFiles(e)) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    document.body.classList.add('dropping')
+  })
+  document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('dropping') })
+  document.addEventListener('drop', (e) => {
+    document.body.classList.remove('dropping')
+    if (!dragsFiles(e)) return
+    e.preventDefault()
+    addFiles([...e.dataTransfer.files])
+  })
 
   api.onDelta((d) => {
     const r = startReply()
@@ -989,7 +1169,7 @@
         if (history[k].role !== 'tool' && ++texts === 40) { from = k; break }
       }
       for (const m of history.slice(from)) {
-        if (m.role === 'user') entry('you').querySelector('.text').textContent = m.text
+        if (m.role === 'user') fillYou(entry('you'), m.text, m.images || [])
         else if (m.role === 'assistant') setReplyText(entry('claude').querySelector('.text'), m.text)
         else if (m.role === 'output') add('cmd-output', '').textContent = m.text
         else if (m.role === 'tool') {
@@ -1014,6 +1194,7 @@
     send: sendMessage,
     stop: () => { api.stop(); labelled('error', 'stopped'); reply = null; setBusy(false) },
     hide: () => api.hide(),
+    attach: async () => addPaths(await api.chooseFiles()),
     quit: () => api.quit(),
     new: newChapter,
     sessions: showSessions,
@@ -1219,7 +1400,11 @@
       ],
       onAsk: on('onAsk'), onAskClosed: on('onAskClosed'),
       newChapter: async () => ++n,
-      send(text) {
+      pathForFile: (f) => `C:/Workspace/${f.name}`,
+      chooseFiles: async () => ['C:/Workspace/MapEditor/docs/specifiche.pdf', 'C:/Workspace/MapEditor/src/MapView.cpp'],
+      readImage: async () => null,
+      send(msg) {
+        const text = typeof msg === 'string' ? msg : msg.text || '(allegati)'
         if (text.startsWith('/')) {
           // I comandi finti: uno locale con la sua uscita, gli altri come una risposta
           if (/^\/usage/.test(text)) fire('onCommandOutput', 'Sessione corrente\n  Token in ingresso   12.408\n  Token in uscita     3.215\n  Costo stimato       0,21 $', 400)

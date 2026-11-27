@@ -78,6 +78,7 @@ c'è.
 | `data-part="log"` | Dove scorre la conversazione. Il motore vi aggiunge le voci (classe `item`); il resto del contenuto (per esempio il titolo del capitolo) resta |
 | `data-part="input"` | La `textarea` dove si scrive. Invio spedisce, Maiusc+Invio va a capo |
 | `data-part="input"` (menu) | Scrivendo `/` il motore apre il menu dei comandi (`.cmd-menu`, righe `.cmd`) sopra la penna, dentro il suo contenitore: il tema può ridisegnarlo nel suo CSS |
+| `data-part="attachments"` | La striscia degli allegati (`.attachment.image`, `.attachment.file`, ognuno con `.attachment-remove`). Se manca, il motore la crea subito prima della `textarea`, nel suo contenitore |
 | `data-part="folder"` | La cartella della conversazione: il motore ci mette un pulsante (`.folder-btn`) che apre il menu delle cartelle (`.folder-menu`) |
 | `data-part="hint"` | Il suggerimento sotto la penna, che cambia mentre Claude lavora |
 | `data-part="chapter-title"`, `data-part="chapter-date"` | Il titolo del capitolo, o della cronaca aperta, e la sua data |
@@ -96,7 +97,8 @@ Su un qualunque elemento cliccabile (anche più di uno per azione):
 | `sessions`, `sessions-close` | Apre e chiude le cronache in sovrimpressione |
 | `themes` | Apre il selettore dei temi: un pannello sopra il layout (dentro il primo elemento `data-solid`) con una scheda per tema, anteprima, nome e `description`. L'anteprima la disegna il motore coi disegni del tema: `paper`, poi `leather` o `roll` per la fascia in alto, e `trayIcon` |
 | `scene` | Notte ↔ giorno. Se l'elemento è vuoto, il motore ci scrive il nome dell'altra scena |
-| `hide`, `quit` | Nasconde la finestra; chiude l'app |
+| `attach` | Sceglie file o immagini dal disco da allegare al prossimo messaggio (incollare e trascinare funzionano sempre) |
+| `hide`, `quit` | Riduce a icona la finestra; chiude l'app |
 | `maximize`, `fullscreen` | Ingrandisce all'area di lavoro, o a tutto schermo; di nuovo, ripristina. Su un `.ctl.max` vuoto il motore disegna l'icona (un quadrato, due da ingrandita). Anche F11 e il doppio clic sulla testata |
 
 ### La finestra: `data-solid`, `data-drag`, `data-grip`

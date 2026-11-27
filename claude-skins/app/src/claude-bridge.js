@@ -109,6 +109,31 @@ function lineOf(text, needle) {
 }
 
 // Il testo semplice di un messaggio salvato: le parti di testo, senza azioni né risultati
+// I file allegati: in fondo al testo, un percorso per riga dentro <attached_files>. La pagina li riconosce e li mostra
+// come etichette, nella conversazione e nelle cronache riaperte
+function withFiles(text, files) {
+  const list = files.map((f) => String(f || '').trim()).filter(Boolean)
+  if (!list.length) return text
+  return `${text.trim()}\n\n<attached_files>\n${list.join('\n')}\n</attached_files>`.trimStart()
+}
+
+// Un messaggio con le immagini: un flusso di un solo messaggio, coi blocchi immagine prima del testo (come l'app desktop)
+function userMessage(text, images) {
+  const content = images.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mediaType, data: i.data } }))
+  if (text.trim()) content.push({ type: 'text', text })
+  return (async function* () {
+    yield { type: 'user', session_id: '', parent_tool_use_id: null, message: { role: 'user', content } }
+  })()
+}
+
+// Le immagini di un messaggio salvato, come indirizzi data: per le miniature
+function imagesOf(message) {
+  const content = message && message.content
+  if (!Array.isArray(content)) return []
+  return content.filter((b) => b && b.type === 'image' && b.source && b.source.type === 'base64' && b.source.data)
+    .map((b) => `data:${b.source.media_type};base64,${b.source.data}`)
+}
+
 function plainText(message) {
   const content = message && message.content
   if (typeof content === 'string') return content
@@ -262,9 +287,15 @@ class ClaudeBridge extends EventEmitter {
     resolve(allow ? { behavior: 'allow', updatedPermissions: always ? this.suggestions.get(id) : undefined } : { behavior: 'deny', message: 'La persona ha negato il permesso.' })
   }
 
-  async send(prompt) {
+  // Il messaggio della persona: testo, immagini ({ mediaType, data } in base64) e file (percorsi, che Claude apre da
+  // sé con i suoi strumenti). Con le immagini il messaggio parte come blocchi di contenuto, altrimenti come testo
+  async send(payload) {
     this.cancel()
-    if (!prompt.trim()) return
+    const msg = typeof payload === 'string' ? { text: payload } : payload || {}
+    const images = (msg.images || []).filter((i) => i && i.data && /^image\/(png|jpeg|gif|webp)$/.test(i.mediaType))
+    const text = withFiles(String(msg.text || ''), msg.files || [])
+    if (!text.trim() && !images.length) return
+    const prompt = images.length ? userMessage(text, images) : text
     let current = null
     this.suggestions = this.suggestions || new Map()
     try {
@@ -472,7 +503,8 @@ class ClaudeBridge extends EventEmitter {
         }
       }
       const text = plainText(m.message).trim()
-      if (!text) continue
+      const pics = imagesOf(m.message)
+      if (!text && !pics.length) continue
       // Un comando con /: si mostra come lo si era scritto
       const name = /<command-name>\s*\/?([^<\s]+)\s*<\/command-name>/.exec(text)
       if (name) {
@@ -487,7 +519,7 @@ class ClaudeBridge extends EventEmitter {
       }
       // Promemoria di sistema e notifiche non sono della persona
       if (/^<(command|local-command|system-reminder|task-notification)/.test(text)) continue
-      items.push({ role: 'user', text })
+      items.push(pics.length ? { role: 'user', text, images: pics } : { role: 'user', text })
     }
     return items
   }

@@ -211,6 +211,13 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
 - **Gli strumenti propri dell'app desktop** (browser integrato, avvio di altre sessioni, pannelli) dal rotolo non ci
   sono: Claude ha quelli di base di Claude Code, più i server MCP e i plugin della configurazione dell'utente.
 
+- **Allegati:** con immagini, `send()` passa a `query()` un flusso di un solo `SDKUserMessage` (blocchi `image` base64
+  prima del testo); senza, una stringa (che questa versione dell'SDK scrive comunque come messaggio utente su stdin,
+  quindi i server MCP in-process funzionano anche così). I file vanno come percorsi in `<attached_files>` in fondo al
+  testo, e la pagina li rimostra come etichette. Il percorso di un file trascinato o incollato viene da
+  `webUtils.getPathForFile` nel preload (`File.path` non c'è più). Da verificare su Windows: con la finestra che lascia
+  passare i clic (`setIgnoreMouseEvents`), il trascinamento da Esplora file potrebbe non arrivare se il cursore non è
+  già "dentro" una parte disegnata; incolla e "+" funzionano comunque.
 - **Sessioni e app desktop** (dai report del 27/11, poi tolti): senza `CLAUDE_CODE_ENTRYPOINT` l'SDK segna le
   sessioni `sdk-ts`, e gli elenchi (il `/resume` del terminale, le app) le scartano come programmatiche: ora il ponte
   passa `cli` (configurabile con `entrypoint` in config.json). Le sessioni del desktop sono `claude-desktop`; se il

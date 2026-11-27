@@ -1,5 +1,5 @@
 // Il ponte fra la pagina e il processo principale: solo queste funzioni, niente accesso diretto a Node
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer, webUtils } = require('electron')
 
 const listen = (channel) => (cb) => ipcRenderer.on(channel, (_e, payload) => cb(payload))
 
@@ -19,7 +19,12 @@ contextBridge.exposeInMainWorld('skins', {
   setMode: (mode) => ipcRenderer.send('mode:set', mode),
   openLink: (url) => ipcRenderer.send('link:open', url),
   newChapter: () => ipcRenderer.invoke('chapter:new'),
-  send: (text) => ipcRenderer.send('chat:send', text),
+  send: (msg) => ipcRenderer.send('chat:send', msg),
+  // Gli allegati: il percorso sul disco di un file trascinato o incollato (vuoto se non ne ha), la scelta dal disco,
+  // la lettura di un'immagine
+  pathForFile: (file) => { try { return webUtils.getPathForFile(file) || '' } catch { return '' } },
+  chooseFiles: () => ipcRenderer.invoke('files:choose'),
+  readImage: (p) => ipcRenderer.invoke('file:image', p),
   stop: () => ipcRenderer.send('chat:stop'),
   setTrayIcon: (dataUrl) => ipcRenderer.send('tray:icon', dataUrl),
   answer: (id, allow, always) => ipcRenderer.send('perm:answer', { id, allow, always }),

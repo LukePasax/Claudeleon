@@ -205,6 +205,7 @@
         <div class="box">
           <textarea data-part="input" data-s-placeholder="placeholder" spellcheck="false"></textarea>
           <div class="row">
+            <button class="attach-btn" data-action="attach" data-s-title="attachTip">+</button>
             <div class="modes" data-part="modes"></div>
             <div class="folder" data-part="folder"></div>
             <span class="sp"></span>

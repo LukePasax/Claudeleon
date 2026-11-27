@@ -366,7 +366,22 @@ function registerIpc() {
     saveConfig()
     return config.chapter
   })
-  ipcMain.on('chat:send', (_e, text) => bridge.send(String(text || '')))
+  // Il messaggio: testo, o { text, images, files } con gli allegati
+  ipcMain.on('chat:send', (_e, msg) => bridge.send(msg && typeof msg === 'object' ? msg : String(msg || '')))
+  // Il pulsante "allega": file e immagini dal disco
+  ipcMain.handle('files:choose', async () => {
+    const r = await dialog.showOpenDialog(win, { title: 'Allega file o immagini', defaultPath: bridge.sessionCwd || bridge.workdir, properties: ['openFile', 'multiSelections'] })
+    return r.canceled ? [] : r.filePaths
+  })
+  // Un'immagine dal disco, per mandarla a Claude come immagine e non come percorso
+  ipcMain.handle('file:image', (_e, p) => {
+    const types = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' }
+    const mediaType = types[path.extname(String(p || '')).toLowerCase()]
+    try {
+      if (!mediaType || fs.statSync(p).size > 30 * 1024 * 1024) return null
+      return { mediaType, data: fs.readFileSync(p).toString('base64') }
+    } catch { return null }
+  })
   ipcMain.on('chat:stop', () => bridge.cancel())
   ipcMain.on('perm:answer', (_e, { id, allow, always }) => bridge.answer(id, !!allow, !!always))
   ipcMain.handle('sessions:list', () => bridge.sessions())

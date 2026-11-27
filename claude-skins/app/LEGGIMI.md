@@ -40,6 +40,11 @@ npm 11 altrimenti non arriva.
   un'anteprima di ogni tema, oppure dal vassoio, **Tema**. Cambia sul posto (forma della finestra compresa) senza perdere la conversazione;
   Claude prende il tono del nuovo tema dal messaggio successivo. Il pulsante "Accendi le stelle"/"Apri le imposte" (o "notte"/"giorno")
   passa da una scena all'altra.
+- **Allegati:** immagini e file, come nell'app desktop. Si incolla uno screenshot (Ctrl+V) o dei file copiati in
+  Esplora file, si trascinano file sulla finestra, o si sceglie col pulsante "+" accanto ai modi. Sopra la penna
+  compaiono come miniature ed etichette, ciascuna con la sua ×. Le immagini partono come immagini (rimpicciolite oltre
+  1568 px di lato); gli altri file partono come percorsi in fondo al messaggio (`<attached_files>`) e Claude li apre
+  coi suoi strumenti. Nella conversazione e nelle cronache riaperte le immagini restano in miniatura.
 - **Conversazione:** Invio spedisce, Maiusc+Invio va a capo. "nuovo capitolo" ricomincia la conversazione; quella
   corrente prosegue fra un avvio e l'altro.
 - **Claude Code:** comandato con l'Agent SDK (`@anthropic-ai/claude-agent-sdk`) sopra

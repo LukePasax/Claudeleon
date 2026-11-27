@@ -286,3 +286,27 @@ body.maximized .ctl.max::before, body.fullscreen .ctl.max::before { -webkit-mask
   background: var(--ctl-bg); color: var(--ctl-ink); border-radius: var(--radius-small);
 }
 .ctl:hover { background: var(--ctl-hover); color: var(--ink); }
+
+/* Gli allegati: la striscia sopra la penna (immagini in miniatura, file come etichette, ciascuno con la sua ×), il
+   pulsante "+" e, nella conversazione, le miniature dentro la domanda */
+.attachments { display: flex; flex-wrap: wrap; gap: 10px; margin: 2px 0 8px; }
+.attachment { position: relative; display: inline-flex; align-items: center; border: var(--line) solid var(--edge-light); border-radius: var(--radius-small); background: var(--code); }
+.attachment.image img { display: block; height: 58px; max-width: 140px; object-fit: cover; border-radius: inherit; }
+.attachment.file { gap: 6px; padding: 4px 10px; font-size: var(--small-size); max-width: 240px; color: var(--ink); }
+.attachment.file::before { content: ''; flex: none; width: 9px; height: 11px; border: 1.5px solid currentColor; border-radius: 1px; opacity: 0.6; clip-path: polygon(0 0, 65% 0, 100% 30%, 100% 100%, 0 100%); }
+.attachment.file .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.attachments .attachment.file { padding-right: 14px; }
+.attachment-remove {
+  position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; padding: 0; border-radius: 50%; cursor: pointer;
+  display: grid; place-items: center; font-size: 13px; line-height: 1; border: none; background: var(--ink); color: var(--bg); opacity: 0.85;
+}
+.attachment-remove:hover { opacity: 1; }
+.attach-btn {
+  flex: none; width: 28px; height: 28px; padding: 0; border-radius: 50%; cursor: pointer; font-size: 18px; line-height: 1;
+  display: grid; place-items: center; background: none; color: var(--ink-soft); border: var(--line) solid var(--edge-light);
+}
+.attach-btn:hover { color: var(--ink); border-color: var(--ink-soft); }
+.sent-attachments { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: flex-end; gap: 6px; margin: 2px 0 6px; white-space: normal; }
+.sent-attachments img { display: block; max-height: 120px; max-width: 220px; border-radius: var(--radius-small); }
+/* Mentre si trascinano file sulla finestra la penna si illumina */
+body.dropping [data-part="input"] { outline: 2px dashed var(--gold); outline-offset: 4px; }

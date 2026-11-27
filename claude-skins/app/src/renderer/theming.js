@@ -53,6 +53,11 @@
     folderFirst: 'In quale cartella lavoriamo? Scegline una e il messaggio parte.',
     folderNew: 'Una conversazione resta nella sua cartella: sceglierne un\'altra apre un capitolo nuovo.',
     folderOther: 'Scegli un\'altra cartella…',
+    // Gli allegati
+    attachTip: 'Allega file o immagini (anche incollando o trascinando)',
+    attachRemove: 'Togli',
+    attachNoPath: '«{name}» non ha un percorso sul disco: trascinalo da Esplora file o sceglilo col pulsante +.',
+    attachFailed: 'Non riesco a leggere l\'immagine «{name}».',
     // I comandi con /
     cmdNone: 'Nessun comando con questo nome.',
     cmdLoading: 'Chiedo i comandi a Claude Code...',
