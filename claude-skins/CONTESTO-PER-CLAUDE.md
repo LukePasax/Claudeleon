@@ -70,7 +70,17 @@ del tema, licenza OFL. Il capolettera è una grande iniziale onciale rossa senza
 solo su un primo paragrafo lungo (classe `long-start`, da 160 caratteri): su una frase breve staccava la prima
 lettera ("cco quanto mi chiedi"). Cuoio della copertina appena granulato.
 
-**Più Terra di Mezzo (novembre 2026).** L'utente trovava il Libro Rosso poco riconoscibile. Aggiunti: la mappa del
+**Lo scrittoio (27 novembre 2026).** Il libro non convinceva come struttura: dopo i mockup (mappa, scrittoio, pietra,
+miniatura; quattro stili: pixel, vettoriale, acquerello, incisione) e una variante "soft" vicina all'app desktop,
+l'utente ha scelto lo scrittoio di Casa Baggins. Terra di Mezzo è stato riscritto da capo: niente kit pixel, disegni
+ad acquerello in SVG (feTurbulence + feDisplacementMap per i bordi rotti, mix-blend-mode multiply per le stesure,
+grana della carta) generati come stringhe in `theme.js`. Pareti e finestra tonda sono immagini di sfondo `data:`;
+il foglio dipende dalla misura, quindi si disegna in un canvas (SVG → Image → canvas) che il CSS allarga mentre si
+ridimensiona, e si ridisegna 140 ms dopo che la misura si ferma. Gli indirizzi `blob:` non vanno: da una pagina
+`file://` il CSS non li carica. La candela è SVG in linea: la fiamma tremola in CSS, più svelta con `body.busy`. La
+mappa del viaggio, l'Anello e il resto della pixel art del libro sono stati tolti (stanno nella storia di git).
+
+**Più Terra di Mezzo (novembre 2026, poi sostituito dallo scrittoio).** L'utente trovava il Libro Rosso poco riconoscibile. Aggiunti: la mappa del
 viaggio sulla pagina sinistra (pixel art procedurale nello stile delle mappe dei libri, non copiata: mare, Contea,
 Vecchia Foresta, Montagne Nebbiose, Bosco Atro, Lothlórien, Anduin, Mordor e il Monte Fato che arde), con il
 viandante che avanza di una tappa a ogni messaggio del capitolo (Hobbiville, Brea, Colle Vento, Gran Burrone,
@@ -135,11 +145,10 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
     la chiave in `data-s`; i canvas `data-art` e gli sfondi `data-art-bg` si ridisegnano a ogni cambio di misura.
   - `style.css` è comune a tutti i temi ma senza forma: variabili, voci della conversazione, pulsanti, righe delle
     cronache, barre di scorrimento.
-  - `themes/<id>/` sono i temi. **Terra di Mezzo**, il predefinito: il Libro Rosso aperto in cuoio con titolo
-    d'oro e spille a foglia, pagina degli annali e pagina della conversazione, dorso cucito, segnalibro verde, rune
-    inventate, calendario della Contea, l'Anello come lume (lettere di fuoco mentre Claude lavora), palantír, fiala
-    di luce, "Non passerai" per il rifiuto, uno scriba di Gran Burrone come persona. **Pergamena**: il rotolo, con
-    i disegni di `Pixel.lib`.
+  - `themes/<id>/` sono i temi. **Terra di Mezzo**, il predefinito: lo scrittoio di Casa Baggins ad acquerello
+    (pareti di legno, finestra tonda sulla Contea, foglio coi bordi rotti, candela), con la struttura dell'app
+    desktop; calendario della Contea, frasi del cammino, "Non passerai" per il rifiuto, uno scriba di Gran Burrone
+    come persona. **Moderno**: pulito, barra laterale, icone SVG.
 
 ## Lezioni pratiche (costate tempo)
 

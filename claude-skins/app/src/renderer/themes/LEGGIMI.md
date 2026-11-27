@@ -19,7 +19,7 @@ il tono dal messaggio successivo.
 
 ```
 themes/
-  terra-di-mezzo/   pixel art: il Libro Rosso aperto, annali a sinistra, conversazione a destra
+  terra-di-mezzo/   acquerello in SVG: lo scrittoio di Casa Baggins, con la struttura dell'app desktop
   moderno/          niente pixel: un riquadro pulito con l'ombra, barra laterale, icone SVG, agganci
 kits/
   pixel.css         lo stile pixel condiviso (caratteri, gradini, palette di pergamena): lo includono i temi pixel
@@ -102,7 +102,7 @@ Su un qualunque elemento cliccabile (anche più di uno per azione):
 ### La finestra: `data-solid`, `data-drag`, `data-grip`
 
 - `data-solid`: i clic sono per l'app sopra questi elementi e attraversano la finestra altrove. Di solito va sul
-  contenitore principale e su ogni pezzo che sporge, come il segnalibro del Libro Rosso.
+  contenitore principale e su ogni pezzo che sporge, come un segnalibro che pende sotto il libro.
 - `data-drag`: tenendo premuto qui si sposta la finestra. Fanno eccezione i pulsanti, i campi, le righe delle
   cronache e gli elementi con `data-no-drag`.
 - `data-grip`: trascinando da qui si ridimensiona la finestra, dall'angolo in basso a destra.

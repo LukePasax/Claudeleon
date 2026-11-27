@@ -1,9 +1,9 @@
 # Claude Skins
 
-Claude in una finestra in pixel art, grande come l'app desktop e (se si vuole) sempre in primo piano. Forma e
-aspetto vengono dal tema. Quello di partenza è **Terra di Mezzo**: il Libro Rosso aperto, con gli annali a sinistra
-e la conversazione a destra. C'è anche **Moderno**,
-pulito come un'app di oggi, senza pixel art. Altri temi si
+Claude in una finestra a temi, grande come l'app desktop e (se si vuole) sempre in primo piano. Forma e
+aspetto vengono dal tema. Quello di partenza è **Terra di Mezzo**: lo scrittoio di Casa Baggins ad acquerello,
+con la struttura dell'app desktop (annali a sinistra sotto la finestra tonda, conversazione sul foglio, candela
+accanto alla penna). C'è anche **Moderno**, pulito come un'app di oggi. Altri temi si
 aggiungono come cartelle in `src/renderer/themes/`, ognuno con il proprio scheletro (guida:
 [`src/renderer/themes/LEGGIMI.md`](src/renderer/themes/LEGGIMI.md)).
 
@@ -32,10 +32,10 @@ npm 11 altrimenti non arriva.
   tutto schermo; di nuovo, si ripristina. Spostarla da ingrandita la riporta alla sua misura.
 - **Sempre in primo piano:** dal vassoio si può spegnere, ora che la finestra è grande.
 - **Scorciatoia:** `Ctrl+Alt+P` mostra o nasconde la finestra da qualunque programma; c'è anche l'icona nel vassoio.
-- **Tema:** dalla finestra ("altri libri" in fondo alla pagina sinistra del Libro Rosso,
+- **Tema:** dalla finestra ("Altre stanze" in fondo alla barra dello scrittoio,
   "Temi" in fondo alla barra laterale di Moderno), con
   un'anteprima di ogni tema, oppure dal vassoio, **Tema**. Cambia sul posto (forma della finestra compresa) senza perdere la conversazione;
-  Claude prende il tono del nuovo tema dal messaggio successivo. Il pulsante "stelle"/"Contea" (o "notte"/"giorno")
+  Claude prende il tono del nuovo tema dal messaggio successivo. Il pulsante "Accendi le stelle"/"Apri le imposte" (o "notte"/"giorno")
   passa da una scena all'altra.
 - **Conversazione:** Invio spedisce, Maiusc+Invio va a capo. "nuovo capitolo" ricomincia la conversazione; quella
   corrente prosegue fra un avvio e l'altro.
@@ -65,8 +65,8 @@ npm 11 altrimenti non arriva.
 
   Le domande compaiono nella conversazione con Permetti, Sempre e Nega, e con le differenze se riguardano un file.
 - **Cronache (annali):** le sessioni di Claude Code di tutte le cartelle, le più recenti prima, come nella barra
-  laterale dell'app desktop (le sue comprese, coi loro titoli); accanto alla data c'è la cartella. Nel Libro Rosso
-  sono sempre visibili sulla pagina sinistra, in Moderno nella barra laterale. Aprendone una si vedono
+  laterale dell'app desktop (le sue comprese, coi loro titoli); accanto alla data c'è la cartella. Sono sempre
+  visibili nella barra laterale. Aprendone una si vedono
   gli ultimi 40 messaggi con le azioni di Claude e il loro esito, le modifiche ai file (chiuse: si aprono con un
   clic sulla riga), i comandi con `/` e la loro uscita; i messaggi dopo la continuano nella sua cartella. Non aprire qui una sessione che è aperta
   anche nell'app desktop.

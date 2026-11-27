@@ -1,18 +1,11 @@
-// Tema "Terra di Mezzo": la finestra è il Libro Rosso aperto, la cronaca dei viaggi degli hobbit. Copertina in cuoio
-// rosso con il titolo d'oro e spille a foglia; a sinistra la pagina del capitolo e degli annali (le sessioni, sempre
-// in vista come nella barra laterale dell'app desktop), a destra la conversazione; un segnalibro verde pende sotto.
-// Rune al posto del tratteggio, la data nel calendario della Contea, l'Anello come lume (le lettere di fuoco
-// compaiono mentre Claude lavora), il palantír per i messaggi, la fiala di luce per le ricerche. Tutto disegnato qui
-// a pixel: nessuna immagine, logo o testo preso dai libri o dai film; le rune sono segni inventati, non un alfabeto.
+// Tema "Terra di Mezzo": lo scrittoio di Casa Baggins. La struttura è quella dell'app desktop (a sinistra gli annali,
+// cioè le conversazioni, al centro la conversazione in una colonna, in basso la casella con modo e cartella), dentro
+// una stanza scavata nella collina: pareti di legno, la finestra tonda sulla Contea (di notte le stelle e una finestra
+// accesa), il foglio di carta con i bordi rotti, una candela accanto alla penna che arde più viva mentre Claude lavora.
+// Lo stile è l'acquerello: stesure trasparenti dai bordi irregolari (filtri SVG), linee d'inchiostro, grana della
+// carta. I disegni si fanno in SVG e diventano immagini di sfondo: il browser li dipinge una volta sola. Nessuna
+// immagine, logo o testo preso dai libri o dai film.
 ;(function () {
-  // Il viaggio: le tappe dalla Contea al Monte Fato, in frazioni della mappa (x da ovest, y da nord). Il viandante
-  // avanza di una tappa a ogni messaggio del capitolo; un capitolo nuovo lo riporta a Hobbiville
-  const STOPS = [
-    ['Hobbiville', 0.07, 0.62], ['Brea', 0.19, 0.56], ['Colle Vento', 0.27, 0.49], ['Gran Burrone', 0.36, 0.36],
-    ['Moria', 0.45, 0.58], ['Lothlórien', 0.53, 0.5], ['Amon Hen', 0.63, 0.66], ['le Paludi Morte', 0.71, 0.55],
-    ["l'Ithilien", 0.76, 0.75], ['Cirith Ungol', 0.83, 0.62], ['il Monte Fato', 0.9, 0.45],
-  ]
-
   // Le frasi del cammino, una a caso mentre Claude lavora: luoghi e cose della Terra di Mezzo, nessuna citazione
   const ROAD = [
     'Lo scriba attraversa la Vecchia Foresta…', 'Lo scriba si ferma al Puledro Impennato…',
@@ -23,138 +16,223 @@
     'Lo scriba consulta le mappe dei Nani…', 'Lo scriba aspetta il passaggio delle aquile…',
   ]
 
-  // Il viandante: la tappa a cui è arrivato (i messaggi della persona nel capitolo), sulla mappa e sotto
-  function updateJourney(ctx) {
-    const map = ctx.root.querySelector('.journey-map')
-    const place = ctx.root.querySelector('.journey-place')
-    if (!map) return
-    const n = ctx.root.querySelectorAll('[data-part="log"] > .entry.you').length
-    const step = Math.min(n, STOPS.length - 1)
-    map.dataset.step = String(step)
-    if (place) place.textContent = ctx.t('journeyAt', { place: STOPS[step][0] })
-    ctx.redraw()
+  // --- Il pennello ad acquerello, in stringhe SVG ---
+  // brush(seed) dà wash (stesura trasparente coi bordi rotti e il pigmento che si raccoglie sul bordo), line (inchiostro
+  // appena tremolante), sky (sfumatura), paper (grana) e svg(w, h) che chiude il disegno
+  function brush(seed) {
+    const parts = []
+    const defs = `
+      <filter id="w" x="-15%" y="-15%" width="130%" height="130%"><feTurbulence type="fractalNoise" baseFrequency=".03" numOctaves="3" seed="${seed}" result="t"/><feDisplacementMap in="SourceGraphic" in2="t" scale="8" result="d"/><feGaussianBlur in="d" stdDeviation=".5"/></filter>
+      <filter id="l"><feTurbulence type="turbulence" baseFrequency=".05" numOctaves="2" seed="${seed + 1}" result="t"/><feDisplacementMap in="SourceGraphic" in2="t" scale="2.2"/></filter>
+      <filter id="p" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".75" numOctaves="3" seed="2"/><feColorMatrix values="0 0 0 0 .45  0 0 0 0 .35  0 0 0 0 .22  0 0 0 .09 0"/></filter>`
+    let n = 0
+    return {
+      raw(s) { parts.push(s) },
+      // solid: stesura normale invece che moltiplicata, per le cose chiare su fondo scuro
+      wash(d, col, op = 0.55, edge = true, solid = false) {
+        parts.push(`<g filter="url(#w)"${solid ? '' : ' style="mix-blend-mode:multiply"'}><path d="${d}" fill="${col}" opacity="${op}"/>${edge ? `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.6" opacity="${Math.min(1, op + 0.25)}"/>` : ''}</g>`)
+      },
+      line(d, o = {}) {
+        parts.push(`<path d="${d}" fill="none" stroke="${o.color || '#3a2814'}" stroke-width="${o.width || 1.1}" opacity="${o.opacity ?? 0.8}" stroke-linecap="round" filter="url(#l)"/>`)
+      },
+      sky(x, y0, w, y1, col, op = 0.6) {
+        const id = 's' + n++
+        parts.push(`<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity="${op}"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient><rect x="${x}" y="${y0}" width="${w}" height="${y1 - y0}" fill="url(#${id})"/>`)
+      },
+      paper(x, y, w, h) { parts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" filter="url(#p)"/>`) },
+      svg(w, h, extra = '') {
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"${extra}><defs>${defs}</defs>${parts.join('')}</svg>`
+      },
+    }
+  }
+  const url = (svg) => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
+  // Un generatore di numeri ripetibile: lo stesso disegno a ogni avvio
+  const seeded = (s) => () => (s = (s * 16807) % 2147483647) / 2147483647
+
+  // Le pareti di legno: assi verticali, una piastrella che si ripete in orizzontale
+  function wall(night) {
+    const W = 444
+    const H = 1600
+    const B = brush(8)
+    const rnd = seeded(9)
+    B.raw(`<rect width="${W}" height="${H}" fill="${night ? '#3a2416' : '#6e4a2c'}"/>`)
+    for (let x = 0; x < W; x += 74) {
+      B.wash(`M${x + 2} -10 H${x + 72} V${H + 10} H${x + 2}Z`, ['#8a5a32', '#7a4e2a', '#946238'][Math.floor(rnd() * 3)], night ? 0.3 : 0.45, false)
+      for (let k = 0; k < 9; k++) { const xx = x + 8 + rnd() * 58; const y = rnd() * H; B.line(`M${xx} ${y} q ${(rnd() - 0.5) * 10} 200 0 ${300 + rnd() * 300}`, { color: '#4a2e18', opacity: 0.25, width: 0.8 }) }
+      B.line(`M${x} -10 V${H + 10}`, { color: '#2a180c', opacity: 0.5, width: 1.6 })
+    }
+    if (night) B.raw(`<rect width="${W}" height="${H}" fill="#0c1030" opacity=".28"/>`)
+    B.paper(0, 0, W, H)
+    return B.svg(W, H)
   }
 
-  // Il fondo della mappa (mare, montagne, boschi, fiume, Mordor) non cambia: si disegna una volta per misura e scena
-  const mapCache = new Map()
-  function mapBase(P, w, h, pal) {
-    const key = `${w}x${h}|${pal.gold}|${pal.inkSoft}`
-    if (mapCache.has(key)) return mapCache.get(key)
-    if (mapCache.size > 8) mapCache.clear()
-    const c = P.canvas(w, h)
-    const g = c.getContext('2d')
-    const X = (f) => Math.round(f * (w - 1))
-    const Y = (f) => Math.round(f * (h - 1))
-    const ink = pal.inkSoft
-    const rand = P.seeded(21)
-    // Il mare a ovest, a onde
-    for (let y = 3; y < h - 3; y += 4) { P.px(g, 2, y, pal.blue); P.px(g, 3, y + 1, pal.blue); P.px(g, 4, y, pal.blue) }
-    // Una montagna: punta e due fianchi, il destro in ombra
-    const mountain = (x, y, col, shade) => { P.px(g, x, y, col); P.px(g, x - 1, y + 1, col); P.px(g, x + 1, y + 1, shade); P.px(g, x - 2, y + 2, col); P.px(g, x + 2, y + 2, shade) }
-    // Le Montagne Nebbiose, da nord a sud
-    for (let f = 0.06; f < 0.86; f += 0.07) mountain(X(0.44 + (rand() - 0.5) * 0.03), Y(f), ink, pal.gold)
-    // Mordor: le due catene e il recinto a ovest, scure; dentro, cenere
-    for (let f = 0.79; f < 0.98; f += 0.045) { mountain(X(f), Y(0.26), ink, pal.red); mountain(X(f), Y(0.74), ink, pal.red) }
-    for (let f = 0.3; f < 0.74; f += 0.09) mountain(X(0.79), Y(f), ink, pal.red)
-    for (let k = 0; k < 18; k++) P.px(g, X(0.82 + rand() * 0.14), Y(0.34 + rand() * 0.34), pal.red)
-    // Un albero: chioma di due pixel e tronco
-    const tree = (x, y, col) => { P.px(g, x, y, col); P.px(g, x + 1, y, col); P.px(g, x, y + 1, ink) }
-    const wood = (cx, cy, rx, ry, col, count) => { for (let k = 0; k < count; k++) { const a = rand() * Math.PI * 2; const r = Math.sqrt(rand()); tree(X(cx + Math.cos(a) * rx * r), Y(cy + Math.sin(a) * ry * r), col) } }
-    wood(0.14, 0.68, 0.035, 0.08, pal.leaf.v, 7)          // la Vecchia Foresta
-    wood(0.63, 0.2, 0.06, 0.13, pal.leaf.d, 14)           // Bosco Atro
-    wood(0.53, 0.5, 0.03, 0.07, pal.gold, 7)              // Lothlórien, alberi d'oro
-    // La Contea: colline verdi
-    for (const [fx, fy] of [[0.05, 0.55], [0.1, 0.7], [0.04, 0.72]]) { P.px(g, X(fx), Y(fy), pal.leaf.v); P.px(g, X(fx) + 1, Y(fy) - 1, pal.leaf.l); P.px(g, X(fx) + 2, Y(fy), pal.leaf.v) }
-    // L'Anduin, da nord a sud, a serpentina
-    for (let y = 2; y < h - 2; y++) P.px(g, X(0.6 + 0.05 * (y / h)) + Math.round(Math.sin(y / 3) * 1.2), y, pal.blue)
-    // La rosa dei venti, in basso a destra
-    const rx = w - 6
-    const ry = h - 6
-    P.px(g, rx, ry - 3, pal.goldLight); P.px(g, rx, ry - 2, pal.gold); P.px(g, rx, ry + 2, pal.gold); P.px(g, rx - 2, ry, pal.gold); P.px(g, rx + 2, ry, pal.gold); P.px(g, rx, ry, pal.goldLight)
-    // La cornice
-    g.fillStyle = ink
-    g.fillRect(0, 0, w, 1); g.fillRect(0, h - 1, w, 1); g.fillRect(0, 0, 1, h); g.fillRect(w - 1, 0, 1, h)
-    mapCache.set(key, c)
-    return c
+  // La finestra tonda sulla Contea: colline, un albero, la porta tonda di un'altra casa; di notte stelle, luna e una
+  // finestra accesa
+  function porthole(night) {
+    const W = 740
+    const H = 330
+    const B = brush(4)
+    const rnd = seeded(5)
+    const frame = `M0 ${H} V165 A 165 165 0 0 1 165 0 H575 A 165 165 0 0 1 ${W} 165 V${H}`
+    B.raw(`<clipPath id="c"><path d="${frame}Z"/></clipPath><g clip-path="url(#c)">`)
+    B.raw(`<rect width="${W}" height="${H}" fill="${night ? '#1c2448' : '#f6efdf'}"/>`)
+    if (night) {
+      for (let i = 0; i < 80; i++) B.raw(`<circle cx="${rnd() * W}" cy="${rnd() * 180}" r="${rnd() * 2.4 + 0.6}" fill="#fff" opacity="${0.5 + rnd() * 0.5}"/>`)
+      B.wash('M590 80 a 34 34 0 1 1 0 .1z', '#f6efc8', 0.9, false, true)
+    } else {
+      B.sky(0, 0, W, 240, '#5ea8dc', 0.6)
+      B.wash('M590 84 a 38 38 0 1 1 0 .1z', '#ffd24a', 0.55)
+    }
+    B.wash(`M-10 ${H} V 190 Q 130 110 300 180 T 560 160 T 760 140 V${H}Z`, night ? '#2e4a3a' : '#9ccf6a', 0.7)
+    B.wash(`M-10 ${H} V 250 Q 170 190 360 230 T 760 220 V${H}Z`, night ? '#1e3428' : '#5e9a3e', 0.7)
+    B.wash('M200 200 a 30 30 0 1 1 60 0 a 30 30 0 1 1 -60 0', night ? '#16281c' : '#3f8a2a', 0.75)
+    B.line('M230 262 V 214 M230 236 l -12 -12 M230 244 l 12 -10', { opacity: 0.6, width: 2 })
+    B.wash('M430 250 a 46 46 0 0 1 92 0 z', night ? '#16281c' : '#2e5c2a', 0.85)
+    B.raw(`<circle cx="476" cy="232" r="7" fill="${night ? '#ffd27a' : '#c9a646'}"/>`)
+    if (night) {
+      B.wash('M540 226 h 18 v 16 h -18z', '#ffd27a', 0.9, false, true)
+      B.raw('<circle cx="549" cy="234" r="26" fill="#ffd27a" opacity=".14"/>')
+    }
+    B.wash('M80 326 C 200 290 300 316 430 290', '#cbb184', 0.7)
+    B.paper(0, 0, W, H)
+    B.raw('</g>')
+    B.raw(`<path d="${frame}Z" fill="none" stroke="#2e5c2a" stroke-width="22"/><path d="M370 0 V${H} M0 165 H${W}" stroke="#2e5c2a" stroke-width="12"/><path d="${frame}Z" fill="none" stroke="#1c3a1a" stroke-width="3"/>`)
+    return B.svg(W, H, ' preserveAspectRatio="xMidYMid meet"')
   }
+
+  // Il foglio, della misura esatta dell'elemento: carta con i bordi rotti e un alone più scuro verso il margine
+  function sheet(w, h, night) {
+    const B = brush(30)
+    const m = 4
+    B.wash(`M${m} ${m} H${w - m} V${h - m} H${m}Z`, night ? '#eadcb8' : '#f4ead2', 1, true, true)
+    B.wash(`M${m} ${m} H${w - m} V${h - m} H${m}Z M24 24 V${h - 24} H${w - 24} V24Z`, '#c9a46a', 0.2, false)
+    B.paper(m, m, w - 2 * m, h - 2 * m)
+    return B.svg(w, h, ' preserveAspectRatio="none"')
+  }
+
+  // La candela accanto alla penna: la fiamma è un gruppo a parte, che il CSS fa tremolare (più viva mentre Claude
+  // lavora). Disegnata a tinte piene: è piccola e si muove, i filtri non servono
+  const CANDLE = `<svg viewBox="0 0 46 110" xmlns="http://www.w3.org/2000/svg">
+    <defs><radialGradient id="cg"><stop offset="0" stop-color="#ffd27a" stop-opacity=".55"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient></defs>
+    <circle class="glow" cx="23" cy="32" r="23" fill="url(#cg)"/>
+    <ellipse cx="23" cy="104" rx="19" ry="5" fill="#c9a646"/><ellipse cx="23" cy="103" rx="19" ry="4" fill="none" stroke="#8a6a20" stroke-width=".8" opacity=".6"/>
+    <path d="M15 50 h16 v52 h-16z" fill="#f3ead2"/><path d="M25 50 h6 v52 h-6z" fill="#c9b88f" opacity=".6"/>
+    <path d="M17 50 q 3 10 0 16 h 3 q 2 -7 -1 -16z" fill="#e0d4b4"/>
+    <path d="M15 50 h16 v52 h-16z" fill="none" stroke="#7a6243" stroke-width=".8" opacity=".5"/>
+    <path d="M23 50 v-6" stroke="#3a2814" stroke-width="1.4"/>
+    <g class="flame"><path d="M23 18 C 31 28 31 37 23 44 C 15 37 15 28 23 18Z" fill="#ffb347"/><path d="M23 28 C 26 33 26 38 23 41 C 20 38 20 33 23 28Z" fill="#fff1b0"/></g>
+  </svg>`
+
+  // Dipinge le parti con l'acquerello della scena. Il foglio dipende dalla misura: si ridipinge (con calma) quando
+  // cambia; nel frattempo il disegno di prima si allarga
+  function paint(ctx) {
+    const night = ctx.scene !== 'giorno'
+    const desk = ctx.root.querySelector('.desk')
+    const hole = ctx.root.querySelector('.porthole')
+    if (desk) desk.style.backgroundImage = url(wall(night))
+    if (hole) hole.style.backgroundImage = url(porthole(night))
+    paintSheet(ctx)
+  }
+  function paintSheet(ctx) {
+    const el = ctx.root.querySelector('.sheet-paper')
+    if (!el) return
+    const w = Math.round(el.offsetWidth)
+    const h = Math.round(el.offsetHeight)
+    if (!w || !h) return
+    const key = `${w}x${h}|${ctx.scene}`
+    if (el.dataset.painted === key) return
+    el.dataset.painted = key
+    // Un SVG coi filtri, allargato, si ridipingerebbe a ogni fotogramma del ridimensionamento: lo si fissa una volta
+    // in un canvas (alla densità dello schermo), che il CSS allarga a tutto il foglio
+    const img = new Image()
+    img.onload = () => {
+      if (el.dataset.painted !== key) return
+      const k = Math.min(2, window.devicePixelRatio || 1)
+      let c = el.querySelector('canvas')
+      if (!c) { c = document.createElement('canvas'); el.appendChild(c) }
+      c.width = Math.round(w * k)
+      c.height = Math.round(h * k)
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
+    }
+    img.src = `data:image/svg+xml,${encodeURIComponent(sheet(w, h, ctx.scene !== 'giorno'))}`
+  }
+
+  // Un'icona a linea d'inchiostro, 24×24
+  const icon = (pal, body) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${pal.inkSoft}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`
 
   const theme = {
     id: 'terra-di-mezzo',
     name: 'Terra di Mezzo',
-    description: 'Il Libro Rosso aperto: cuoio, rune, il calendario della Contea e un Anello che arde mentre Claude lavora.',
+    description: 'Lo scrittoio di Casa Baggins, ad acquerello: la finestra tonda sulla Contea, il foglio, la candela.',
 
-    // La finestra: grande come l'app desktop; sotto i 760 px le due pagine non ci stanno
-    window: { width: 1180, height: 780, minWidth: 760, minHeight: 520 },
+    // Grande come l'app desktop; sotto gli 820 px la barra laterale si nasconde
+    window: { width: 1180, height: 780, minWidth: 560, minHeight: 480 },
 
-    // Lo stile pixel (bordi a gradino, palette di partenza color pergamena) viene dal kit, poi theme.css
-    kits: ['pixel'],
-    // Pixel ×2: più fini di quelli di partenza (×3), con più dettaglio nei disegni
-    artScale: 2,
     css: true,
 
     layout: `
-  <div class="book" data-solid data-art-bg="leather">
-    <header class="book-head" data-drag>
-      <canvas class="brooch" data-art="leaf" data-art-fit="natural"></canvas>
-      <div class="title" data-s="title"></div>
-      <canvas class="brooch" data-art="leaf" data-art-arg="destra" data-art-fit="natural"></canvas>
-      <div class="controls">
-        <button class="ctl" data-action="hide" data-s-title="hideTip">_</button>
-        <button class="ctl max" data-action="maximize" data-s-title="maxTip"></button>
-        <button class="ctl" data-action="quit" data-s-title="quitTip">x</button>
+  <div class="desk" data-solid>
+    <aside class="side">
+      <div class="porthole" data-drag></div>
+      <div class="side-head" data-drag><span class="brand" data-s="title"></span></div>
+      <button class="new" data-action="new"><span class="plus">+</span><span data-s="newChapter"></span></button>
+      <div class="side-label" data-s="sessionsTitle"></div>
+      <div class="sessions" data-part="sessions" data-mode="always">
+        <div class="sessions-list" data-part="sessions-list"></div>
       </div>
-    </header>
-    <div class="spread">
-      <section class="page left" data-art-bg="paper">
-        <div class="chapter">
-          <div class="chapter-title" data-part="chapter-title"></div>
-          <div class="chapter-date" data-part="chapter-date"></div>
-          <canvas class="chapter-divider" data-art="divider"></canvas>
+      <div class="side-foot">
+        <button class="link" data-action="scene"></button>
+        <button class="link" data-action="themes" data-s="themes"></button>
+      </div>
+    </aside>
+    <main class="sheet">
+      <div class="sheet-paper"></div>
+      <header class="top" data-drag>
+        <div class="top-title">
+          <span class="chapter-title" data-part="chapter-title"></span>
+          <span class="chapter-date" data-part="chapter-date"></span>
         </div>
-        <button class="btn small new-chapter" data-action="new" data-s="newChapter"></button>
-        <div class="annali" data-part="sessions" data-mode="always">
-          <div class="annali-head" data-s="sessionsTitle"></div>
-          <div class="sessions-list" data-part="sessions-list"></div>
+        <div class="controls">
+          <button class="ctl" data-action="hide" data-s-title="hideTip">&#8211;</button>
+          <button class="ctl max" data-action="maximize" data-s-title="maxTip"></button>
+          <button class="ctl" data-action="quit" data-s-title="quitTip">&#10005;</button>
         </div>
-        <div class="journey">
-          <div class="journey-head" data-s="journeyTitle"></div>
-          <canvas class="journey-map" data-art="journey" data-art-anim></canvas>
-          <div class="journey-place"></div>
-        </div>
-        <div class="page-foot"><button class="scene" data-action="scene"></button><span>&middot;</span><button class="scene" data-action="themes" data-s="themes"></button></div>
-      </section>
-      <canvas class="spine" data-art="spine"></canvas>
-      <section class="page right" data-art-bg="paper">
-        <div class="log" data-part="log"></div>
-        <div class="quill">
-          <div class="quill-top">
+      </header>
+      <div class="log" data-part="log"></div>
+      <div class="composer">
+        <div class="box-wrap">
+        <div class="candle">${CANDLE}</div>
+        <div class="box">
+          <textarea data-part="input" data-s-placeholder="placeholder" spellcheck="false"></textarea>
+          <div class="row">
             <div class="modes" data-part="modes"></div>
             <div class="folder" data-part="folder"></div>
-          </div>
-          <textarea data-part="input" data-s-placeholder="placeholder" spellcheck="false"></textarea>
-          <div class="quill-row">
-            <canvas class="lamp" data-art="lamp" data-art-anim data-art-fit="natural"></canvas>
-            <span class="hint" data-part="hint"></span>
-            <button class="btn" data-action="send" data-s="send"></button>
-            <button class="btn" data-action="stop" data-s="stop" hidden></button>
+            <span class="sp"></span>
+            <button class="btn send" data-action="send" data-s="send"></button>
+            <button class="btn deny stop" data-action="stop" data-s="stop" hidden></button>
           </div>
         </div>
-      </section>
-    </div>
-  </div>
-  <canvas class="ribbon" data-art="ribbon" data-art-fit="natural" data-solid></canvas>
-  <div class="grip" data-grip data-solid data-s-title="gripTip"></div>`,
+        </div>
+        <div class="hint" data-part="hint"></div>
+      </div>
+    </main>
+    <div class="grip" data-grip data-s-title="gripTip"></div>
+  </div>`,
 
     persona: [
-      'Le tue risposte compaiono in una piccola finestra in pixel art che imita una pagina del Libro Rosso, la cronaca dei viaggi degli hobbit nella Terra di Mezzo.',
+      'Le tue risposte compaiono in una finestra che imita lo scrittoio di Casa Baggins, nella Contea: un foglio di carta accanto alla finestra tonda.',
       'Scrivi come uno scriba di Gran Burrone che annota il viaggio della persona: garbato, con al massimo un\'immagine della Terra di Mezzo per risposta (sentieri, compagnie, mappe, fucine dei Nani, la Contea) e solo quando viene naturale.',
       'Non riportare citazioni dei libri o dei film. La sostanza tecnica viene prima dello stile: nomi di file, comandi, numeri e risultati restano esatti, e una risposta breve resta breve.',
       'Usa markdown leggero (grassetto, `codice`, blocchi di codice, elenchi).',
     ].join(' '),
 
     strings: {
-      title: 'Libro Rosso',
-      busyHint: 'Lo scriba è in cammino...',
+      title: 'Casa Baggins',
+      placeholder: 'Intingi la penna e scrivi…',
+      hint: 'Invio per spedire · Maiusc+Invio per andare a capo · / per i comandi',
+      busyHint: 'Lo scriba è in cammino…',
+      send: 'Spedisci',
+      stop: 'Posa la penna',
       stopped: 'Lo scriba ha posato la penna.',
       you: 'Il viandante scrive:',
       claude: 'Lo scriba annota:',
@@ -169,17 +247,16 @@
       denied: 'Il passaggio è negato.',
       sessions: 'annali',
       sessionsTitle: 'Gli annali',
-      sessionsLoading: 'Sfoglio gli annali...',
+      sessionsLoading: 'Sfoglio gli annali…',
       sessionsEmpty: 'Nessun annale: Claude Code non ha ancora conversazioni salvate su questo computer.',
-      copying: 'Ricopio le pagine...',
+      copying: 'Ricopio le pagine…',
       continueHere: 'Da qui in poi si scrive nello stesso annale.',
-      notte: 'stelle',
-      giorno: 'Contea',
+      notte: 'Accendi le stelle',
+      giorno: 'Apri le imposte',
       newChapter: 'Nuovo capitolo',
-      journeyTitle: 'Il viaggio',
-      journeyAt: 'Il viandante è a {place}',
-      themes: 'altri libri',
-      themesTitle: 'Gli altri libri',
+      themes: 'Altre stanze',
+      themesTitle: 'Le altre stanze',
+      modesLabel: '',
       planTitle: 'Lo scriba traccia la via',
       planApprove: 'Approva la via',
       planKeep: 'Continua a tracciarla',
@@ -188,8 +265,11 @@
       diffMore: 'Sfoglia altre {n} righe',
       diffLess: 'Richiudi',
       diffNew: 'Pagina nuova.',
-      gripTip: 'Trascina per allargare o allungare il libro',
+      hideTip: 'Nascondi',
+      quitTip: 'Chiudi',
+      gripTip: 'Ridimensiona',
     },
+
 
     // La data nel calendario della Contea (dodici mesi di trenta giorni, più i giorni di Yule e di Lithe; l'anno
     // comincia verso il nostro 22 dicembre), seguita da quella di tutti i giorni
@@ -215,48 +295,35 @@
     },
 
     scenes: {
-      // Sotto le stelle: carta scura, cuoio rosso cupo
-      notte: {
-        palette: {
-          roll: ['#5a1a14', '#7a261c', '#9a3626', '#b84a32', '#8a2e20', '#4a1410', '#2a0a08'],
-          leaf: { d: '#2c4420', v: '#4f7a3a', l: '#8fbf5a', s: '#c8ccd4' },
-          ring: ['#7a5418', '#d4a338', '#ffe7a0', '#fff8e0'],
-          iconColors: { v: '#4f7a3a', s: '#c8d0dc', w: '#f4f8ff', b: '#1e2638', k: '#2a0a08' },
-        },
-        vars: {
-          green: '#8fbf5a', 'leather-dark': '#1e0806',
-          'title-ink': '#ffe7a0', 'title-glow': 'rgba(20, 4, 2, 0.8)',
-          'initial-bg': '#4a1410',
-          'ctl-bg': '#3a0f0c', 'ctl-hover': '#5a1a14', 'ctl-light': '#8a3022', 'ctl-dark': '#1e0806', 'ctl-ink': '#ffe7a0',
-          'deny-bg': '#55525a', 'deny-light': '#8a8690', 'deny-dark': '#2e2c33', 'deny-ink': '#f0ece0',
-        },
-      },
-      // La Contea: carta chiara, cuoio rosso vivo
+      // Il foglio resta chiaro anche di notte (lo illumina la candela): cambiano le pareti e la finestra
       giorno: {
-        palette: {
-          roll: ['#7a261c', '#9a3626', '#b84a32', '#d0644a', '#a83c2a', '#6a2018', '#4a1410'],
-          leaf: { d: '#2c4420', v: '#4f7a3a', l: '#8fbf5a', s: '#eef0f4' },
-          ring: ['#7a5418', '#c8963a', '#f6d98a', '#fff8e0'],
-          iconColors: { v: '#3f6a2e', s: '#8a96a8', w: '#ffffff', b: '#1e2638', k: '#4a1410' },
-        },
-        vars: {
-          green: '#3f6a2e', 'leather-dark': '#2a0a08',
-          'title-ink': '#ffe7a0', 'title-glow': 'rgba(40, 8, 4, 0.8)',
-          'initial-bg': '#7a261c',
-          'ctl-bg': '#4a1410', 'ctl-hover': '#6a2018', 'ctl-light': '#9a3626', 'ctl-dark': '#2a0a08', 'ctl-ink': '#ffe7a0',
-          'deny-bg': '#6a6670', 'deny-light': '#9a96a0', 'deny-dark': '#3e3c43', 'deny-ink': '#f6f2e8',
-        },
+        palette: { inkSoft: '#7a6243', accent: '#2e5c2a', wood: '#6e4a2c', side: '#3a2414', paper: '#f4ead2', ink: '#2e2216', glass: '#9ccf6a', sky: '#bcd6e6' },
+        vars: {},
+      },
+      notte: {
+        palette: { inkSoft: '#7a6243', accent: '#2e5c2a', wood: '#3a2416', side: '#1e120a', paper: '#eadcb8', ink: '#2e2216', glass: '#1e3428', sky: '#1c2448' },
+        vars: {},
       },
     },
 
-    // Gli agganci: la mappa segue il capitolo, e mentre Claude lavora il suggerimento sotto la penna è una tappa
-    // del cammino
     hooks: {
-      mount: updateJourney,
-      chapter: updateJourney,
-      done: updateJourney,
+      mount(ctx) {
+        paint(ctx)
+        // Il foglio segue la misura della finestra: si ridipinge quando il ridimensionamento si ferma
+        const el = ctx.root.querySelector('.sheet-paper')
+        if (el && window.ResizeObserver) {
+          let timer = 0
+          theme._ro = new ResizeObserver(() => { clearTimeout(timer); timer = setTimeout(() => paintSheet(ctx), 140) })
+          theme._ro.observe(el)
+        }
+      },
+      unmount() {
+        if (theme._ro) theme._ro.disconnect()
+        theme._ro = null
+      },
+      scene(ctx, name) { paint(Object.assign({}, ctx, { scene: name })) },
+      // Mentre Claude lavora, il suggerimento sotto la penna è una tappa del cammino
       busy(ctx, on) {
-        updateJourney(ctx)
         if (!on) return
         const hint = ctx.part('hint')
         if (hint) hint.textContent = ROAD[Math.floor(Math.random() * ROAD.length)]
@@ -264,314 +331,56 @@
     },
 
     art: {
-      // La mappa del viaggio: il fondo (in cache), la rotta (fatta in rosso, da fare a puntini), le tappe, il Monte
-      // Fato con il fuoco che guizza e il viandante con la sua bandierina, che saltella mentre Claude lavora
-      journey({ w, h, pal, frame, busy, el }) {
-        const P = window.Pixel
-        if (w < 30 || h < 16) return null
-        const c = P.canvas(w, h)
-        const g = c.getContext('2d')
-        g.drawImage(mapBase(P, w, h, pal), 0, 0)
-        const step = Math.min(STOPS.length - 1, Number(el && el.dataset.step) || 0)
-        const pts = STOPS.map(([, fx, fy]) => [Math.round(fx * (w - 1)), Math.round(fy * (h - 1))])
-        for (let i = 0; i < pts.length - 1; i++) {
-          const [x0, y0] = pts[i]
-          const [x1, y1] = pts[i + 1]
-          const done = i < step
-          const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))
-          for (let k = 0; k <= n; k++) {
-            if (k % (done ? 2 : 3)) continue
-            P.px(g, Math.round(x0 + (x1 - x0) * k / n), Math.round(y0 + (y1 - y0) * k / n), done ? pal.red : pal.inkSoft)
-          }
-        }
-        pts.forEach(([x, y], i) => P.px(g, x, y, i <= step ? pal.goldLight : pal.inkSoft))
-        // Il Monte Fato: un cono scuro con il fuoco in cima
-        const [vx, vy] = pts[pts.length - 1]
-        for (let r = 0; r < 4; r++) for (let dx = -r; dx <= r; dx++) P.px(g, vx + dx, vy - 2 + r, r === 3 ? pal.inkSoft : '#1c0c08')
-        P.px(g, vx, vy - 3, pal.flame[frame % 3])
-        P.px(g, vx + (frame % 2 ? 1 : -1), vy - 4, pal.flame[(frame + 1) % 3])
-        // Il viandante: un alone d'oro sulla tappa, un'asta con la bandierina rossa bordata di scuro (si vede anche
-        // sopra le montagne); saltella mentre Claude lavora
-        const [mx, my] = pts[step]
-        const bob = busy ? frame % 2 : 0
-        for (const [dx, dy] of [[-1, 0], [1, 0], [0, 1], [-1, 1], [1, 1]]) P.px(g, mx + dx, my + dy, pal.gold)
-        P.px(g, mx, my, pal.goldLight)
-        const dark = '#1c0c08'
-        for (let k = 1; k <= 7; k++) P.px(g, mx, my - k - bob, dark)
-        for (let y = 0; y < 4; y++) for (let x = 1; x <= 5 - y; x++) P.px(g, mx + x, my - 7 + y - bob, x === 5 - y || y === 0 || y === 3 ? dark : pal.red)
-        P.px(g, mx + 1, my - 6 - bob, pal.goldLight)
-        P.px(g, mx, my - 8 - bob, pal.goldLight)
-        return c
-      },
-
-      // La grana del cuoio della copertina: riquadro 48×48 senza giunture, appena accennata (il cuoio quasi liscio si
-      // legge meglio): pochi pixel un filo più scuri dove la grana è bassa, qualche riflesso dove è alta
-      leather({ pal }) {
-        const P = window.Pixel
-        const S = 48
-        const c = P.canvas(S, S)
-        const ctx = c.getContext('2d')
-        const rand = P.seeded(5)
-        const grain = P.valueNoise(S, 4, 4)
-        const base = pal.roll[4]
-        const shade = pal.roll[1]
-        const light = pal.roll[2]
-        ctx.fillStyle = base
-        ctx.fillRect(0, 0, S, S)
-        for (let y = 0; y < S; y++) {
-          for (let x = 0; x < S; x++) {
-            const g = grain(x, y)
-            const r = rand()
-            if (r < (0.4 - g) * 0.6) P.px(ctx, x, y, shade)
-            else if (r > 1 - (g - 0.62) * 0.35) P.px(ctx, x, y, light)
-          }
-        }
-        return c
-      },
-
-      paper: ({ pal }) => window.Pixel.lib.paperTile(pal),
-
-      // La spilla a foglia, 13×15: una foglia vera (lente appuntita, inclinata), bordo d'argento, nervatura chiara,
-      // verde più chiaro verso la luce, un picciolo; arg "destra" la specchia
-      leaf({ pal, arg }) {
-        const P = window.Pixel
-        const W = 13
-        const H = 15
-        const c = P.canvas(W, H)
-        const ctx = c.getContext('2d')
-        const { d, v, l, s } = pal.leaf
-        const cx = 6.5
-        const cy = 7
-        const ang = -Math.PI / 4
-        const L = 7.4
-        const B = 3.3
-        const inside = (x, y) => {
-          const dx = x - cx
-          const dy = y - cy
-          const u = dx * Math.cos(ang) - dy * Math.sin(ang)
-          const w = dx * Math.sin(ang) + dy * Math.cos(ang)
-          return { u, w, ok: Math.abs(u) <= L && Math.abs(w) <= B * (1 - (u / L) * (u / L)) }
-        }
-        for (let y = 0; y < H; y++) {
-          for (let x = 0; x < W; x++) {
-            const p = inside(x + 0.5, y + 0.5)
-            if (!p.ok) continue
-            // Sul bordo se un vicino è fuori
-            const rim = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ox, oy]) => !inside(x + 0.5 + ox, y + 0.5 + oy).ok)
-            let col = p.w < 0 ? l : v
-            if (Math.abs(p.w) < 0.55) col = s
-            if (rim) col = p.w < 0 ? s : d
-            P.px(ctx, x, y, col)
-          }
-        }
-        // Il picciolo, in basso a sinistra
-        P.line(ctx, 0, 14, 2, 12, d)
-        const flip = arg === 'destra'
-        if (!flip) return c
-        const m = P.canvas(W, H)
-        const mc = m.getContext('2d')
-        mc.translate(W, 0)
-        mc.scale(-1, 1)
-        mc.drawImage(c, 0, 0)
-        return m
-      },
-
-      // Il dorso fra le due pagine: la carta che si piega verso la cucitura, con il cuoio che si vede in mezzo
-      spine({ w, h, pal }) {
-        const P = window.Pixel
-        const W = Math.max(4, w)
-        const H = Math.max(1, h)
-        const c = P.canvas(W, H)
-        const ctx = c.getContext('2d')
-        const mid = (W - 1) / 2
-        for (let x = 0; x < W; x++) {
-          const d = Math.abs(x - mid) / mid
-          ctx.fillStyle = d < 0.2 ? pal.roll[6] : d < 0.45 ? pal.paperEdge : d < 0.75 ? pal.paper[2] : pal.paper[0]
-          ctx.fillRect(x, 0, 1, H)
-        }
-        // Qualche punto di cucitura d'oro lungo il dorso
-        for (let y = 4; y < H - 2; y += 9) P.px(ctx, Math.round(mid), y, pal.gold)
-        return c
-      },
-
-      // Una riga di rune d'oro fra due rombi, alte 9 pixel, tracciate a linee con un'ombra sotto: segni inventati
-      // (un'asta e qualche ramo), sempre gli stessi (seme fisso)
-      divider({ w, pal }) {
-        const P = window.Pixel
-        // Ogni runa: segmenti [x0, y0, x1, y1] su una griglia 5×9
-        const RUNES = [
-          [[2, 0, 2, 8], [2, 2, 4, 0], [2, 5, 0, 3]],
-          [[2, 0, 2, 8], [0, 0, 2, 2], [4, 0, 2, 2]],
-          [[2, 0, 2, 8], [2, 3, 4, 5], [2, 6, 0, 8]],
-          [[0, 0, 0, 8], [0, 2, 3, 0], [0, 4, 3, 2]],
-          [[4, 0, 4, 8], [4, 3, 1, 5], [1, 5, 1, 2]],
-          [[0, 0, 4, 8], [4, 0, 0, 8], [2, 0, 2, 2]],
-          [[2, 0, 2, 8], [0, 4, 4, 4], [0, 4, 2, 2]],
-          [[1, 0, 1, 8], [1, 0, 4, 2], [4, 2, 1, 4], [1, 4, 4, 7]],
-          [[2, 0, 2, 8], [0, 2, 2, 4], [4, 2, 2, 4], [0, 6, 2, 8]],
-        ]
-        w = Math.max(40, w)
-        const H = 11
-        const c = P.canvas(w, H)
-        const ctx = c.getContext('2d')
-        const shade = pal.knob ? pal.knob[1] : pal.inkSoft
-        const draw = (x0, gold, dy) => RUNES[gold].forEach(([a, b, e, f]) => P.line(ctx, x0 + a, 1 + b + dy, x0 + e, 1 + f + dy, dy ? shade : pal.gold))
-        const diamond = (x) => ctx.drawImage(P.bitmap(['...y...', '..ygy..', '.ygggy.', 'ygggggs', '.sgggs.', '..sgs..', '...s...'], { y: pal.goldLight, g: pal.gold, s: shade }), x, 2)
-        diamond(0)
-        diamond(w - 7)
-        const rand = P.seeded(11)
-        const glyphs = []
-        let x = 11
-        let n = 0
-        while (x + 5 <= w - 11) {
-          if (n > 0 && n % 4 === 0) { glyphs.push(['dot', x]); x += 4 }
-          if (x + 5 > w - 11) break
-          glyphs.push([Math.floor(rand() * RUNES.length), x])
-          x += 8
-          n++
-        }
-        // Prima le ombre, poi l'oro sopra
-        for (const dy of [1, 0]) {
-          for (const [g, gx] of glyphs) {
-            if (g === 'dot') { P.px(ctx, gx + 1, 5 + dy, dy ? shade : pal.goldLight); continue }
-            draw(gx, g, dy)
-          }
-        }
-        return c
-      },
-
-      // Il segnalibro di seta verde che pende sotto il libro, 8×24: un riflesso lungo la seta, la coda a coda di rondine
-      ribbon({ pal }) {
-        const P = window.Pixel
-        const { d, v, l } = pal.leaf
-        const rows = []
-        for (let i = 0; i < 20; i++) rows.push(i % 6 === 2 ? 'ddllvvvd' : 'dvllvvvd')
-        rows.push('dvlvvvvd', 'dvv..vvd', 'dv....vd', 'd......d')
-        return P.bitmap(rows, { d, v, l })
-      },
-
-      // Le icone che cambiano, 12×12; le altre (penna, incudine, rosa dei venti) restano quelle di partenza.
-      // Colori in più: v verde, s argento, w luce, b pietra scura, k cuoio scuro
+      // Icone a linea d'inchiostro
       icons: {
-        leggere: [
-          '.kkkkkkkkkk.',
-          '.kggggggggp.',
-          '.kgrrrrrrgpp',
-          '.kgrryyrrgpp',
-          '.kgrwrryrgpp',
-          '.kgryrryrgpp',
-          '.kgryrryrgpp',
-          '.kgrryyrrgpp',
-          '.kgrrrrrrgpp',
-          '.kgrrrrrrgpp',
-          '.kggggggggp.',
-          '.kkkkkkkkkk.',
-        ],
-        cercare: [
-          '.....ss.....',
-          '.....ss.....',
-          '....ssss....',
-          '.....ss.....',
-          '...sswwss...',
-          '..sswwwwss..',
-          '..swwyyyws..',
-          '..swyyyyws..',
-          '..swyyyyws..',
-          '..sswwwwss..',
-          '...sswwss...',
-          '.....ss.....',
-        ],
-        messaggi: [
-          '....bbbb....',
-          '..bbbbbbbb..',
-          '..bssbbbbb..',
-          '.bbsbbbbbbb.',
-          '.bbbbbbbbbb.',
-          '.bbbbbrrrbb.',
-          '.bbbbbryrbb.',
-          '..bbbbrrrb..',
-          '..bbbbbbbb..',
-          '....bbbb....',
-          '...gggggg...',
-          '..dddddddd..',
-        ],
-        compagnia: [
-          '.yy.........',
-          '.dsssssssss.',
-          '.dvvvvwvvvv.',
-          '.dvvvvwvvv..',
-          '.dvvvwwwv...',
-          '.dvvvvwvvv..',
-          '.dvvvvvvvvv.',
-          '.d..........',
-          '.d..........',
-          '.d..........',
-          '.d..........',
-          '.d..........',
-        ],
-        altro: [
-          '............',
-          '....yyyg....',
-          '..yyyyyggg..',
-          '..yw....gg..',
-          '.yy......dd.',
-          '.yy......dd.',
-          '.yy......dd.',
-          '.gg......dd.',
-          '..gg....dd..',
-          '..ggdddddd..',
-          '....dddd....',
-          '............',
-        ],
+        leggere: ({ pal }) => icon(pal, '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="M10 12h5M10 16h5"/>'),
+        scrivere: ({ pal }) => icon(pal, '<path d="M4 20c3-1 5-3 7-6l7-9c1 1 1 2 0 3l-7 9"/><path d="M4 20l2-5"/>'),
+        forgiare: ({ pal }) => icon(pal, '<path d="M4 15h12l-1 3H6z"/><path d="M7 15c0-2 1-3 3-3h6c2 0 3-1 4-2"/><path d="M9 18v2M14 18v2"/>'),
+        cercare: ({ pal }) => icon(pal, '<circle cx="11" cy="11" r="6"/><path d="M15.5 15.5L20 20"/>'),
+        messaggi: ({ pal }) => icon(pal, '<circle cx="12" cy="10" r="6.5"/><path d="M9 8c1-1.5 2.5-2 4-1.5"/><path d="M7 20h10M9 17l-1 3M15 17l1 3"/>'),
+        compagnia: ({ pal }) => icon(pal, '<circle cx="9" cy="9" r="3"/><path d="M3.5 19c.5-3 3-4.5 5.5-4.5s5 1.5 5.5 4.5"/><circle cx="16.5" cy="8" r="2.5"/><path d="M16 13c2.5 0 4 1.5 4.5 4"/>'),
+        mappa: ({ pal }) => icon(pal, '<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>'),
+        altro: ({ pal }) => icon(pal, '<circle cx="12" cy="12" r="2.5"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"/>'),
       },
 
-      // L'Anello, 19×19: a riposo un riflesso gira lungo il cerchio; mentre Claude lavora, sulla fascia compaiono
-      // lettere di fuoco che tremolano
-      lamp({ pal, frame, busy }) {
-        const P = window.Pixel
-        const S = 19
-        const c = P.canvas(S, S)
-        const ctx = c.getContext('2d')
-        const [dark, gold, light, glint] = pal.ring
-        const cx = 9
-        const cy = 9
-        const glintAt = (frame % 16) / 16 * Math.PI * 2
-        for (let y = 0; y < S; y++) {
-          for (let x = 0; x < S; x++) {
-            const dx = x - cx
-            const dy = y - cy
-            const d = Math.hypot(dx, dy)
-            if (d < 5.6 || d > 9.2) continue
-            // Luce da in alto a sinistra
-            const lit = (-dx - dy) / (d * Math.SQRT2)
-            // Il bordo interno ed esterno più scuri: la fascia sembra tonda
-            const edge = d < 6.1 || d > 8.7
-            let color = edge ? (lit > 0.5 ? gold : dark) : lit > 0.45 ? light : lit < -0.35 ? dark : gold
-            const a = Math.atan2(dy, dx) + Math.PI
-            if (busy && d > 6.4 && d < 8.4) {
-              // Le lettere: tratti fissi lungo la fascia, il colore del fuoco cambia a ogni fotogramma
-              const k = Math.floor(a / (Math.PI * 2) * 40)
-              if ((k * 7) % 5 < 3) color = pal.flame[(k + frame) % 3]
-            } else if (!busy && d > 7.4 && !edge) {
-              let diff = Math.abs(a - glintAt)
-              diff = Math.min(diff, Math.PI * 2 - diff)
-              if (diff < 0.2) color = glint
-            }
-            P.px(ctx, x, y, color)
-          }
-        }
+      // L'anteprima per il selettore: parete, barra con la finestra tonda, foglio con due righe e la casella
+      preview({ pal, width, height }) {
+        const c = document.createElement('canvas')
+        c.width = width * 2
+        c.height = height * 2
+        const g = c.getContext('2d')
+        g.scale(2, 2)
+        g.fillStyle = pal.wood; g.fillRect(0, 0, width, height)
+        g.fillStyle = 'rgba(0,0,0,.25)'; for (let x = 0; x < width; x += 12) g.fillRect(x, 0, 1, height)
+        g.fillStyle = pal.side; g.globalAlpha = 0.6; g.fillRect(0, 0, 40, height); g.globalAlpha = 1
+        // La finestra tonda
+        g.beginPath(); g.moveTo(5, 26); g.lineTo(5, 15); g.arc(15, 15, 10, Math.PI, Math.PI * 1.5); g.lineTo(25, 5); g.arc(25, 15, 10, Math.PI * 1.5, 0); g.lineTo(35, 26); g.closePath()
+        g.fillStyle = pal.sky; g.fill(); g.lineWidth = 2; g.strokeStyle = '#2e5c2a'; g.stroke()
+        g.fillStyle = pal.glass; g.fillRect(6, 19, 28, 6)
+        for (let i = 0; i < 4; i++) { g.fillStyle = 'rgba(244,234,210,.5)'; g.fillRect(6, 34 + i * 9, 20 + (i % 2) * 6, 3) }
+        // Il foglio
+        g.fillStyle = pal.paper; g.fillRect(46, 5, width - 51, height - 10)
+        g.fillStyle = 'rgba(46,92,42,.15)'; g.fillRect(96, 14, 40, 8)
+        g.fillStyle = pal.inkSoft; g.fillRect(58, 30, 70, 3); g.fillRect(58, 37, 62, 3); g.fillRect(58, 44, 44, 3)
+        g.fillStyle = '#fffbf0'; g.fillRect(58, 62, 80, 16); g.strokeStyle = 'rgba(90,60,30,.35)'; g.lineWidth = 1; g.strokeRect(58.5, 62.5, 79, 15)
+        g.fillStyle = pal.accent; g.fillRect(124, 68, 10, 6)
+        g.fillStyle = '#ffb347'; g.beginPath(); g.ellipse(51, 68, 2, 3.5, 0, 0, Math.PI * 2); g.fill()
+        g.fillStyle = '#f3ead2'; g.fillRect(49.5, 72, 3, 7)
         return c
       },
 
-      // Il vassoio: il Libro Rosso chiuso, con l'Anello d'oro sulla copertina (16×16)
+      // Il vassoio: la porta tonda verde col pomello d'oro (32×32)
       trayIcon() {
-        const P = window.Pixel
-        const rows = [
-          '................', '.krrrrrrrrrrrk..', '.krgggggggggrkp.', '.krgrrrrrrrgrkp.', '.krgrrryyrrgrkp.', '.krgrryrryrgrkp.',
-          '.krgrryrryrgrkp.', '.krgrrryyrrgrkp.', '.krgrrrrrrrgrkp.', '.krgrrrrrrrgrkp.', '.krgrrrrrrrgrkp.', '.krgrrrrrrrgrkp.',
-          '.krgggggggggrkp.', '.krrrrrrrrrrrkp.', '..kkkkkkkkkkkpp.', '................',
-        ]
-        return P.bitmap(rows, { k: '#2a0a08', r: '#9a3626', g: '#d4a338', y: '#ffe7a0', p: '#ead9ad' })
+        const c = document.createElement('canvas')
+        c.width = 32
+        c.height = 32
+        const g = c.getContext('2d')
+        g.beginPath(); g.arc(16, 16, 15, 0, Math.PI * 2); g.fillStyle = '#5a3a1a'; g.fill()
+        g.beginPath(); g.arc(16, 16, 12.5, 0, Math.PI * 2); g.fillStyle = '#2e5c2a'; g.fill()
+        g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = 1
+        for (const x of [10, 16, 22]) { g.beginPath(); g.moveTo(x + 0.5, 4); g.lineTo(x + 0.5, 28); g.stroke() }
+        g.beginPath(); g.arc(16, 16, 2.6, 0, Math.PI * 2); g.fillStyle = '#e6c36a'; g.fill()
+        return c
       },
     },
   }
