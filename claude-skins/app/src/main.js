@@ -7,6 +7,7 @@ const { ClaudeBridge, DEFAULT_CLAUDE, loadContextMax, savedContextMax } = requir
 const { Updater } = require('./updater')
 const { listFiles, rankFiles } = require('./files')
 const gitOps = require('./git')
+const permissions = require('./permissions')
 const { plainSnippet } = require('./text')
 const { listThemes, DEFAULT_THEME } = require('./themes')
 
@@ -643,6 +644,14 @@ function registerIpc() {
   ipcMain.handle('git:push', gitCall((cwd) => gitOps.push(cwd)))
   ipcMain.handle('git:pr-info', gitCall((cwd) => gitOps.prInfo(cwd)))
   ipcMain.handle('git:pr', gitCall((cwd, opts) => gitOps.createPr(cwd, opts && typeof opts === 'object' ? opts : {})))
+  // Le regole dei permessi: lette e scritte nei file delle impostazioni di Claude Code; dopo una modifica le
+  // conversazioni ripartono con quelle nuove
+  ipcMain.handle('perms:get', (_e, conv) => { try { return permissions.read(cwdOf(conv)) } catch (err) { return { error: err.message, scopes: [] } } })
+  ipcMain.handle('perms:change', (_e, conv, scope, op) => {
+    const r = permissions.change(cwdOf(conv), String(scope || ''), op)
+    if (r.ok) for (const b of allBridges()) b.refreshSettings()
+    return r
+  })
   ipcMain.handle('git:wt-merge', gitCall((cwd) => gitOps.mergeWorktree(cwd)))
   ipcMain.handle('git:wt-remove', gitCall((cwd, force) => gitOps.removeWorktree(cwd, !!force)))
   // I file da citare con @, nella cartella della conversazione

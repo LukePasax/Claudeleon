@@ -46,6 +46,8 @@ contextBridge.exposeInMainWorld('skins', {
   openFile: (p, conv) => ipcRenderer.invoke('file:open', p, conv),
   revealFile: (p, conv) => ipcRenderer.invoke('file:reveal', p, conv),
   capturePreview: (rect) => ipcRenderer.invoke('preview:capture', rect),
+  permissions: (conv) => ipcRenderer.invoke('perms:get', conv),
+  changePermission: (conv, scope, op) => ipcRenderer.invoke('perms:change', conv, scope, op),
   gitStatus: (conv) => ipcRenderer.invoke('git:status', conv),
   gitDiff: (conv, file) => ipcRenderer.invoke('git:diff', conv, file),
   gitBranches: (conv) => ipcRenderer.invoke('git:branches', conv),

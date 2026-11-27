@@ -130,6 +130,13 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   stato, da quanto, quanti strumenti ha usato, l'ultimo e il riassunto finale, con "Ferma" e "Uscita" (il file con
   l'uscita). Mentre Claude lavora, "Manda in background" (o Ctrl+B) sposta in background il comando o il sotto-agente
   in corso, come nel terminale, e Claude va avanti. Con attività in corso la conversazione non si spegne da sola.
+- **Regole dei permessi:** nelle impostazioni, "Regole dei permessi" apre il pannello con i tre posti di Claude Code:
+  tutti i progetti (`~/.claude/settings.json`), questo progetto condiviso col repo (`.claude/settings.json`) e questo
+  progetto solo per te (`.claude/settings.local.json`, dove finiscono anche le scelte "Sempre"). In ognuno le liste
+  "Senza chiedere", "Chiede sempre", "Mai" (che vince su tutto) e le cartelle in più dove Claude può lavorare: una
+  regola si aggiunge (es. `Bash(npm run test:*)`, `Read(./docs/**)`, `WebFetch(domain:github.com)`), si sposta in
+  un'altra lista o si toglie. Si tocca solo il campo `permissions` dei file; uno con il JSON rotto non si modifica.
+  Le conversazioni ripartono con le regole nuove al prossimo messaggio (quella che sta lavorando, a fine turno).
 - **Anteprima di un server locale:** quando Claude avvia un server (npm run dev e simili), il suo indirizzo
   (localhost, 127.0.0.1 con la porta) si riconosce nell'uscita dei comandi, delle attività in background e nelle
   risposte, e nella riga della penna compare "Anteprima · localhost:5173". Un clic apre la pagina in un pannello

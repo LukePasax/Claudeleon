@@ -243,6 +243,28 @@ for (const tema of TEMI) {
     } finally { srv.close() }
   })
 
+  test(`${tema}: regole dei permessi`, async () => {
+    await open(tema)
+    await page.keyboard.press('Control+,')
+    await page.waitForSelector('.settings-panel')
+    await page.click('.settings-panel .set-row:has-text("Regole dei permessi") .btn')
+    await page.waitForSelector('.perm-panel .perm-rule')
+    await page.click('.perm-tab:has-text("Questo progetto")')
+    await page.fill('.perm-allow .perm-input', 'Bash(cmake --build:*)')
+    await page.press('.perm-allow .perm-input', 'Enter')
+    await page.waitForFunction(() => [...document.querySelectorAll('.perm-allow .perm-rule code')].some((c) => c.textContent === 'Bash(cmake --build:*)'))
+    // Spostata in "Mai", poi tolta
+    await page.selectOption('.perm-allow .perm-rule:has-text("cmake") select', 'deny')
+    await page.waitForSelector('.perm-deny .perm-rule:has-text("cmake")')
+    await page.click('.perm-deny .perm-rule:has-text("cmake") .btn')
+    await page.waitForFunction(() => !document.querySelector('.perm-rule code') || ![...document.querySelectorAll('.perm-rule code')].some((c) => /cmake/.test(c.textContent)))
+    // Una regola che non va bene: l'errore resta in cima
+    await page.fill('.perm-ask .perm-input', 'npm test')
+    await page.press('.perm-ask .perm-input', 'Enter')
+    await page.waitForSelector('.perm-panel .git-note.error')
+    assert.deepEqual(errors, [])
+  })
+
   test(`${tema}: impostazioni, estensioni, contesto, cambio di tema che tiene la conversazione`, async () => {
     await open(tema)
     await send('Ciao')

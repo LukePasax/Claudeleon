@@ -298,6 +298,16 @@ Nella pagina: `data-part="git"` (o dentro `data-part="folder"`), pannello `.git-
 conversazione, `refreshGit()` lo rilegge (cambio di cartella o di conversazione, fine risposta, focus della finestra).
 Prove: `test/unit/git.test.js` (un repo vero con un remoto nudo), e il pannello nelle prove della finestra.
 
+## Regole dei permessi
+
+`src/permissions.js`: `read(cwd)` dà i tre posti (user = `CLAUDE_CONFIG_DIR` o `~/.claude/settings.json`; project e
+local nella cartella della conversazione), `change(cwd, scope, op)` aggiunge/toglie/sposta una regola in
+allow/ask/deny o una cartella in `additionalDirectories`, scrivendo solo `permissions` (una regola sta in una lista
+sola; un file con JSON rotto non si scrive). IPC `perms:get` / `perms:change`; dopo una modifica
+`bridge.refreshSettings()` su tutte le conversazioni: Claude Code legge le impostazioni all'avvio, quindi una
+conversazione ferma si spegne (il prossimo messaggio la riprende) e una che lavora si spegne a fine turno
+(`staleSettings`). Pannello `.perm-panel` dalle impostazioni.
+
 ## Anteprima
 
 Il ponte riconosce gli indirizzi locali (`localUrls`, toglie i colori ANSI che Vite mette in mezzo all'indirizzo) nei

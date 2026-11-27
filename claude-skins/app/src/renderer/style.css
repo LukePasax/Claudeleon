@@ -698,3 +698,25 @@ body.busy .entry .edit-btn { display: none; }
 .pv-empty[hidden] { display: none; }
 /* Stretti al massimo, cartella, modello e branch tengono almeno la loro icona */
 [data-part="folder"]:has(> button:not([hidden])), [data-part="model"]:has(> button:not([hidden])), [data-part="git"]:has(> button:not([hidden])) { min-width: 30px; }
+
+/* Regole dei permessi */
+.perm-tabs { display: flex; gap: 4px; margin: 0 0 10px; border-bottom: var(--line) solid var(--edge-light); }
+.perm-tab { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font: inherit; font-size: 14px; color: var(--ink-soft); background: none; border: none; border-bottom: 2px solid transparent; padding: 5px 10px 6px; margin-bottom: -1px; }
+.perm-tab:hover { color: var(--ink); }
+.perm-tab.on { color: var(--strong, var(--ink)); border-bottom-color: var(--gold); }
+.perm-count { font-size: 11px; min-width: 16px; padding: 0 5px; border-radius: 8px; background: var(--code); color: var(--ink-soft); text-align: center; }
+.perm-file { padding-left: 0; overflow-wrap: anywhere; }
+.perm-list { margin: 12px 0 4px; }
+.perm-list-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.pl-title { font-weight: 600; color: var(--strong, var(--ink)); }
+.perm-allow .pl-title { color: var(--plus); }
+.perm-deny .pl-title { color: var(--minus); }
+.pl-note { font-size: var(--small-size); color: var(--ink-soft); }
+.perm-rule { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: var(--line) solid var(--edge-light); }
+.perm-rule code { min-width: 0; overflow-wrap: anywhere; font-family: var(--font-code); font-size: var(--code-size); user-select: text; }
+.perm-rule .sp { flex: 1; }
+.perm-move { font-size: 12.5px; padding: 1px 4px; }
+.perm-none { font-size: var(--small-size); color: var(--ink-soft); padding: 2px 0 4px; }
+.pl-add { display: flex; gap: 6px; margin-top: 6px; }
+.pl-add .perm-input { flex: 1; width: auto; max-width: none; }
+.perm-examples { padding: 10px 0 0; }

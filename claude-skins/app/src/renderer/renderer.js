@@ -1725,6 +1725,7 @@
       button(row('setWorkdir', st.workdir || t('setWorkdirNone')), 'setChange', () => set('workdir'))
       toggle(row('setWorktree', t('setWorktreeNote')), st.worktree, (v) => { worktreeOn = v; set('worktree', v); renderFolder() })
       select(row('setMode'), MODES.map(([m, key]) => [m, t(key)]), mode, (v) => { chooseMode(v); st.mode = v })
+      if (api.permissions) button(row('setPermissions', t('setPermissionsNote')), 'setOpenPanel', () => { closeThemes(); openPermissions() })
       select(row('setModel'), [['', t('modelDefault')], ...models.filter((m) => m.value !== 'default').map((m) => [m.value, m.name])], model || '', (v) => {
         model = v || null
         const m = modelInfo()
@@ -2299,6 +2300,112 @@
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID()
     const h = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('')
     return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`
+  }
+
+  // ------------------------------------------------------------------ regole dei permessi
+
+  // Le regole dei permessi di Claude Code, come nelle impostazioni dell'app desktop: tre posti (tutti i progetti,
+  // questo progetto condiviso col repo, questo progetto solo per te), e in ognuno le liste "senza chiedere" (allow),
+  // "chiede sempre" (ask), "mai" (deny) e le cartelle in più. Una regola si aggiunge, si toglie o si sposta in un'altra
+  // lista; le conversazioni ripartono con le regole nuove al prossimo messaggio
+  let permScope = 'local'
+  async function openPermissions() {
+    closeThemes()
+    closeFolderMenu()
+    const host = app.querySelector('[data-solid]') || app
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+    const panel = document.createElement('div')
+    panel.className = 'theme-picker perm-panel'
+    panel.innerHTML = '<div class="theme-picker-box settings-box"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="perm-tabs"></div><div class="settings-body"></div></div>'
+    label(panel.querySelector('.theme-picker-head span'), 'permTitle')
+    const close = panel.querySelector('.theme-picker-head button')
+    label(close, 'themesClose')
+    close.addEventListener('click', closeThemes)
+    panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    const tabs = panel.querySelector('.perm-tabs')
+    const body = panel.querySelector('.settings-body')
+    const conv = active && active.id
+    let data = null
+    let note = null
+    const load = async () => { try { data = await api.permissions(conv) } catch { data = null } }
+    const changeRule = async (op) => {
+      const r = await api.changePermission(conv, permScope, op).catch((err) => ({ ok: false, error: err.message }))
+      note = r && r.ok ? { text: t('permApplied') } : { text: (r && r.error) || '?', error: true }
+      await load()
+      fill()
+    }
+    const fill = () => {
+      tabs.innerHTML = ''
+      body.innerHTML = ''
+      const scopes = (data && data.scopes) || []
+      for (const sc of scopes) {
+        const b = document.createElement('button')
+        b.className = `perm-tab${sc.id === permScope ? ' on' : ''}`
+        label(b, `permScope_${sc.id}`)
+        const n = sc.allow.length + sc.ask.length + sc.deny.length
+        if (n) { const c = document.createElement('span'); c.className = 'perm-count'; c.textContent = n; b.appendChild(c) }
+        b.addEventListener('click', () => { permScope = sc.id; note = null; fill() })
+        tabs.appendChild(b)
+      }
+      const sc = scopes.find((x) => x.id === permScope)
+      if (!sc) return
+      if (note) {
+        const n = document.createElement('div')
+        n.className = `git-note${note.error ? ' error' : ''}`
+        n.textContent = note.text
+        body.appendChild(n)
+      }
+      const head = document.createElement('div')
+      head.className = 'folder-note perm-file'
+      head.textContent = t(`permScopeNote_${sc.id}`, { x: sc.file })
+      body.appendChild(head)
+      if (sc.noProject) { const n = document.createElement('div'); n.className = 'folder-note'; body.appendChild(label(n, 'permNoProject')); return }
+      if (sc.error) { const n = document.createElement('div'); n.className = 'git-note error'; n.textContent = t('permBroken', { x: sc.error }); body.appendChild(n); return }
+      for (const list of ['allow', 'ask', 'deny', 'dirs']) {
+        const sec = document.createElement('div')
+        sec.className = `perm-list perm-${list}`
+        sec.innerHTML = '<div class="perm-list-head"><span class="pl-title"></span><span class="pl-note"></span></div><div class="pl-rules"></div><div class="pl-add"><input spellcheck="false"><button class="btn small"></button></div>'
+        label(sec.querySelector('.pl-title'), `permList_${list}`)
+        label(sec.querySelector('.pl-note'), `permListNote_${list}`)
+        const rules = sec.querySelector('.pl-rules')
+        for (const rule of sc[list]) {
+          const r = document.createElement('div')
+          r.className = 'perm-rule'
+          r.innerHTML = '<code></code><span class="sp"></span>'
+          r.querySelector('code').textContent = rule
+          if (list !== 'dirs') {
+            const sel = document.createElement('select')
+            sel.className = 'set-select perm-move'
+            sel.title = t('permMoveTip')
+            for (const l of ['allow', 'ask', 'deny']) { const o = document.createElement('option'); o.value = l; o.textContent = t(`permList_${l}`); if (l === list) o.selected = true; sel.appendChild(o) }
+            sel.addEventListener('change', () => changeRule({ kind: 'move', list, to: sel.value, rule }))
+            r.appendChild(sel)
+          }
+          const x = document.createElement('button')
+          x.className = 'btn small deny'
+          label(x, 'permRemove')
+          x.addEventListener('click', () => changeRule({ kind: 'remove', list, rule }))
+          r.appendChild(x)
+          rules.appendChild(r)
+        }
+        if (!sc[list].length) { const n = document.createElement('div'); n.className = 'perm-none'; rules.appendChild(label(n, list === 'dirs' ? 'permNoneDirs' : 'permNone')) }
+        const input = sec.querySelector('.pl-add input')
+        input.className = 'git-input perm-input'
+        input.placeholder = t(list === 'dirs' ? 'permAddDirPh' : `permAddPh_${list}`)
+        const add = () => { const v = input.value.trim(); if (v) changeRule({ kind: 'add', list, rule: v }) }
+        input.addEventListener('keydown', (e) => { if (!e.ctrlKey && !e.metaKey) e.stopPropagation(); if (e.key === 'Enter') add() })
+        const ab = sec.querySelector('.pl-add button')
+        label(ab, 'permAdd')
+        ab.addEventListener('click', add)
+        body.appendChild(sec)
+      }
+      const ex = document.createElement('div')
+      ex.className = 'folder-note perm-examples'
+      body.appendChild(label(ex, 'permExamples'))
+    }
+    await load()
+    fill()
+    host.appendChild(panel)
   }
 
   // ------------------------------------------------------------------ anteprima
@@ -3898,6 +4005,13 @@
     const gitTotals = () => { fakeGit.totals = fakeGit.files.reduce((t, f) => ({ files: t.files + 1, added: t.added + f.added, removed: t.removed + f.removed }), { files: 0, added: 0, removed: 0 }) }
     gitTotals()
     const fakeBranches = ['fiumi', 'main', 'sentieri']
+    // Le regole dei permessi finte, nei tre posti
+    const fakePerms = {
+      user: { allow: ['WebSearch', 'Bash(git status)'], ask: [], deny: ['Bash(rm -rf:*)'], dirs: [] },
+      project: { allow: ['Bash(npm run test:*)', 'Read(./docs/**)'], ask: ['Bash(git push:*)'], deny: [], dirs: [] },
+      local: { allow: ['Edit(src/**)'], ask: [], deny: [], dirs: ['C:/Users/luca/Documenti/Mappe'] },
+    }
+    const fakePermFiles = { user: 'C:/Users/luca/.claude/settings.json', project: 'C:/Users/luca/MapEditor/.claude/settings.json', local: 'C:/Users/luca/MapEditor/.claude/settings.local.json' }
     const fakeUpdate = { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/luca/Claude-desktop-skins', installed: true }
     const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '0.1.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claude Skins', shortcut: 'Ctrl+Alt+P', worktree: false }
     const fakeSessions = [
@@ -3959,6 +4073,16 @@
       onModels: on('onModels'), onTodos: on('onTodos'), onContext: on('onContext'),
       onThinkingStart: on('onThinkingStart'), onSuggestion: on('onSuggestion'), onThinking: on('onThinking'), onThinkingEnd: on('onThinkingEnd'),
       openFile: async () => true,
+      permissions: async () => ({ cwd: 'C:/Users/luca/MapEditor', scopes: ['user', 'project', 'local'].map((id) => Object.assign({ id, file: fakePermFiles[id], exists: true, error: '' }, JSON.parse(JSON.stringify(fakePerms[id])))) }),
+      changePermission: async (_c, scope, op) => {
+        const sc = fakePerms[scope]
+        const rule = String(op.rule || '').trim()
+        if (op.kind === 'add' && op.list !== 'dirs' && !/^[A-Za-z0-9_*.-]+(\(.+\))?$/.test(rule)) return { ok: false, error: `«${rule}» non sembra una regola: per esempio Bash(npm run test:*) o Read(./docs/**)` }
+        if (op.kind === 'add') { for (const l of ['allow', 'ask', 'deny']) if (op.list !== 'dirs') sc[l] = sc[l].filter((x) => x !== rule); if (!sc[op.list].includes(rule)) sc[op.list].push(rule) }
+        if (op.kind === 'remove') sc[op.list] = sc[op.list].filter((x) => x !== rule)
+        if (op.kind === 'move') { sc[op.list] = sc[op.list].filter((x) => x !== rule); sc[op.to].push(rule) }
+        return { ok: true }
+      },
       capturePreview: async () => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
       gitStatus: async () => JSON.parse(JSON.stringify(fakeGit)),
       gitDiff: async (_c, f) => (f.endsWith('.cpp') ? { file: f, created: f.includes('Rivers'), hunks: [{ before: f.includes('Rivers') ? '' : 'void Draw(Map& map) {\n    DrawRoads(map);\n}\n', after: 'void Draw(Map& map) {\n    DrawRivers(map);\n    DrawRoads(map);\n}\n', line: 1 }] } : { file: f, deleted: true, hunks: [{ before: '# Vecchio\n', after: '', line: 1 }] }),

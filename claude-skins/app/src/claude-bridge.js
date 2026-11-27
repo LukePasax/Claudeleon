@@ -692,6 +692,8 @@ class ClaudeBridge extends EventEmitter {
       // Una conversazione ferma da molto si spegne (gli hook di fine sessione partono allora); il prossimo messaggio la
       // riaccende riprendendo la sessione
       clearTimeout(live.idle)
+      // Regole dei permessi cambiate durante il turno: si spegne subito, il prossimo messaggio riparte con quelle nuove
+      if (this.staleSettings && !this.runningTasks()) { this.staleSettings = false; this.closeLive(); return }
       // (non con attività in background ancora in corso: si spegnerebbero con lui)
       live.idle = setTimeout(() => { if (this.live === live && !live.turn.open && !this.runningTasks()) this.closeLive() }, IDLE_CLOSE_MS)
     }
@@ -781,6 +783,15 @@ class ClaudeBridge extends EventEmitter {
     const ended = [...this.tasks.values()].filter((x) => x.status !== 'running').sort((a, b) => (b.ended || 0) - (a.ended || 0))
     for (const x of ended.slice(12)) this.tasks.delete(x.id)
     this.emitTasks()
+  }
+  // Le impostazioni di Claude Code sono cambiate (regole dei permessi): Claude Code le legge all'avvio, quindi una
+  // conversazione ferma si spegne e il prossimo messaggio la riaccende (riprendendo la sessione) con quelle nuove; una
+  // che lavora lo fa a fine turno
+  refreshSettings() {
+    const live = this.live
+    if (!live || live.ended) return
+    if (!live.turn.open && !this.runningTasks()) this.closeLive()
+    else this.staleSettings = true
   }
   emitTasks() {
     // Un comando in background che è un server: il suo indirizzo, dalla coda della sua uscita
