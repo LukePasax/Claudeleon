@@ -77,6 +77,10 @@
     effort_high: 'High',
     effort_xhigh: 'Extra',
     effort_max: 'Max',
+    // Il ragionamento di Claude
+    thinkingNow: 'Sta ragionando…',
+    thinkingDone: 'Ha ragionato per {s} s',
+    thinkingPast: 'Ragionamento',
     // Il contesto
     contextTip: 'Contesto: {p}% ({used} di {max} token)',
     contextNone: 'Contesto: il conto arriva dopo la prima risposta',

@@ -462,6 +462,9 @@ function registerIpc() {
 
   bridge.on('delta', (t) => { replyText += t; send('claude:delta', t) })
   bridge.on('tool', (t) => send('claude:tool', t))
+  bridge.on('thinkingStart', () => send('claude:thinkingStart'))
+  bridge.on('thinking', (t) => send('claude:thinking', t))
+  bridge.on('thinkingEnd', () => send('claude:thinkingEnd'))
   bridge.on('toolDone', (t) => send('claude:toolDone', t))
   bridge.on('done', (r) => {
     send('claude:done', r)

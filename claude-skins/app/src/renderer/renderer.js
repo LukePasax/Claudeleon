@@ -1189,8 +1189,57 @@
     addFiles([...e.dataTransfer.files])
   })
 
+  // ------------------------------------------------------------------ ragionamento
+
+  // Il ragionamento di Claude (i riassunti che Claude Code manda), come nell'app desktop: mentre arriva un riquadro
+  // aperto "Sta ragionando…" col testo che scorre; finito, si chiude in "Ha ragionato per N s" e si riapre con un clic
+  let thinking = null
+  let thinkingFrame = 0
+  function thinkingBox(live) {
+    const box = add(`thinking${live ? ' open live' : ''}`, '<div class="thinking-head"><span class="caret"></span><span class="th-text"></span></div><div class="thinking-body text"></div>')
+    box.querySelector('.thinking-head').addEventListener('click', () => { if (!box.classList.contains('empty')) box.classList.toggle('open') })
+    box.raw = ''
+    return box
+  }
+  function renderThinking() {
+    thinkingFrame = 0
+    if (!thinking) return
+    const body = thinking.querySelector('.thinking-body')
+    body.innerHTML = markdown(thinking.raw)
+    body.scrollTop = body.scrollHeight
+  }
+  function startThinking() {
+    renderReply()
+    reply = null
+    thinking = thinkingBox(true)
+    thinking.started = Date.now()
+    label(thinking.querySelector('.th-text'), 'thinkingNow')
+  }
+  function endThinking() {
+    if (!thinking) return
+    renderThinking()
+    const box = thinking
+    thinking = null
+    label(box.querySelector('.th-text'), 'thinkingDone', { s: Math.max(1, Math.round((Date.now() - box.started) / 1000)) })
+    box.classList.remove('open', 'live')
+    // Senza testo (il modello non manda i riassunti): resta solo la riga, che non si apre
+    if (!box.raw.trim()) box.classList.add('empty')
+  }
+  if (api.onThinkingStart) {
+    api.onThinkingStart(startThinking)
+    api.onThinking((text) => {
+      if (!thinking) startThinking()
+      thinking.raw += text
+      if (!thinkingFrame) thinkingFrame = requestAnimationFrame(renderThinking)
+    })
+    api.onThinkingEnd(endThinking)
+  }
+
   api.onDelta((d) => {
+    endThinking()
     const r = startReply()
+    // Una risposta che comincia dopo un ragionamento non parte con righe vuote
+    if (!r.raw) d = d.replace(/^\s+/, '')
     r.raw += d
     if (!pending) { pending = true; requestAnimationFrame(renderReply) }
   })
@@ -1275,6 +1324,7 @@
     scrollDown()
   })
   api.onDone(({ durationMs }) => {
+    endThinking()
     renderReply()
     labelled('footnote', 'took', { s: Math.round((durationMs || 0) / 1000) })
     hook('done', { durationMs })
@@ -1284,6 +1334,7 @@
     if (sessionsPinned()) refreshSessions()
   })
   api.onError((msg) => {
+    endThinking()
     hook('error', String(msg))
     renderReply()
     add('error', esc(String(msg)))
@@ -1727,6 +1778,12 @@
       for (const m of history.slice(from)) {
         if (m.role === 'user') fillYou(entry('you'), m.text, m.images || [])
         else if (m.role === 'assistant') setReplyText(entry('claude').querySelector('.text'), m.text)
+        else if (m.role === 'thinking') {
+          const box = thinkingBox(false)
+          box.raw = m.text
+          box.querySelector('.thinking-body').innerHTML = markdown(m.text)
+          label(box.querySelector('.th-text'), 'thinkingPast')
+        }
         else if (m.role === 'output') add('cmd-output', '').textContent = m.text
         else if (m.role === 'tool') {
           addTool(m.id, m.name, m.summary, m.change, m.intent)
@@ -1748,7 +1805,7 @@
 
   const actions = {
     send: sendMessage,
-    stop: () => { api.stop(); labelled('error', 'stopped'); reply = null; setBusy(false) },
+    stop: () => { endThinking(); api.stop(); labelled('error', 'stopped'); reply = null; setBusy(false) },
     hide: () => api.hide(),
     attach: async () => addPaths(await api.chooseFiles()),
     quit: () => api.quit(),
@@ -1966,6 +2023,7 @@
       deleteSession: async (id) => { const k = fakeSessions.findIndex((x) => x.id === id); if (k >= 0 && confirm('Eliminare?')) { fakeSessions.splice(k, 1); return { deleted: true } } return { deleted: false } },
       openSession: async () => [
         { role: 'user', text: 'Aggiungi i fiumi alla mappa' },
+        { role: 'thinking', text: 'La mappa si disegna in **MapView.cpp**: conviene guardare prima lì.' },
         { role: 'assistant', text: 'Guardo prima come si disegna la mappa.' },
         { role: 'tool', id: 'h1', name: 'Read', summary: 'src/MapView.cpp', change: null, error: false },
         { role: 'tool', id: 'h2', name: 'Edit', summary: 'src/MapView.cpp', change: FAKE_EDIT, error: false },
@@ -1987,6 +2045,7 @@
       ], model: null, effort: null }),
       setModel() {},
       onModels: on('onModels'), onTodos: on('onTodos'), onContext: on('onContext'),
+      onThinkingStart: on('onThinkingStart'), onThinking: on('onThinking'), onThinkingEnd: on('onThinkingEnd'),
       send(msg) {
         const text = typeof msg === 'string' ? msg : msg.text || '(allegati)'
         if (text.startsWith('/')) {
@@ -1997,6 +2056,9 @@
           fire('onDone', { durationMs: 900 }, 800)
           return
         }
+        fire('onThinkingStart', null, 60)
+        ;['Devo capire **dove** si disegnano le strade. ', 'Cerco DrawRoads nel codice, poi leggo MapView.cpp ', 'e aggiungo i fiumi prima delle strade.'].forEach((x, i) => fire('onThinking', x, 80 + i * 40))
+        fire('onThinkingEnd', null, 190)
         fire('onTool', { id: 't0', name: 'Grep', summary: 'DrawRoads', intent: { verb: 'grep', target: 'DrawRoads' } }, 200)
         fire('onToolDone', { id: 't0', error: false }, 260)
         fire('onTool', { id: 't1', name: 'Read', summary: 'src/MapView.cpp', intent: { verb: 'read', target: 'MapView.cpp' } }, 300)

@@ -55,6 +55,10 @@ npm 11 altrimenti non arriva.
   mette a disposizione (letto all'avvio, poi ricordato), i livelli di ragionamento coi nomi dell'app desktop (Low,
   Medium, High, Extra, Max) e l'interruttore **Ultracode** (orchestrazione dinamica dei flussi di lavoro). Valgono
   subito, anche a conversazione accesa, e si ricordano (`model`, `effort`, `ultracode` in config.json). I modi dei permessi stanno in un menu a tendina, come nell'app desktop.
+- **Ragionamento:** quando Claude ragiona prima di rispondere compare una riga "Sta ragionando…" col testo che
+  scorre sotto; finito, diventa "Ha ragionato per N s" e si riapre con un clic. Anche nelle cronache riaperte. Il
+  testo è il riassunto che Claude Code chiede all'API (`showThinkingSummaries`): con un modello che non lo manda
+  resta solo la riga.
 - **Contesto:** accanto a "Spedisci" un anello dice quanto è pieno il contesto della conversazione (rosso oltre
   l'80%); passandoci sopra la percentuale e i token, con un clic il dettaglio per categoria (prompt di sistema,
   strumenti, memoria, conversazione, riserva, spazio libero) e "Compatta ora" (`/compact`). Si aggiorna a fine di

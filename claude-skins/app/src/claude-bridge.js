@@ -447,7 +447,8 @@ class ClaudeBridge extends EventEmitter {
         model: this.model || undefined,
         effort: this.effort || undefined,
         // Ultracode: orchestrazione dinamica dei flussi di lavoro, per la sessione (come l'interruttore dell'app desktop)
-        settings: this.ultracode ? { ultracode: true } : undefined,
+        // e i riassunti del ragionamento, da mostrare nella conversazione come nell'app desktop
+        settings: Object.assign({ showThinkingSummaries: true }, this.ultracode ? { ultracode: true } : {}),
         systemPrompt: { type: 'preset', preset: 'claude_code', append: this.persona || FALLBACK_PERSONA },
         env: Object.assign({}, process.env, {
           // Claude Code manda anche una frase che riassume ogni gruppo di azioni (come nell'app desktop)
@@ -532,7 +533,17 @@ class ClaudeBridge extends EventEmitter {
     if (msg.type === 'tool_use_summary' && msg.summary) this.emit('toolSummary', { summary: String(msg.summary), ids: msg.preceding_tool_use_ids || [] })
     if (msg.type === 'stream_event') {
       const ev = msg.event || {}
-      if (ev.type === 'content_block_start' && ev.content_block?.type === 'text' && turn.wroteText) {
+      // Il ragionamento: inizio, testo che arriva, fine del blocco
+      if (ev.type === 'content_block_start' && ev.content_block?.type === 'thinking') {
+        turn.thinkingIdx = ev.index
+        turn.streamedThinking = true
+        this.emit('thinkingStart')
+      } else if (ev.type === 'content_block_delta' && ev.delta?.type === 'thinking_delta') {
+        if (ev.delta.thinking) this.emit('thinking', ev.delta.thinking)
+      } else if (ev.type === 'content_block_stop' && turn.thinkingIdx != null && ev.index === turn.thinkingIdx) {
+        turn.thinkingIdx = null
+        this.emit('thinkingEnd')
+      } else if (ev.type === 'content_block_start' && ev.content_block?.type === 'text' && turn.wroteText) {
         this.emit('delta', '\n\n')
       } else if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
         turn.sawDelta = true
@@ -541,6 +552,11 @@ class ClaudeBridge extends EventEmitter {
       }
     } else if (msg.type === 'assistant') {
       for (const block of msg.message?.content || []) {
+        // Un ragionamento che non è arrivato a pezzi (senza stream): tutto insieme
+        if (block.type === 'thinking') {
+          if (block.thinking && !turn.streamedThinking) { this.emit('thinkingStart'); this.emit('thinking', block.thinking); this.emit('thinkingEnd') }
+          continue
+        }
         if (block.type === 'tool_use' && TODO_TOOLS.has(block.name)) {
           if (applyTodo(this.todos, this.todoCreated, block.name, block.id, block.input)) this.emit('todos', this.todos)
         } else if (block.type === 'tool_use') this.emit('tool', { id: block.id, name: block.name, summary: summary(block.input), intent: intent(block.name, block.input), change: this.change(block.name, block.input) })
@@ -550,6 +566,7 @@ class ClaudeBridge extends EventEmitter {
         }
       }
       turn.sawDelta = false
+      turn.streamedThinking = false
     } else if (msg.type === 'user') {
       const out = localStdout(msg.message)
       if (out != null && !turn.sawOutput) { turn.sawOutput = true; this.emit('commandOutput', plainOutput(out)) }
@@ -775,6 +792,7 @@ class ClaudeBridge extends EventEmitter {
       const content = m.message && m.message.content
       const blocks = Array.isArray(content) ? content : [{ type: 'text', text: typeof content === 'string' ? content : '' }]
       if (m.type === 'assistant') {
+        for (const b of blocks) if (b.type === 'thinking' && b.thinking && b.thinking.trim()) items.push({ role: 'thinking', text: b.thinking })
         const text = plainText(m.message)
         if (text.trim()) items.push({ role: 'assistant', text })
         for (const b of blocks) {
