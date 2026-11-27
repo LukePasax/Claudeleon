@@ -2177,7 +2177,7 @@
     const fireAll = fire
     let n = 1
     let fakeWin = 'normal'
-    // Dalla console dell'anteprima: anteprima.tema('moderno'), anteprima.permesso(), anteprima.piano(),
+    // Dalla console dell'anteprima: anteprima.tema('metrios'), anteprima.permesso(), anteprima.piano(),
     // anteprima.risposta('testo in markdown')
     window.anteprima = {
       tema: (id) => fire('onTheme', id, 0),
@@ -2213,7 +2213,7 @@
       // ?tema=<id>&scena=giorno nell'indirizzo per guardare un tema
       info: async () => {
         const q = new URLSearchParams(location.search)
-        return { scene: q.get('scena') || 'notte', chapter: n, theme: q.get('tema') || 'terra-di-mezzo', themes: ['terra-di-mezzo', 'moderno'], workdir: 'C:/Workspace', workdirChosen: q.get('cartella') !== 'no', mode: q.get('modo') || 'auto' }
+        return { scene: q.get('scena') || 'notte', chapter: n, theme: q.get('tema') || 'terra-di-mezzo', themes: ['terra-di-mezzo', 'metrios', 'dream'], workdir: 'C:/Workspace', workdirChosen: q.get('cartella') !== 'no', mode: q.get('modo') || 'auto' }
       },
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
       setMode: (m) => fire('onMode', m, 0),
