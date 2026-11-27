@@ -797,7 +797,9 @@ function fakeConversation(capture) {
 // Il nome con cui Windows raggruppa la finestra nella barra delle applicazioni e riconosce le sue notifiche. Era
 // 'Claude Skins': Windows gli aveva già legato l'icona di Electron (il primo collegamento era nato senza icona) e la
 // teneva in memoria; con un nome nuovo ricomincia da capo
-const APP_ID = 'ClaudeSkins.App'
+// La versione lanciata dal repo (electron.exe) ne ha un altro: con lo stesso, Windows mescolava le due e mostrava
+// l'icona di electron.exe anche per l'app installata
+const APP_ID = app.isPackaged ? 'ClaudeSkins.App' : 'ClaudeSkins.Dev'
 if (process.platform === 'win32') app.setAppUserModelId(APP_ID)
 
 // Le icone. Quella dell'app (menu Start, barra delle applicazioni, eseguibile, installer) è di Claude Skins e non

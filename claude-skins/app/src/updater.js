@@ -2,7 +2,7 @@
 // nel suo package.json, scritti da scripts/dist.js); quella lanciata dal repo lo trova da sé. Controllare: git fetch,
 // poi quante novità ha il branch remoto e se il repo è più avanti dell'app installata. Aggiornare: git pull
 // --ff-only, npm install se sono cambiate le dipendenze, e per l'app installata le prove (npm test) e un installer nuovo lanciato in
-// silenzio (/S --force-run: si installa sopra e riapre l'app); per quella dal repo basta riavviarsi.
+// silenzio (--updated /S --force-run: si installa sopra lasciando collegamenti e pulsante fissato, e riapre l'app); per quella dal repo basta riavviarsi.
 const { execFile, spawn } = require('child_process')
 const fs = require('fs')
 const path = require('path')
@@ -128,7 +128,9 @@ class Updater extends EventEmitter {
       this.set({ state: 'updating', step: 'install' })
       this.log('installo', setup.f)
       // L'installer si stacca dall'app: si installa sopra (stessa cartella) e la riapre
-      const child = spawn(path.join(dist, setup.f), ['/S', '--force-run'], { detached: true, stdio: 'ignore', windowsHide: true })
+      // --updated: è un aggiornamento, non un'installazione nuova (collegamenti e pulsante fissato nella barra delle
+      // applicazioni restano dove sono); /S silenzioso; --force-run riapre l'app alla fine
+      const child = spawn(path.join(dist, setup.f), ['--updated', '/S', '--force-run'], { detached: true, stdio: 'ignore', windowsHide: true })
       child.unref()
       setTimeout(() => this.app.quit(), 800)
     } catch (err) {

@@ -251,7 +251,8 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
 `electron-builder` (devDependency), configurato nel campo `build` di package.json: NSIS per Windows, per utente,
 cartella scelta, collegamenti nel menu Start e sul desktop, `appId` = `ClaudeSkins.App`, lo stesso AppUserModelId che
 main.js imposta (l'installer lo mette sui collegamenti: notifiche e icona della barra vanno da sé, e l'app impacchettata
-non scrive il suo collegamento). Icona dell'app in `build/icon.ico`, uguale per tutti i temi (tre carte sovrapposte
+non scrive il suo collegamento). La versione lanciata dal repo (electron.exe) usa invece `ClaudeSkins.Dev`: con lo
+stesso ID Windows mescolava le due e mostrava l'icona di electron.exe anche per l'app installata. Icona dell'app in `build/icon.ico`, uguale per tutti i temi (tre carte sovrapposte
 con una stellina, otto misure da 256 a 16, scritta come .ico coi PNG dentro): eseguibile, installer, collegamenti,
 barra delle applicazioni (`setAppDetails`). Il tema dà solo l'icona del vassoio e della finestra. Nel pacchetto non
 entrano i binari di Claude Code che l'SDK porta per ogni sistema (`claude-agent-sdk-*`, ~380 MB l'uno): l'app usa
@@ -278,7 +279,7 @@ electron-builder `extraMetadata.skinsRepo` e `skinsCommit` (git toplevel e HEAD)
 dell'app impacchettata. `src/updater.js`: `check()` fa `git fetch` e conta `HEAD..@{u}` (novità remote) e
 `skinsCommit..HEAD` (repo più avanti dell'app installata); le modifiche locali tracciate (tranne package-lock.json)
 bloccano. `update()`: `git pull --ff-only`, `npm install` se sono cambiati package.json o package-lock.json (poi il lock
-torna com'era con `git checkout`), `npm run dist`, e l'installer in `dist` lanciato staccato con `/S --force-run`
+torna com'era con `git checkout`), `npm run dist`, e l'installer in `dist` lanciato staccato con `--updated /S --force-run` (`--updated` evita la disinstallazione completa, che toglieva collegamenti e pulsante fissato nella barra)
 (NSIS di electron-builder: silenzioso, stessa cartella, riapre l'app), poi `app.quit()`. Dal repo (non installata):
 pull e `app.relaunch()`. Il processo principale controlla 30 s dopo l'avvio e ogni 6 ore (`config.autoUpdate`),
 notifica una volta per numero di novità; la pagina mostra un avviso (`.update-banner`) e la sezione nelle impostazioni.
