@@ -580,6 +580,44 @@
       b.title = context ? t('contextTip', { p, used: kTok(context.used), max: kTok(context.max) }) : t('contextNone')
     }
   }
+  // L'utilizzo del piano (sessione di 5 ore, settimana), come nell'app desktop: una barra per finestra, con quando
+  // si azzera. Arriva da Claude Code all'avvio e dopo le risposte
+  let usage = null
+  if (api.onUsage) api.onUsage((u) => { usage = u })
+  if (api.usage) api.usage().then((u) => { if (u && !usage) usage = u }).catch(() => {})
+  function resetWhen(iso) {
+    if (!iso) return ''
+    const d = new Date(iso)
+    if (isNaN(d)) return ''
+    const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    const today = new Date()
+    if (d.toDateString() === today.toDateString()) return t('usageAt', { when: hm })
+    const days = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab']
+    return t('usageAt', { when: `${days[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}, ${hm}` })
+  }
+  function usageSection(menu) {
+    const head = document.createElement('div')
+    head.className = 'folder-head usage-head'
+    menu.appendChild(label(head, 'usageTitle'))
+    const rows = usage ? [['usage5h', usage.fiveHour], ['usageWeek', usage.week], ['usageWeekOpus', usage.weekOpus], ['usageWeekSonnet', usage.weekSonnet]].filter(([, w]) => w) : []
+    if (!rows.length) {
+      const n = document.createElement('div')
+      n.className = 'folder-note'
+      menu.appendChild(label(n, 'usageNone'))
+      return
+    }
+    for (const [key, w] of rows) {
+      const row = document.createElement('div')
+      row.className = 'usage-row' + (w.used >= 80 ? ' warn' : '')
+      row.innerHTML = '<div class="u-line"><span class="u-name"></span><span class="u-pct"></span></div><div class="u-bar"><span></span></div><div class="u-reset"></div>'
+      label(row.querySelector('.u-name'), key)
+      row.querySelector('.u-pct').textContent = `${w.used}%`
+      row.querySelector('.u-bar span').style.width = `${Math.max(1, Math.min(100, w.used))}%`
+      row.querySelector('.u-reset').textContent = resetWhen(w.resetsAt)
+      menu.appendChild(row)
+    }
+  }
+
   function openContextMenu(anchor) {
     closeFolderMenu()
     const menu = document.createElement('div')
@@ -588,17 +626,18 @@
     head.className = 'folder-head'
     if (!context) {
       menu.appendChild(label(head, 'contextEmpty'))
+      usageSection(menu)
       placeMenu(menu, anchor)
       return
     }
     menu.appendChild(label(head, 'contextTitle', { p: context.percentage }))
     const of = document.createElement('div')
     of.className = 'folder-note'
-    menu.appendChild(label(of, 'contextOf', { used: kTok(context.used), max: kTok(context.max) }))
-    // La barra: una fetta per categoria usata, il resto libero
+    menu.appendChild(label(of, context.estimate ? 'contextEstimate' : 'contextOf', { used: kTok(context.used), max: kTok(context.max) }))
+    // La barra: una fetta per categoria usata, il resto libero (una stima senza categorie: una fetta sola)
     const bar = document.createElement('div')
     bar.className = 'context-bar'
-    const used = context.categories.filter((c) => c.kind === 'used')
+    const used = context.categories.length ? context.categories.filter((c) => c.kind === 'used') : [{ name: t('ctx_messages'), tokens: context.used, kind: 'used' }]
     used.forEach((c, k) => {
       const seg = document.createElement('span')
       seg.style.width = `${Math.max(0.5, (c.tokens / Math.max(1, context.max)) * 100)}%`
@@ -623,6 +662,7 @@
     const note = document.createElement('div')
     note.className = 'folder-note'
     menu.appendChild(label(note, 'contextNote'))
+    usageSection(menu)
     const compact = document.createElement('div')
     compact.className = 'folder-item other'
     menu.appendChild(label(compact, 'contextCompact'))
@@ -2424,6 +2464,8 @@
         { value: 'haiku', name: 'Haiku', description: 'Il più rapido, per le risposte brevi', efforts: [] },
       ], model: null, effort: null }),
       setModel() {},
+      usage: async () => ({ plan: 'max', fiveHour: { used: 34, resetsAt: new Date(Date.now() + 2 * 3600000).toISOString() }, week: { used: 82, resetsAt: new Date(Date.now() + 3 * 86400000).toISOString() } }),
+      onUsage: on('onUsage'),
       onModels: on('onModels'), onTodos: on('onTodos'), onContext: on('onContext'),
       onThinkingStart: on('onThinkingStart'), onSuggestion: on('onSuggestion'), onThinking: on('onThinking'), onThinkingEnd: on('onThinkingEnd'),
       send(msg, conv) {

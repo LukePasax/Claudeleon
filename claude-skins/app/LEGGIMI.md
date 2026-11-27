@@ -80,8 +80,11 @@ npm 11 altrimenti non arriva.
 - **Contesto:** accanto a "Spedisci" un anello dice quanto è pieno il contesto della conversazione (rosso oltre
   l'80%); passandoci sopra la percentuale e i token, con un clic il dettaglio per categoria (prompt di sistema,
   strumenti, memoria, conversazione, riserva, spazio libero) e "Compatta ora" (`/compact`). Si aggiorna a fine di
-  ogni risposta e dopo una compattazione (`getContextUsage` dell'SDK); per una cronaca appena riaperta arriva dopo la
-  prima risposta.
+  ogni risposta e dopo una compattazione (`getContextUsage` dell'SDK). Per una cronaca appena riaperta c'è subito una
+  stima, dai token dell'ultima risposta salvata; il conto vero arriva dopo la prima risposta. Nello stesso riquadro
+  c'è l'**utilizzo del piano**, come nell'app desktop: la sessione di 5 ore e la settimana (e per modello, se ci
+  sono), con la percentuale e quando si azzerano. Lo dà Claude Code all'avvio e dopo le risposte (un'interfaccia
+  ancora sperimentale dell'SDK; solo con l'abbonamento claude.ai).
 - **Allegati:** immagini e file, come nell'app desktop. Si incolla uno screenshot (Ctrl+V) o dei file copiati in
   Esplora file, si trascinano file sulla finestra, o si sceglie col pulsante "+" accanto ai modi. Sopra la penna
   compaiono come miniature ed etichette, ciascuna con la sua ×. Le immagini partono come immagini (rimpicciolite oltre

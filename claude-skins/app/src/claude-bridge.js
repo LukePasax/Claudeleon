@@ -56,6 +56,9 @@ function settleTodo(todos, created, toolUseId, result) {
   return true
 }
 
+// La finestra del contesto dell'ultimo conto vero (per la stima di una cronaca appena aperta)
+let lastContextMax = 200000
+
 // Dopo quanto una conversazione ferma si spegne (si riaccende da sola al messaggio dopo)
 const IDLE_CLOSE_MS = 30 * 60 * 1000
 
@@ -268,6 +271,9 @@ class ClaudeBridge extends EventEmitter {
       try {
         const list = await Promise.race([q.supportedCommands(), new Promise((_, reject) => setTimeout(() => reject(new Error('tempo scaduto')), 60000))])
         this.setCommands(list)
+        // L'utilizzo del piano, per averlo subito
+        this.fetchUsage(q)
+        await new Promise((r) => setTimeout(r, 3000))
         // I modelli disponibili, per il selettore
         const models = await Promise.race([q.supportedModels(), new Promise((resolve) => setTimeout(() => resolve(null), 20000))]).catch(() => null)
         if (Array.isArray(models) && models.length) this.emit('models', models.map((m) => ({ value: m.value, name: m.displayName || m.value, description: m.description || '', efforts: m.supportsEffort ? (m.supportedEffortLevels || ['low', 'medium', 'high']) : [] })))
@@ -596,6 +602,7 @@ class ClaudeBridge extends EventEmitter {
         this.emit('done', { durationMs: msg.duration_ms || 0 })
       }
       this.refreshContext(live)
+      this.fetchUsage(live.query)
       // Una conversazione ferma da molto si spegne (gli hook di fine sessione partono allora); il prossimo messaggio la
       // riaccende riprendendo la sessione
       clearTimeout(live.idle)
@@ -609,12 +616,27 @@ class ClaudeBridge extends EventEmitter {
     if (!live || live.ended || !live.query.getContextUsage) return
     live.query.getContextUsage({ detail: 'summary' }).then((u) => {
       if (this.live !== live || !u) return
+      if (u.rawMaxTokens) lastContextMax = u.rawMaxTokens
       this.emit('context', {
         percentage: Math.round(u.percentage || 0),
         used: u.totalTokens || 0,
         max: u.rawMaxTokens || u.maxTokens || 0,
         categories: (u.categories || []).filter((c) => c.tokens > 0).map((c) => ({ id: c.id || '', name: c.name, tokens: c.tokens, kind: c.kind || (c.isDeferred ? 'deferred' : 'used') })),
       })
+    }).catch(() => {})
+  }
+
+  // L'utilizzo del piano (sessione di 5 ore, settimana) chiesto a un Claude Code acceso. È un'interfaccia sperimentale
+  // dell'SDK: se manca o non risponde, semplicemente non c'è. Al più una volta al minuto
+  fetchUsage(q) {
+    const fn = q && q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET
+    if (typeof fn !== 'function' || Date.now() - (this.usageAt || 0) < 60000) return
+    this.usageAt = Date.now()
+    fn.call(q, { skipBehaviors: true }).then((u) => {
+      if (!u || !u.rate_limits_available || !u.rate_limits) return
+      const w = (x) => (x && x.utilization != null ? { used: Math.round(x.utilization), resetsAt: x.resets_at || null } : null)
+      const r = u.rate_limits
+      this.emit('usage', { plan: u.subscription_type || null, fiveHour: w(r.five_hour), week: w(r.seven_day), weekOpus: w(r.seven_day_opus), weekSonnet: w(r.seven_day_sonnet) })
     }).catch(() => {})
   }
 
@@ -842,6 +864,16 @@ class ClaudeBridge extends EventEmitter {
     }
     // La cronaca riaperta continua con le sue attività
     this.resetTodos(todos)
+    // Il contesto, stimato dai token dell'ultima risposta salvata (il conto vero arriva dopo la prima risposta)
+    for (let k = messages.length - 1; k >= 0; k--) {
+      const m = messages[k]
+      const u = m.type === 'assistant' && !m.parent_tool_use_id && m.message && m.message.usage
+      if (!u) continue
+      const used = (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.output_tokens || 0)
+      if (!used) continue
+      this.emit('context', { percentage: Math.round((used / lastContextMax) * 100), used, max: lastContextMax, categories: [], estimate: true })
+      break
+    }
     return items
   }
 }

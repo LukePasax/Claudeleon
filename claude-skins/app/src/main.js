@@ -25,6 +25,8 @@ let bridge = null
 const convs = new Map()
 let activeConv = null
 let nextConv = 1
+// L'ultimo utilizzo del piano saputo (sessione di 5 ore, settimana)
+let lastUsage = null
 let captureMode = false
 let configFile = null
 // workdir: la cartella in cui lavora Claude Code e di cui si elencano le cronache; vuota, la cartella utente
@@ -539,6 +541,8 @@ function registerIpc() {
     send('commands:list', list)
   })
   bridge.on('commandsError', () => send('commands:error'))
+  bridge.on('usage', (u) => { lastUsage = u; send('claude:usage', u) })
+  ipcMain.handle('usage:get', () => lastUsage)
   bridge.on('models', (list) => {
     bridge.modelList = list
     try { fs.writeFileSync(path.join(app.getPath('userData'), 'models.json'), JSON.stringify(list)) } catch {}
@@ -581,6 +585,7 @@ function wireConv(c) {
   fwd('askClosed', 'perm:closed')
   fwd('todos', 'claude:todos')
   fwd('suggestion', 'claude:suggestion')
+  b.on('usage', (u) => { lastUsage = u; send('claude:usage', u) })
   fwd('context', 'claude:context')
   // Claude riprende a lavorare da sé (un messaggio entrato mentre il turno finiva)
   fwd('busy', 'claude:busy')
@@ -697,6 +702,14 @@ function setAppIcon(dataUrl) {
   try {
     const changed = writeIco(img)
     ensureStartMenuShortcut(changed)
+    // Le proprietà della finestra che la barra delle applicazioni legge per l'icona (anche quando l'app è fissata)
+    win.setAppDetails({
+      appId: APP_ID,
+      appIconPath: iconFile(),
+      appIconIndex: 0,
+      relaunchCommand: `"${process.execPath}" "${app.getAppPath()}"`,
+      relaunchDisplayName: 'Claude Skins',
+    })
   } catch {}
 }
 

@@ -46,6 +46,8 @@ contextBridge.exposeInMainWorld('skins', {
   onBusy: listen('claude:busy'),
   onContext: listen('claude:context'),
   onSuggestion: listen('claude:suggestion'),
+  onUsage: listen('claude:usage'),
+  usage: () => ipcRenderer.invoke('usage:get'),
   onThinkingStart: listen('claude:thinkingStart'),
   onThinking: listen('claude:thinking'),
   onThinkingEnd: listen('claude:thinkingEnd'),
