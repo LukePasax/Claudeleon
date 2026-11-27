@@ -550,3 +550,12 @@ body.busy .entry .edit-btn { display: none; }
 .fr-actions { flex: none; display: flex; gap: 4px; }
 .fr-diffs { padding: 0 0 10px 14px; }
 .fr-diffs .diff { margin-bottom: 8px; }
+
+/* Le estensioni: un pallino per lo stato davanti a ogni server o plugin */
+.ext-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--ink-soft); opacity: 0.5; }
+.ext-dot.connected { background: var(--plus); opacity: 1; }
+.ext-dot.failed { background: var(--red); opacity: 1; }
+.ext-dot.needs-auth { background: #d99a2b; opacity: 1; }
+.ext-dot.pending { background: #d99a2b; opacity: 0.6; animation: thinking-pulse 1.2s ease-in-out infinite; }
+.ext-dot.disabled { background: none; border: 1.5px solid var(--ink-soft); }
+.ext-error { font-size: var(--small-size); color: var(--red); padding: 2px 0 6px 21px; overflow-wrap: anywhere; }

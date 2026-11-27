@@ -1288,6 +1288,9 @@
       const levels = (modelInfo() && modelInfo().efforts.length ? modelInfo().efforts : ['low', 'medium', 'high', 'xhigh', 'max'])
       select(row('effortTitle'), [['', t('effortAuto')], ...levels.map((l) => [l, t(`effort_${l}`)])], effort || '', (v) => { effort = v || null; api.setModel(model, effort, ultracode); renderModel() })
       toggle(row('ultracode', t('ultracodeDesc')), ultracode, (v) => { ultracode = v; api.setModel(model, effort, ultracode); renderModel(); render() })
+      // Estensioni
+      section('setExtensions')
+      button(row('setExtRow', t('setExtNote')), 'setOpenPanel', () => { closeThemes(); openExtensions() })
       // Claude Code
       section('setClaude')
       const where = row('setClaudePath', `${st.claudePath || ''}${st.claudeFound ? (st.claudeVersion ? ` · ${st.claudeVersion}` : '') : ` · ${t('setClaudeMissing')}`}`)
@@ -1304,6 +1307,101 @@
     host.appendChild(panel)
   }
   if (api.onSettingsOpen) api.onSettingsOpen(() => openSettings())
+
+  // ------------------------------------------------------------------ estensioni: server MCP e plugin
+
+  // Il pannello delle estensioni: i server MCP (stato, strumenti, da dove vengono; accendere, spegnere, riconnettere)
+  // e i plugin (accesi, spenti, errori). Le risposte le dà Claude Code: quello della conversazione in vista se è acceso,
+  // altrimenti uno temporaneo (qualche secondo)
+  async function openExtensions() {
+    closeThemes()
+    closeFolderMenu()
+    const host = app.querySelector('[data-solid]') || app
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+    const panel = document.createElement('div')
+    panel.className = 'theme-picker settings-panel ext-panel'
+    panel.innerHTML = '<div class="theme-picker-box settings-box"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="settings-body"></div></div>'
+    label(panel.querySelector('.theme-picker-head span'), 'extTitle')
+    const close = panel.querySelector('.theme-picker-head button')
+    label(close, 'themesClose')
+    close.addEventListener('click', closeThemes)
+    panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    const body = panel.querySelector('.settings-body')
+    host.appendChild(panel)
+    const note = (key, vars) => { const n = document.createElement('div'); n.className = 'folder-note'; body.appendChild(label(n, key, vars)); return n }
+    async function load() {
+      body.innerHTML = ''
+      note('extLoading')
+      let x = null
+      try { x = await api.extensions() } catch {}
+      if (!panel.isConnected) return
+      body.innerHTML = ''
+      if (!x || !x.ok) { note('extFailed', { err: (x && x.error) || '' }); }
+      if (x) render(x)
+    }
+    const section = (key) => { const h = document.createElement('div'); h.className = 'set-section'; body.appendChild(label(h, key)) }
+    const row = (name, noteText, dot) => {
+      const r = document.createElement('div')
+      r.className = 'set-row'
+      r.innerHTML = '<span class="ext-dot"></span><div class="set-text"><div class="set-label"></div><div class="set-note"></div></div><div class="set-control"></div>'
+      if (dot) r.querySelector('.ext-dot').classList.add(dot)
+      else r.querySelector('.ext-dot').remove()
+      r.querySelector('.set-label').textContent = name
+      if (noteText) r.querySelector('.set-note').textContent = noteText
+      else r.querySelector('.set-note').remove()
+      body.appendChild(r)
+      return r.querySelector('.set-control')
+    }
+    const toggle = (ctl, on, fn) => {
+      const b = document.createElement('button')
+      b.className = 'set-switch' + (on ? ' on' : '')
+      b.innerHTML = '<span class="switch"></span>'
+      b.addEventListener('click', async () => {
+        b.disabled = true
+        const r = await fn(!on).catch((err) => ({ ok: false, error: err.message }))
+        if (r && r.ok === false) { const n = document.createElement('div'); n.className = 'ext-error'; n.textContent = r.error || '?'; ctl.closest('.set-row').after(n) }
+        load()
+      })
+      ctl.appendChild(b)
+    }
+    function render(x) {
+      // Server MCP
+      section('extMcp')
+      if (!x.mcp.length) note('extMcpNone')
+      for (const s of x.mcp) {
+        const where = [s.source || s.scope, s.tools ? t('extTools', { n: s.tools }) : '', s.error].filter(Boolean).join(' · ')
+        const ctl = row(s.name, `${t(`extStatus_${s.status}`)}${where ? ` · ${where}` : ''}`, s.status)
+        if (s.status === 'failed' || s.status === 'needs-auth') {
+          const b = document.createElement('button')
+          b.className = 'btn small deny'
+          label(b, 'extReconnect')
+          b.addEventListener('click', async () => { b.disabled = true; await api.reconnectMcp(s.name).catch(() => {}); load() })
+          ctl.appendChild(b)
+        }
+        if (s.source !== 'sdk') toggle(ctl, s.status !== 'disabled', (on) => api.toggleMcp(s.name, on))
+      }
+      // Plugin: quelli caricati, quelli spenti nelle impostazioni, quelli accesi che non si sono caricati
+      section('extPlugins')
+      const enabled = x.enabled || {}
+      const keyOf = (name) => Object.keys(enabled).find((k) => k.split('@')[0] === name) || null
+      const seen = new Set()
+      const rows = []
+      for (const p of x.plugins) { const k = keyOf(p.name); if (k) seen.add(k); rows.push({ name: p.name, key: k, on: true, note: [p.version && `v${p.version}`, k && k.includes('@') ? k.split('@')[1] : p.source].filter(Boolean).join(' · ') }) }
+      for (const [k, v] of Object.entries(enabled)) {
+        if (seen.has(k)) continue
+        const err = x.errors.find((e) => e.plugin === k || e.plugin.split('@')[0] === k.split('@')[0])
+        rows.push({ name: k.split('@')[0], key: k, on: !!v, note: [k.split('@')[1], v && (err ? err.message : t('extNotLoaded'))].filter(Boolean).join(' · ') })
+      }
+      if (!rows.length) note('extPluginsNone')
+      for (const r of rows) {
+        const ctl = row(r.name, r.note, r.on ? 'connected' : 'disabled')
+        if (r.key) toggle(ctl, r.on, (on) => api.togglePlugin(r.key, on))
+      }
+      for (const e of x.errors) if (!rows.some((r) => r.key === e.plugin)) { const n = document.createElement('div'); n.className = 'ext-error'; n.textContent = `${e.plugin}: ${e.message}`; body.appendChild(n) }
+      note('extHowTo')
+    }
+    load()
+  }
 
   // ------------------------------------------------------------------ la finestra: bordi, ingrandire
 
@@ -2863,6 +2961,13 @@
       onThinkingStart: on('onThinkingStart'), onSuggestion: on('onSuggestion'), onThinking: on('onThinking'), onThinkingEnd: on('onThinkingEnd'),
       openFile: async () => true,
       revealFile: async () => false,
+      extensions: async () => ({ ok: true, mcp: [
+        { name: 'github', status: 'connected', scope: 'user', source: 'user', tools: 48, error: '' },
+        { name: 'Gmail', status: 'needs-auth', scope: 'claudeai', source: 'claudeai', tools: 0, error: '' },
+        { name: 'datadog', status: 'failed', scope: 'plugin', source: 'plugin', tools: 0, error: 'connessione rifiutata' },
+        { name: 'notion', status: 'disabled', scope: 'project', source: 'project', tools: 0, error: '' },
+      ], plugins: [{ name: 'engineering', version: '1.2.0', source: '' }], errors: [], enabled: { 'engineering@anthropic-plugins': true, 'cowork-plugin-management@anthropic-plugins': false } }),
+      toggleMcp: async () => ({ ok: true }), reconnectMcp: async () => ({ ok: true }), togglePlugin: async () => ({ ok: true }),
       settings: async () => fakeSettings,
       setSetting: async (k, v) => { if (k in fakeSettings) fakeSettings[k] = v; return fakeSettings },
       suggestFiles: async (q) => ['src/', 'src/MapView.cpp', 'src/MapView.h', 'src/MapLoader.cpp', 'src/RouteFinder.h', 'docs/', 'docs/specifiche.pdf', 'README.md', 'CMakeLists.txt'].filter((f) => f.toLowerCase().includes(q.toLowerCase())).slice(0, 15),

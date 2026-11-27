@@ -55,6 +55,13 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   centro e dimensione iniziale; notifiche; cartella di lavoro, permessi, modello, ragionamento e ultracode; il
   programma di Claude Code (percorso, se c'è e la sua versione, per sceglierne un altro) e come si presentano le
   sessioni alle altre app (`entrypoint`); versione, scorciatoia e cartella dei dati.
+- **Server MCP e plugin:** dalle impostazioni, "Estensioni" → "Apri…". Per ogni server MCP lo stato (collegato,
+  non si collega, serve l'accesso, spento), da dove viene e quanti strumenti ha; un interruttore lo accende o lo
+  spegne e "Riconnetti" ritenta quelli in errore. Per i plugin quelli caricati, quelli spenti e quelli accesi che non
+  si sono caricati, con un interruttore che li accende o spegne per tutte le conversazioni (`enabledPlugins` nelle
+  impostazioni dell'utente di Claude Code, scritte da Claude Code stesso, poi i plugin si ricaricano). Le risposte le
+  dà il Claude Code della conversazione in vista, o uno temporaneo. Server e plugin nuovi si aggiungono da Claude
+  Code (`/mcp`, `/plugin`, `claude mcp add`).
 - **Notifiche:** quando la finestra non è davanti (ridotta a icona o dietro ad altre), una notifica di Windows dice
   che Claude ha finito (con l'inizio della risposta), che chiede un permesso, una scelta o l'approvazione di un piano,
   o che si è fermato; nel titolo c'è il nome della conversazione. Un clic riporta davanti la finestra, e tornandoci le

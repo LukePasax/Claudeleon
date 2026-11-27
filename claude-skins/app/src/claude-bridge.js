@@ -579,6 +579,8 @@ class ClaudeBridge extends EventEmitter {
     // Claude Code dice in che modo è (all'inizio di ogni turno e quando cambia): la finestra si allinea
     if (msg.type === 'system' && (msg.subtype === 'init' || msg.subtype === 'status') && msg.permissionMode) this.setMode(msg.permissionMode, true)
     if (msg.type === 'system') {
+      // All'avvio: i comandi solo da terminale, e plugin, skill, agenti e server MCP della sessione (per il pannello)
+      if (msg.subtype === 'init') this.lastInit = { plugins: msg.plugins || [], errors: msg.plugin_errors || [], skills: msg.skills || [], agents: msg.agents || [] }
       if (msg.subtype === 'init' && Array.isArray(msg.terminal_slash_commands)) this.terminalOnly = new Set(msg.terminal_slash_commands)
       else if (msg.subtype === 'commands_changed') this.setCommands(msg.commands)
       else if (msg.subtype === 'local_command_output') { turn.sawOutput = true; this.emit('commandOutput', plainOutput(msg.content)) }
@@ -814,6 +816,68 @@ class ClaudeBridge extends EventEmitter {
       branch: s.gitBranch || null,
       archived: !!s.archived,
     }))
+  }
+
+  // ------------------------------------------------------------------ estensioni: server MCP e plugin
+
+  // Un Claude Code a cui chiedere: quello acceso della conversazione, o uno temporaneo che si spegne dopo
+  async withQuery(fn) {
+    if (this.live && !this.live.ended) return fn(this.live.query, true)
+    const { query } = await loadSdk()
+    let release
+    const idle = new Promise((resolve) => { release = resolve })
+    async function* nothing() { await idle }
+    const q = query({ prompt: nothing(), options: { cwd: this.sessionCwd || this.workdir, pathToClaudeCodeExecutable: this.claudePath || CLAUDE, permissionMode: this.mode, settings: { disableAllHooks: true } } })
+    try { return await fn(q, false) } finally { release(); try { q.close() } catch {} }
+  }
+  // I plugin accesi o spenti nelle impostazioni dell'utente di Claude Code (enabledPlugins: "nome@marketplace": sì/no)
+  enabledPlugins() {
+    const dir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
+    try { return JSON.parse(fs.readFileSync(path.join(dir, 'settings.json'), 'utf8')).enabledPlugins || {} } catch { return {} }
+  }
+  // Server MCP (stato, strumenti, da dove vengono) e plugin (caricati, spenti, errori)
+  async extensions() {
+    const limit = (p, ms, dflt) => Promise.race([p, new Promise((resolve) => setTimeout(() => resolve(dflt), ms))])
+    return this.withQuery(async (q, live) => {
+      const mcp = await limit(q.mcpServerStatus().catch(() => null), 30000, null)
+      let plugins = null
+      let errors = []
+      if (live && this.lastInit) { plugins = this.lastInit.plugins; errors = this.lastInit.errors }
+      else if (q.reloadPlugins) {
+        const r = await limit(q.reloadPlugins({ refuseIfBusy: true }).catch(() => null), 30000, null)
+        if (r) plugins = r.plugins || []
+      }
+      return {
+        ok: !!mcp,
+        mcp: (mcp || []).filter((s) => s.name !== TITLE_SERVER).map((s) => ({ name: s.name, status: s.status, error: s.error || '', scope: s.scope || '', source: s.source || '', tools: (s.tools || []).length })),
+        plugins: (plugins || []).map((p) => ({ name: p.name, version: p.version || '', source: p.source || '' })),
+        errors: (errors || []).map((e) => ({ plugin: e.plugin || '', message: e.message || '' })),
+        enabled: this.enabledPlugins(),
+      }
+    })
+  }
+  async toggleMcp(name, on) {
+    return this.withQuery((q) => q.toggleMcpServer(name, !!on))
+  }
+  async reconnectMcp(name) {
+    return this.withQuery((q) => q.reconnectMcpServer(name))
+  }
+  // Un plugin acceso o spento: nelle impostazioni dell'utente, scritte da Claude Code (updateSettings), e ricaricato
+  async togglePlugin(key, on) {
+    return this.withQuery(async (q, live) => {
+      const enabled = Object.assign({}, this.enabledPlugins(), { [key]: !!on })
+      if (q.updateSettings) await q.updateSettings('userSettings', { enabledPlugins: enabled })
+      if (live && q.reloadPlugins) {
+        const r = await q.reloadPlugins({ refuseIfBusy: true }).catch(() => null)
+        if (r && this.lastInit) this.lastInit.plugins = r.plugins || this.lastInit.plugins
+        if (r && r.commands) this.setCommands(r.commands)
+      }
+    })
+  }
+  // Le altre conversazioni accese ricaricano i plugin dopo un cambio
+  reloadPluginsLive() {
+    if (!this.live || this.live.ended || !this.live.query.reloadPlugins) return
+    this.live.query.reloadPlugins({ refuseIfBusy: true }).then((r) => { if (r && this.lastInit) this.lastInit.plugins = r.plugins || this.lastInit.plugins }).catch(() => {})
   }
 
   // Il titolo della conversazione in corso (per le notifiche): quello dato da Claude o dalla persona, altrimenti il

@@ -491,6 +491,27 @@ function registerIpc() {
   }))
   ipcMain.on('theme:set', (_e, id) => setTheme(String(id)))
   ipcMain.handle('settings:get', () => settingsState())
+  // Le estensioni (server MCP e plugin): si chiede al Claude Code della conversazione in vista, o a uno temporaneo
+  const extBridge = () => { const c = convOf(activeConv); return c && c.bridge.live && !c.bridge.live.ended ? c.bridge : bridge }
+  ipcMain.handle('ext:get', async () => { try { return await extBridge().extensions() } catch (err) { return { ok: false, error: err.message, mcp: [], plugins: [], errors: [], enabled: {} } } })
+  ipcMain.handle('ext:mcp', async (_e, name, on) => {
+    try {
+      await extBridge().toggleMcp(String(name), !!on)
+      // Anche nelle altre conversazioni accese
+      for (const c of convs.values()) if (c.bridge !== extBridge() && c.bridge.live && !c.bridge.live.ended) c.bridge.toggleMcp(String(name), !!on).catch(() => {})
+      return { ok: true }
+    } catch (err) { return { ok: false, error: err.message } }
+  })
+  ipcMain.handle('ext:reconnect', async (_e, name) => { try { await extBridge().reconnectMcp(String(name)); return { ok: true } } catch (err) { return { ok: false, error: err.message } } })
+  ipcMain.handle('ext:plugin', async (_e, key, on) => {
+    try {
+      const b = extBridge()
+      await b.togglePlugin(String(key), !!on)
+      for (const c of convs.values()) if (c.bridge !== b) c.bridge.reloadPluginsLive()
+      bridge.loadCommands()
+      return { ok: true }
+    } catch (err) { return { ok: false, error: err.message } }
+  })
   ipcMain.handle('settings:set', (_e, key, value) => applySetting(String(key), value))
   ipcMain.on('app:icon', (_e, dataUrl) => { if (!captureMode) setAppIcon(String(dataUrl || '')); else if (process.platform !== 'darwin') win.setIcon(nativeImage.createFromDataURL(String(dataUrl || ''))) })
   // Copiare negli appunti (i pulsanti "copia" di codice e risposte)
