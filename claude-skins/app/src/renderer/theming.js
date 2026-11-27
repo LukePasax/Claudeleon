@@ -6,7 +6,7 @@
 
   // Le scritte dell'interfaccia. {s}, {dir} ecc. si sostituiscono con i valori del momento
   const STRINGS = {
-    title: 'Claude Skins',
+    title: 'Claudeleon',
     chapter: 'Conversazione',
     placeholder: 'Scrivi a Claude…',
     hint: 'Invio per inviare · Maiusc+Invio per andare a capo · / per i comandi',
@@ -100,7 +100,7 @@
     updStatus: 'Stato',
     updIdle: 'Non ancora controllato.',
     updUnavailable: 'Non disponibile.',
-    updChecking: 'Controllo il repo…',
+    updChecking: 'Controllo gli aggiornamenti…',
     updUpToDate: 'Aggiornata',
     updAvailable: '{n} novità nel repo',
     updDirty: 'nel repo ci sono modifiche non salvate: aggiorna a mano con git pull',
@@ -109,15 +109,24 @@
     updApply: 'Aggiorna',
     updDetails: 'Dettagli',
     updLater: 'Più tardi',
-    updBanner: 'Aggiornamento di Claude Skins: {n} novità',
+    updBanner: 'Aggiornamento di Claudeleon: {n} novità',
+    updBannerVersion: 'È uscita Claudeleon {v}',
+    updAvailableVersion: 'Versione {v} disponibile',
+    updStep_download: 'Scarico la versione {v}… {p}%',
+    updSource: 'Aggiornamenti da',
+    updSourceNote: 'Le release su GitHub (come tutti), o il repo sul tuo PC (git pull e installer rifatto qui)',
+    updSource_github: 'Release su GitHub',
+    updSource_repo: 'Repo sul PC',
+    updAutoNoteGithub: 'All\'avvio e ogni 6 ore guarda se su GitHub c\'è una release nuova.',
     updAuto: 'Controlla da sola',
+    setVersionNote: 'versione {v}',
     updAutoNote: 'All\'avvio e ogni 6 ore guarda se il repo da cui è installata ha novità (git fetch).',
     updStep_pull: 'Scarico le novità dal repo…',
     updStep_deps: 'Installo le dipendenze…',
     updStep_test: 'Faccio le prove automatiche…',
     updStep_build: 'Creo l\'installer nuovo, qualche minuto…',
-    updStep_install: 'Installo e riapro Claude Skins…',
-    updStep_restart: 'Riavvio Claude Skins…',
+    updStep_install: 'Installo e riapro Claudeleon…',
+    updStep_restart: 'Riavvio Claudeleon…',
     // Cercare nella conversazione e le scorciatoie
     findPlaceholder: 'Cerca nella conversazione',
     findCount: '{i} di {n}',
@@ -355,7 +364,7 @@
     setWindow: 'Finestra',
     setOnTop: 'Sempre in primo piano',
     setLogin: 'Avvia con Windows',
-    setLoginNote: 'Claude Skins si apre da sola all\'accensione del computer.',
+    setLoginNote: 'Claudeleon si apre da sola all\'accensione del computer.',
     setPosition: 'Posizione e misura',
     setCenter: 'Riporta al centro',
     setSize: 'Dimensione iniziale',
@@ -410,7 +419,7 @@
     // Le risposte suggerite
     suggestionTip: 'Manda questa risposta (Tab la scrive nella casella)',
     // Il nome dell'app, per i temi che lo scrivono nella testata
-    appTitle: 'Claude Skins',
+    appTitle: 'Claudeleon',
     // I file da citare con @
     fileNone: 'Nessun file con questo nome nella cartella della conversazione.',
     // Modificare un messaggio

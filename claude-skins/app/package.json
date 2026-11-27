@@ -1,8 +1,9 @@
 {
-  "name": "claude-skins",
-  "productName": "Claude Skins",
-  "version": "0.1.0",
-  "description": "Claude in una finestra a temi",
+  "name": "claudeleon",
+  "productName": "Claudeleon",
+  "version": "1.0.0",
+  "description": "Claude Code in una finestra a temi",
+  "repository": "github:LukePasax/Claudeleon",
   "main": "src/main.js",
   "private": true,
   "scripts": {
@@ -21,13 +22,14 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.332",
+    "electron-updater": "^6.8.11",
     "zod": "^4.6.7"
   },
-  "author": "Claude Skins",
+  "author": "Claudeleon",
   "build": {
     "appId": "ClaudeSkins.App",
-    "productName": "Claude Skins",
-    "copyright": "Claude Skins",
+    "productName": "Claudeleon",
+    "copyright": "Claudeleon",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -58,11 +60,11 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Claude Skins",
-      "uninstallDisplayName": "Claude Skins",
+      "shortcutName": "Claudeleon",
+      "uninstallDisplayName": "Claudeleon",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
-      "artifactName": "Claude Skins Setup ${version}.${ext}",
+      "artifactName": "Claudeleon-Setup-${version}.${ext}",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
     },
@@ -70,6 +72,13 @@
       "target": "dir",
       "icon": "build/icon.png"
     },
-    "publish": null
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "LukePasax",
+        "repo": "Claudeleon",
+        "releaseType": "release"
+      }
+    ]
   }
 }

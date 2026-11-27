@@ -1,4 +1,4 @@
-# Claude Skins
+# Claudeleon
 
 Claude in una finestra a temi, grande come l'app desktop, che si usa come un'app normale. Forma e
 aspetto vengono dal tema. Di serie c'è **Essenziale**: pulito e neutro, con la struttura dell'app desktop
@@ -9,28 +9,57 @@ l'impostazione di Windows. Altri temi si creano con l'**editor dei temi** (color
 
 ## Installazione
 
-Serve Windows con [Node.js](https://nodejs.org) LTS e Claude Code installato a parte, con il login fatto
-(`irm https://claude.ai/install.ps1 | iex`, poi `claude` e `/login`).
+Serve Windows e Claude Code installato a parte, con il login fatto (`irm https://claude.ai/install.ps1 | iex`, poi
+`claude` e `/login`).
 
-### Come app installata (consigliato)
+### Dalla release (consigliato, anche per i colleghi)
+
+Si scarica `Claudeleon-Setup-<versione>.exe` dall'ultima release del repo su GitHub
+(<https://github.com/LukePasax/Claudeleon/releases/latest>) e si lancia: chiede dove installare (di
+partenza nella cartella dell'utente, senza diritti di amministratore), mette Claudeleon nel menu Start e sul
+desktop, e alla fine lo apre. Non serve Node.js né il repo.
+
+- **Aggiornamenti dalle release:** all'avvio e ogni 6 ore l'app guarda se c'è una release più nuova (`latest.yml`
+  della release, con electron-updater). Se c'è, compare l'avviso in alto con una notifica; "Aggiorna" scarica
+  l'installer (controllandone l'impronta), lo lancia in silenzio e riapre l'app. Nelle impostazioni, "Aggiornamenti":
+  la versione nuova, le sue note, "Controlla ora", l'interruttore del controllo automatico. Il diario è in
+  `%APPDATA%\Claudeleon\aggiornamento.log`. Il repo deve essere pubblico, perché l'app legge le release senza
+  credenziali.
+
+### Fare una release
+
+1. Alzare la versione in `claude-skins/app/package.json` (per esempio `npm version minor --no-git-tag-version`
+   nella cartella dell'app) e portarla su `main`.
+2. Su GitHub: **Actions** → **Release** → **Run workflow** (su `main`). In alternativa, spingere un tag
+   `v<versione>` uguale a quella del package.json.
+
+La Action (`.github/workflows/release.yml`) fa le prove della logica su Linux, poi su Windows crea l'installer e
+pubblica la release `v<versione>` con l'installer, il suo `.blockmap` e `latest.yml`, e le note generate dai
+commit e dalle pull request. Se la release di quella versione c'è già si ferma: prima si alza la versione.
+
+### Dal repo, come app installata
 
 Doppio clic su `crea-installer.cmd` (qui o nella cartella principale del repo). La prima volta scarica gli strumenti
-(electron-builder), poi crea `dist\Claude Skins Setup <versione>.exe` e apre la cartella. Si lancia l'installer:
-chiede dove installare (di partenza nella cartella dell'utente, senza diritti di amministratore), mette Claude Skins
+(electron-builder), poi crea `dist\Claudeleon-Setup-<versione>.exe` e apre la cartella. Serve [Node.js](https://nodejs.org) LTS. Si lancia l'installer:
+chiede dove installare (di partenza nella cartella dell'utente, senza diritti di amministratore), mette Claudeleon
 nel menu Start e sul desktop con la sua icona, e alla fine lo apre. Si disinstalla da Impostazioni → App.
 
 - L'installer non è firmato: Windows SmartScreen può dire "Windows ha protetto il PC". Si va avanti con
   "Ulteriori informazioni" → "Esegui comunque".
 - Configurazione, temi scelti e conversazioni restano gli stessi della versione da `avvia.cmd`
-  (`%APPDATA%\Claude Skins`, e le sessioni sono quelle di Claude Code). Disinstallare non li cancella.
-- **Aggiornamenti:** l'app installata sa da quale clone del repo è nata e a quale commit (li scrive `npm run dist`).
+  (`%APPDATA%\Claudeleon`, e le sessioni sono quelle di Claude Code). Disinstallare non li cancella.
+- **Prima si chiamava Claude Skins.** Al primo avvio come Claudeleon riprende da sola impostazioni, temi importati e
+  conversazioni fissate dalla cartella di allora (`%APPDATA%\claude-skins`), che resta dov'è. Per Windows è la
+  stessa app, ma il collegamento nel menu Start e il pulsante fissato nella barra delle applicazioni hanno il nome
+  nuovo: se ne resta uno vecchio "Claude Skins" che non si apre, si toglie e si fissa Claudeleon.
+- **Aggiornamenti dal repo:** l'app installata dal repo sa da quale clone è nata e a quale commit (li scrive `npm run dist`).
   All'avvio e ogni 6 ore fa `git fetch` lì: se il branch ha novità, o il repo è più avanti dell'app installata (un
   pull fatto senza reinstallare), compare un avviso in alto, con una notifica, e "Aggiorna" fa da sola `git pull`,
   `npm install` se sono cambiate le dipendenze, l'installer nuovo, e lo lancia in silenzio: si installa sopra e
   riapre l'app. Nelle impostazioni, "Aggiornamenti": lo stato, le novità, "Controlla ora" e l'interruttore del
   controllo automatico. Con modifiche non salvate nel repo non aggiorna (si fa a mano). Il diario dell'ultimo
-  aggiornamento è in `%APPDATA%\Claude Skins\aggiornamento.log`. Lanciata da `avvia.cmd`, l'app fa il pull e si
-  riavvia.
+  aggiornamento è in `%APPDATA%\Claudeleon\aggiornamento.log`. Lanciata da `avvia.cmd`, l'app fa il pull e si
+  riavvia. Nelle impostazioni, "Aggiornamenti da" passa alle release di GitHub (come i colleghi) e viceversa.
 - Il pacchetto non contiene Claude Code: usa quello installato (`~/.local/bin/claude.exe`).
 
 ### Dal repo, senza installare
@@ -75,7 +104,7 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   che Claude ha finito (con l'inizio della risposta), che chiede un permesso, una scelta o l'approvazione di un piano,
   o che si è fermato; nel titolo c'è il nome della conversazione. Un clic riporta davanti la finestra, e tornandoci le
   notifiche aperte si chiudono. Si spengono dal vassoio, "Notifiche". Perché Windows le mostri, all'avvio l'app crea
-  (o aggiorna) il collegamento "Claude Skins" nel menu Start, con lo stesso identificativo dell'app.
+  (o aggiorna) il collegamento "Claudeleon" nel menu Start, con lo stesso identificativo dell'app.
 - **Icona:** l'app ha la sua, uguale per tutti i temi (tre "pelli" sovrapposte con una stellina, `build/icon.ico`):
   eseguibile, installer, menu Start e barra delle applicazioni. Il tema cambia solo l'icona del vassoio e quella della
   finestra (Alt+Tab): per Essenziale il quadrato con la stellina nel colore d'accento.
@@ -264,7 +293,7 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
 - **Che cosa fa Claude:** ogni azione si legge a parole ("Legge MapView.cpp", "Cerca «DrawRoads» nel codice", o la
   descrizione che Claude ha scritto per un comando), col dettaglio tecnico accanto. Quando Claude Code manda la frase
   che riassume un gruppo di azioni, le azioni si raccolgono sotto di lei e si aprono con un clic.
-- **Configurazione:** `%APPDATA%\Claude Skins\config.json`: `workdir` (la cartella in cui nascono le
+- **Configurazione:** `%APPDATA%\Claudeleon\config.json`: `workdir` (la cartella in cui nascono le
   conversazioni nuove; vuota, la cartella utente), posizione, dimensione per tema, scena, numero della conversazione, sessione e sua
   cartella, tema, modo dei permessi, sempre in primo piano; `entrypoint` (come si presentano le sessioni a Claude
   Code, normalmente `cli`: così compaiono nel `/resume` del terminale e negli elenchi delle altre app). Al primo

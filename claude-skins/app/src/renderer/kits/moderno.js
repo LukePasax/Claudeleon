@@ -15,7 +15,7 @@
   }
 
   const strings = {
-    title: 'Claude',
+    title: 'Claudeleon',
     chapter: 'Nuova conversazione',
     newChapter: 'Nuova conversazione',
     placeholder: 'Scrivi a Claude…',

@@ -77,3 +77,61 @@ test('installata senza sapere da quale repo: lo dice', async () => {
   const u = new Updater(fakeApp({ isPackaged: true, getAppPath: () => inst }))
   assert.equal((await u.check()).state, 'unavailable')
 })
+
+// ------------------------------------------------------------------ dalle release di GitHub
+
+const { EventEmitter } = require('events')
+const { ReleaseUpdater, noteLines, friendly } = require('../../src/release-updater')
+
+// Un electron-updater finto: si decide noi cosa trova e cosa scarica
+function fakeAutoUpdater(found) {
+  const au = new EventEmitter()
+  au.installed = null
+  au.checkForUpdates = async () => {
+    au.emit('checking-for-update')
+    if (found instanceof Error) { au.emit('error', found); return null }
+    if (found) au.emit('update-available', found)
+    else au.emit('update-not-available', {})
+    return {}
+  }
+  au.downloadUpdate = async () => { au.emit('download-progress', { percent: 42.4 }); au.emit('update-downloaded', {}) }
+  au.quitAndInstall = (silent, run) => { au.installed = { silent, run } }
+  return au
+}
+const packagedApp = (d) => ({ isPackaged: true, getPath: () => d })
+
+test('release: le note in righe semplici, gli errori in breve', () => {
+  assert.deepEqual(noteLines('<h2>What\'s Changed</h2><ul><li>Temi in file <code>.skin</code> by @luca</li><li>Essenziale</li></ul><p><strong>Full Changelog</strong>: v1...v2</p>'),
+    ['Temi in file .skin by @luca', 'Essenziale'])
+  assert.deepEqual(noteLines('## Novità\n- **Editor** dei temi\n- `/memory`\n'), ['Editor dei temi', '/memory'])
+  assert.match(friendly(new Error('HttpError: 404 Not Found latest.yml')), /Nessuna release/)
+  assert.match(friendly(new Error('net::ERR_INTERNET_DISCONNECTED')), /connessione/)
+})
+
+test('release: controllo, novità, scarico e installazione in silenzio', async () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'skins-rel-'))
+  const au = fakeAutoUpdater({ version: '1.2.0', releaseNotes: '- Anteprima\n- Dettatura' })
+  const u = new ReleaseUpdater(packagedApp(d), au)
+  assert.equal(au.autoDownload, false)
+  const states = []
+  u.on('state', (s) => states.push(s.state + (s.step ? `:${s.step}` : '')))
+  const s = await u.check()
+  assert.equal(s.state, 'available')
+  assert.equal(s.version, '1.2.0')
+  assert.equal(s.source, 'github')
+  assert.deepEqual(s.commits, ['Anteprima', 'Dettatura'])
+  await u.update()
+  assert.equal(u.state.percent, 42)
+  await new Promise((r) => setTimeout(r, 900))
+  assert.deepEqual(au.installed, { silent: true, run: true })
+  assert.deepEqual(states, ['checking', 'available', 'updating:download', 'updating:download', 'updating:install'])
+})
+
+test('release: niente di nuovo, errori, app non installata', async () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'skins-rel-'))
+  assert.equal((await new ReleaseUpdater(packagedApp(d), fakeAutoUpdater(null)).check()).state, 'uptodate')
+  const err = await new ReleaseUpdater(packagedApp(d), fakeAutoUpdater(new Error('getaddrinfo ENOTFOUND github.com'))).check()
+  assert.deepEqual([err.state, err.error], ['error', 'Nessuna connessione con GitHub.'])
+  const dev = await new ReleaseUpdater({ isPackaged: false, getPath: () => d }, fakeAutoUpdater(null)).check()
+  assert.equal(dev.state, 'unavailable')
+})

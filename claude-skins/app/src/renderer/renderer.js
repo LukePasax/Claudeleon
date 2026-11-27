@@ -1982,7 +1982,11 @@
         for (const c of u.commits.slice(0, 10)) { const li = document.createElement('li'); li.textContent = c; list.appendChild(li) }
         body.appendChild(list)
       }
-      toggle(row('updAuto', t('updAutoNote')), st.autoUpdate !== false, (v) => set('autoUpdate', v))
+      // Da dove: solo se ci sono tutte e due le strade (l'app installata da un installer fatto col repo)
+      if (Array.isArray(st.updateSources) && st.updateSources.length > 1) {
+        select(row('updSource', t('updSourceNote')), st.updateSources.map((x) => [x, t(`updSource_${x}`)]), st.updateSource, async (v) => { await set('updateSource', v); try { updateState = await api.updateState() } catch {} ; render() })
+      }
+      toggle(row('updAuto', t(st.updateSource === 'github' ? 'updAutoNoteGithub' : 'updAutoNote')), st.autoUpdate !== false, (v) => set('autoUpdate', v))
       // Informazioni
       section('setAbout')
       row('setVersion', `${st.version || '?'}${st.installed ? '' : ` · ${t('setFromRepo')}`}`)
@@ -2009,8 +2013,8 @@
     if (u.state === 'unavailable') return u.error || t('updUnavailable')
     if (u.state === 'checking') return t('updChecking')
     if (u.state === 'uptodate') return t('updUpToDate') + (u.checkedAt ? ` · ${formatWhen(u.checkedAt)}` : '')
-    if (u.state === 'available') return t('updAvailable', { n: u.count }) + (u.dirty ? ` · ${t('updDirty')}` : '')
-    if (u.state === 'updating') return t(`updStep_${u.step || 'pull'}`)
+    if (u.state === 'available') return u.version ? t('updAvailableVersion', { v: u.version }) : t('updAvailable', { n: u.count }) + (u.dirty ? ` · ${t('updDirty')}` : '')
+    if (u.state === 'updating') return t(`updStep_${u.step || 'pull'}`, { v: u.version || '', p: u.percent || 0 })
     return `${t('updError')}: ${u.error || '?'}`
   }
   // L'avviso dell'avvio sicuro, al posto di quello degli aggiornamenti finché non lo si chiude
@@ -2039,19 +2043,19 @@
     if (safeInfo) return renderSafeBanner()
     const u = updateState
     if (!u) return
-    const show = u.state === 'updating' || (u.state === 'available' && !u.dirty && bannerDismissed !== u.count) || (u.state === 'error' && u.step === null)
+    const show = u.state === 'updating' || (u.state === 'available' && !u.dirty && bannerDismissed !== (u.version || u.count)) || (u.state === 'error' && u.step === null)
     if (!show) return
     const host = app.querySelector('[data-solid]') || app
     if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
     const b = document.createElement('div')
     b.className = `update-banner ${u.state}`
     b.innerHTML = '<span class="ub-icon"></span><span class="ub-text"></span>'
-    b.querySelector('.ub-text').textContent = u.state === 'available' ? t('updBanner', { n: u.count }) : updateText(u)
+    b.querySelector('.ub-text').textContent = u.state === 'available' ? (u.version ? t('updBannerVersion', { v: u.version }) : t('updBanner', { n: u.count })) : updateText(u)
     const btn = (key, fn, cls) => { const x = document.createElement('button'); x.className = `btn small ${cls || ''}`; label(x, key); x.addEventListener('click', fn); b.appendChild(x) }
     if (u.state === 'available') {
       btn('updApply', () => api.applyUpdate())
       btn('updDetails', () => openSettings(), 'deny')
-      btn('updLater', () => { bannerDismissed = u.count; renderUpdateBanner() }, 'deny')
+      btn('updLater', () => { bannerDismissed = u.version || u.count; renderUpdateBanner() }, 'deny')
     } else if (u.state === 'error') {
       btn('updDetails', () => openSettings(), 'deny')
       btn('updLater', () => { updateState = Object.assign({}, u, { step: undefined }); renderUpdateBanner() }, 'deny')
@@ -4459,11 +4463,11 @@
     ])
     const fakeMemFiles = () => ({ cwd: 'C:/Users/luca/MapEditor', files: [['user', 'C:/Users/luca/.claude/CLAUDE.md'], ['project', 'C:/Users/luca/MapEditor/CLAUDE.md'], ['local', 'C:/Users/luca/MapEditor/CLAUDE.local.md'], ['parent', 'C:/Users/luca/CLAUDE.md']].filter(([id, f]) => id !== 'parent' || fakeMemory.has(f)).map(([id, file]) => ({ id, file, exists: fakeMemory.has(file), size: (fakeMemory.get(file) || '').length })) })
     const fakePermFiles = { user: 'C:/Users/luca/.claude/settings.json', project: 'C:/Users/luca/MapEditor/.claude/settings.json', local: 'C:/Users/luca/MapEditor/.claude/settings.local.json' }
-    const fakeUpdate = { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/luca/Claude-desktop-skins', installed: true }
-    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '0.1.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claude Skins', shortcut: 'Ctrl+Alt+P', worktree: false }
+    const fakeUpdate = { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/luca/Claudeleon', installed: true }
+    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '0.1.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claudeleon', shortcut: 'Ctrl+Alt+P', worktree: false }
     const fakeSessions = [
-      { id: 's0', title: 'Allegati e domande con le opzioni', lastModified: Date.now() - 600000, cwd: 'C:/Workspace/Progetti/Claude-desktop-skins', branch: 'main' },
-      { id: 's1', title: 'Temi per Claude Skins', lastModified: Date.now() - 3600000, cwd: 'C:/Workspace/Progetti/Claude-desktop-skins', branch: 'main' },
+      { id: 's0', title: 'Allegati e domande con le opzioni', lastModified: Date.now() - 600000, cwd: 'C:/Workspace/Progetti/Claudeleon', branch: 'main' },
+      { id: 's1', title: 'Temi per Claudeleon', lastModified: Date.now() - 3600000, cwd: 'C:/Workspace/Progetti/Claudeleon', branch: 'main' },
       { id: 's2', title: 'Il calcolo dei sentieri in RouteFinder', lastModified: Date.now() - day, cwd: 'C:/Workspace/MapEditor' },
       { id: 's3', title: 'Mod desktop Signore degli Anelli', lastModified: Date.now() - 4 * day, cwd: 'C:/Workspace' },
       { id: 's4', title: 'Profilo di Windows Terminal', lastModified: Date.now() - 9 * day, cwd: 'C:/Users/luca' },

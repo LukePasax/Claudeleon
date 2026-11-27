@@ -12,7 +12,7 @@ class Updater extends EventEmitter {
   constructor(app) {
     super()
     this.app = app
-    this.state = { state: 'idle' }
+    this.state = { state: 'idle', source: 'repo' }
     let meta = {}
     try { meta = JSON.parse(fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8')) } catch {}
     this.installed = app.isPackaged
@@ -27,7 +27,7 @@ class Updater extends EventEmitter {
     try { fs.appendFileSync(this.logFile, `${new Date().toISOString()} ${parts.join(' ')}\n`) } catch {}
   }
   set(patch) {
-    this.state = Object.assign({}, this.state, patch, { repo: this.repo, installed: this.installed })
+    this.state = Object.assign({}, this.state, patch, { repo: this.repo, installed: this.installed, source: 'repo' })
     this.emit('state', this.state)
   }
   git(...args) {
@@ -122,8 +122,9 @@ class Updater extends EventEmitter {
       this.set({ state: 'updating', step: 'build' })
       await this.run('npm', ['run', 'dist'], this.appDir)
       const dist = path.join(this.appDir, 'dist')
-      const setup = fs.readdirSync(dist).filter((f) => /^Claude Skins Setup .*\.exe$/.test(f))
-        .map((f) => ({ f, t: fs.statSync(path.join(dist, f)).mtimeMs })).sort((a, b) => b.t - a.t)[0]
+      // L'installer più recente (Claudeleon; prima si chiamava Claude Skins)
+      const setup = fs.readdirSync(dist).filter((f) => /^(Claudeleon|Claude Skins)[ -]Setup[ -].*\.exe$/.test(f))
+        .map((f) => ({ f, t: fs.statSync(path.join(dist, f)).mtimeMs + (f.startsWith('Claudeleon') ? 1 : 0) })).sort((a, b) => b.t - a.t)[0]
       if (!setup) throw new Error('L\'installer nuovo non c\'è nella cartella dist.')
       this.set({ state: 'updating', step: 'install' })
       this.log('installo', setup.f)

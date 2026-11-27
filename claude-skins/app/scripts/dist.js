@@ -18,4 +18,16 @@ const target = process.argv.slice(2).length ? process.argv.slice(2) : ['--win', 
 const args = ['electron-builder', ...target]
 if (repo) args.push(`"-c.extraMetadata.skinsRepo=${repo}"`, `"-c.extraMetadata.skinsCommit=${commit}"`)
 const r = spawnSync('npx', args, { cwd: appDir, stdio: 'inherit', shell: true })
+// L'app si chiamava Claude Skins, e il suo aggiornamento automatico cerca "Claude Skins Setup <versione>.exe": una
+// copia col nome di allora, così chi aggiorna dalla versione vecchia arriva a Claudeleon senza intoppi
+if (r.status === 0) {
+  const fs = require('fs')
+  const dist = path.join(appDir, 'dist')
+  try {
+    for (const f of fs.readdirSync(dist)) {
+      const m = /^Claudeleon-Setup-(.*\.exe)$/.exec(f)
+      if (m) fs.copyFileSync(path.join(dist, f), path.join(dist, `Claude Skins Setup ${m[1]}`))
+    }
+  } catch {}
+}
 process.exit(r.status == null ? 1 : r.status)

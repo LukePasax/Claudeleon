@@ -1,5 +1,5 @@
 @echo off
-rem Crea l'installer di Claude Skins per Windows: dist\Claude Skins Setup <versione>.exe
+rem Crea l'installer di Claudeleon per Windows: dist\Claudeleon Setup <versione>.exe
 rem La prima volta scarica gli strumenti (electron-builder); poi impacchetta l'app con la sua icona.
 setlocal
 set "APP=%~dp0"

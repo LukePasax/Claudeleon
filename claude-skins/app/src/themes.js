@@ -146,7 +146,7 @@ function bundleFor(id, userDir) {
 
 // Controlla un pacchetto letto da un file: { ok, kind, id, name, error }
 function checkBundle(b) {
-  if (!b || b.format !== FORMAT) return { ok: false, error: 'Non è un tema di Claude Skins' }
+  if (!b || b.format !== FORMAT) return { ok: false, error: 'Non è un tema di Claudeleon' }
   if (b.kind === 'colors') return b.spec && typeof b.spec === 'object' ? { ok: true, kind: 'colors', name: kit.normalizeSpec(b.spec).name } : { ok: false, error: 'Il tema non ha i colori' }
   if (b.kind !== 'code') return { ok: false, error: 'Tipo di tema sconosciuto' }
   const id = b.manifest && b.manifest.id
