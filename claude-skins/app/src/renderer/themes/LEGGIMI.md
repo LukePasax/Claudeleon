@@ -20,9 +20,12 @@ il tono dal messaggio successivo.
 ```
 themes/
   terra-di-mezzo/   acquerello in SVG: lo scrittoio di Casa Baggins, con la struttura dell'app desktop
-  moderno/          niente pixel: un riquadro pulito con l'ombra, barra laterale, icone SVG, agganci
+  metrios/          kit moderno coi colori di Metrios: scuro, fondi blu-grigi, accento azzurro
+  dream/            kit moderno coi colori di Dream: chiaro, menta, accento verde
 kits/
   pixel.css         lo stile pixel condiviso (caratteri, gradini, palette di pergamena): lo includono i temi pixel
+  moderno.js        la struttura dei temi puliti (layout, agganci, icone SVG, anteprima): un tema dà solo i colori
+  moderno.css       la forma dei temi puliti: un riquadro con l'ombra, barra laterale, fumetti, il punto che pulsa
 ```
 
 Ogni cartella di tema ha il suo `theme.js` e, se serve, `theme.css` e altri file (immagini, caratteri, suoni).
@@ -116,7 +119,7 @@ Su un qualunque elemento cliccabile (anche più di uno per azione):
   primo elemento `data-solid`, per ridimensionare come una finestra normale. Un tema che non le vuole mette
   `edges: false` nel `theme.js`.
 - Da ingrandita o a schermo intero il corpo ha la classe `maximized` o `fullscreen`: il tema può togliere margini
-  trasparenti, angoli e ombre (Moderno lo fa). Le maniglie spariscono.
+  trasparenti, angoli e ombre (il kit moderno lo fa). Le maniglie spariscono.
 
 ### Scritte
 
@@ -225,6 +228,14 @@ col modo dei permessi, `body[data-theme]` col tema. Un aggancio che va in errore
   cronache e le barre di scorrimento. Non contiene nessuna forma di finestra.
 - Un **kit** (`kits/<nome>.css`) è uno stile intero condiviso da più temi. `kits/pixel.css` porta i caratteri a
   pixel, la palette di pergamena di partenza, angoli vivi e bordi a gradino, il capolettera, le barre a pixel.
+- Un kit può avere anche la sua struttura in JS (`kits/<nome>.js`), quando più temi hanno la stessa forma e cambiano
+  solo i colori. `kits/moderno.js` è una funzione `kit({ id, name, description, look })` che restituisce il tema
+  intero: layout, agganci, icone, anteprima e vassoio vengono dal kit, il tema dà solo `look.palette` (i colori dei
+  disegni) e `look.vars` (le variabili CSS). Lo carica `index.html` prima dei temi; un `theme.js` lo prende da
+  `window.SkinsKits.moderno` nella pagina e con `require('../../kits/moderno.js')` nel processo principale. I temi
+  del kit hanno un aspetto solo, chiaro o scuro, per tutte e due le scene, e non mostrano il pulsante notte/giorno.
+  Oltre alle variabili di `style.css`, `kits/moderno.css` legge `side-bg`, `frame-shadow`, `box-shadow`, `you-bg` e
+  `you-edge` (fondo della barra laterale, ombre, fumetto delle domande).
 - `theme.css` è attivo solo mentre il tema è in uso, quindi le regole non hanno bisogno di prefissi. Contiene la
   forma della finestra e può ridefinire qualunque cosa di `style.css`.
 - Un carattere nuovo va nella cartella del tema e si dichiara con `@font-face` nel `theme.css`, con un percorso

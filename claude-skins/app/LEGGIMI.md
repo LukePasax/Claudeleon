@@ -3,7 +3,8 @@
 Claude in una finestra a temi, grande come l'app desktop, che si usa come un'app normale. Forma e
 aspetto vengono dal tema. Quello di partenza è **Terra di Mezzo**: lo scrittoio di Casa Baggins ad acquerello,
 con la struttura dell'app desktop (annali a sinistra sotto la finestra tonda, conversazione sul foglio, candela
-accanto alla penna). C'è anche **Moderno**, pulito come un'app di oggi. Altri temi si
+accanto alla penna). Ci sono anche **Metrios** e **Dream**, puliti come un'app di oggi, coi colori dei due software (Metrios scuro con
+l'azzurro, Dream chiaro col verde). Altri temi si
 aggiungono come cartelle in `src/renderer/themes/`, ognuno con il proprio scheletro (guida:
 [`src/renderer/themes/LEGGIMI.md`](src/renderer/themes/LEGGIMI.md)).
 
@@ -21,10 +22,10 @@ npm 11 altrimenti non arriva.
 ## Uso
 
 - **Avvio:** doppio clic su `avvia.cmd`. La finestra compare al centro dello schermo, grande come l'app desktop
-  (Terra di Mezzo 1180×780, Moderno 1100×760, mai oltre il 92% dello schermo).
+  (Terra di Mezzo 1180×780, Metrios e Dream 1100×760, mai oltre il 92% dello schermo).
 - **Il viaggio (Terra di Mezzo):** sulla pagina sinistra una mappa della Terra di Mezzo; a ogni tuo messaggio il
   viandante avanza di una tappa, dalla Contea al Monte Fato, e un nuovo capitolo lo riporta a Hobbiville.
-- **Spostare e allargare:** si trascina dalla testata (la copertina del libro, la barra in alto di Moderno); la
+- **Spostare e allargare:** si trascina dalla testata (la copertina del libro, la barra in alto di Metrios e Dream); la
   maniglia a gradini in basso a destra allarga e allunga. Posizione e dimensione restano, e la dimensione è
   ricordata per tema. Dal vassoio: "Riporta al centro" e "Dimensione iniziale".
 - **Bordi e ingrandimento:** la finestra si ridimensiona da tutti i lati e gli angoli, come una finestra normale. Il
@@ -41,7 +42,7 @@ npm 11 altrimenti non arriva.
 - **Scorciatoia:** `Ctrl+Alt+P` riporta davanti la finestra da qualunque programma, o la riduce a icona se è già
   davanti; lo stesso fa un clic sull'icona del vassoio.
 - **Tema:** dalla finestra ("Altre stanze" in fondo alla barra dello scrittoio,
-  "Temi" in fondo alla barra laterale di Moderno), con
+  "Temi" in fondo alla barra laterale di Metrios e Dream), con
   un'anteprima di ogni tema, oppure dal vassoio, **Tema**. Cambia sul posto (forma della finestra compresa) senza perdere la conversazione;
   Claude prende il tono del nuovo tema dal messaggio successivo. Il pulsante "Accendi le stelle"/"Apri le imposte" (o "notte"/"giorno")
   passa da una scena all'altra.
@@ -76,7 +77,7 @@ npm 11 altrimenti non arriva.
   corrente prosegue fra un avvio e l'altro.
 - **Claude Code:** comandato con l'Agent SDK (`@anthropic-ai/claude-agent-sdk`) sopra
   `%USERPROFILE%\.local\bin\claude.exe`, con il prompt di sistema di Claude Code più la "personalità" del tema (lo
-  scriba di Gran Burrone per Terra di Mezzo, diretto e conciso per Moderno). Gli hook dell'utente sono spenti per queste
+  scriba di Gran Burrone per Terra di Mezzo, diretto e conciso per Metrios e Dream). Gli hook dell'utente sono spenti per queste
   conversazioni.
 - **Comandi con `/`:** scrivendo `/` all'inizio della penna si apre l'elenco dei comandi di Claude Code, comprese
   le tue skill, i plugin e i comandi del progetto (con la tacca verde). Si filtra scrivendo; frecce per scegliere,
@@ -142,4 +143,4 @@ npm 11 altrimenti non arriva.
   `src/renderer/index.html?tema=<id>` nel browser.
 
 Caratteri (tutti sotto SIL Open Font License): Pixelify Sans, Jacquarda Bastarda 9 e VT323 (per il codice) nel kit
-pixel; Alegreya e Uncial Antiqua nel tema Terra di Mezzo; il tema Moderno usa quelli di sistema (Google Fonts, licenza SIL Open Font License).
+pixel; Alegreya e Uncial Antiqua nel tema Terra di Mezzo; i temi Metrios e Dream usano quelli di sistema (Google Fonts, licenza SIL Open Font License).

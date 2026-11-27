@@ -59,8 +59,8 @@ Rosso e i valori di partenza li usano. Una configurazione con `theme: 'pergamena
 sistema, bordi sottili, `--radius`) e la pixel art sta nel kit `kits/pixel.css`, che Pergamena e Terra di Mezzo
 includono (`kits: ['pixel']`). Un tema può dare icone SVG o immagini, disegni a qualunque scala (`artScale`,
 `data-art-scale`, `data-art-smooth`), la sua anteprima nel selettore (`art.preview`) e agganci agli eventi
-(`hooks`). Il tema **Moderno** lo dimostra: niente pixel, barra laterale, fumetti, icone SVG, un punto che pulsa con
-l'azione in corso. La divisione del CSS è stata verificata confrontando pixel per pixel le foto dei due temi pixel
+(`hooks`). Il kit **moderno** (`kits/moderno.js` e `kits/moderno.css`) lo dimostra: niente pixel, barra laterale, fumetti,
+icone SVG, un punto che pulsa con l'azione in corso; i temi **Metrios** e **Dream** lo usano e danno solo i colori. La divisione del CSS è stata verificata confrontando pixel per pixel le foto dei due temi pixel
 prima e dopo: identiche.
 
 **Libro Rosso più leggibile.** I caratteri a pixel stancavano nella lettura: il tema Terra di Mezzo tiene la pixel
@@ -149,7 +149,8 @@ tutto l'HTML e la conversazione passa al nuovo layout. La guida per scrivere un 
   - `themes/<id>/` sono i temi. **Terra di Mezzo**, il predefinito: lo scrittoio di Casa Baggins ad acquerello
     (pareti di legno, finestra tonda sulla Contea, foglio coi bordi rotti, candela), con la struttura dell'app
     desktop; calendario della Contea, frasi del cammino, "Non passerai" per il rifiuto, uno scriba di Gran Burrone
-    come persona. **Moderno**: pulito, barra laterale, icone SVG.
+    come persona. **Metrios** e **Dream**: il kit moderno (pulito, barra laterale, icone SVG) coi colori dei due software, un aspetto
+    solo ciascuno (Metrios scuro, Dream chiaro).
 
 ## Lezioni pratiche (costate tempo)
 
