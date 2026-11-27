@@ -57,6 +57,10 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
 - **Come un'app:** la finestra sta nella barra delle applicazioni con l'icona del tema, e "–" la riduce a icona lì
   (non sparisce fra le icone nascoste). Non sta sopra le altre finestre, a meno di accendere "Sempre in primo
   piano" dal vassoio. Una domanda di permesso fa lampeggiare l'icona nella barra se la finestra è ridotta o dietro.
+- **Scorciatoie:** Ctrl+N nuova conversazione, Ctrl+K cerca negli annali, Ctrl+F cerca nella conversazione (una barra
+  in alto: le corrispondenze si evidenziano, Invio e Maiusc+Invio avanti e indietro, Esc chiude), Ctrl+Maiusc+C
+  copia l'ultima risposta, Ctrl+, impostazioni, Esc ferma Claude, F11 schermo intero. L'elenco è anche nelle
+  impostazioni.
 - **Impostazioni:** l'ingranaggio sulla trave (Terra di Mezzo) o "Impostazioni" in fondo alla barra (Metrios e
   Dream), Ctrl+, o il vassoio. Tutto vale subito: tema e scena; sempre in primo piano, avvio con Windows, riporta al
   centro e dimensione iniziale; notifiche; cartella di lavoro, permessi, modello, ragionamento e ultracode; il
@@ -173,7 +177,8 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   (sul posto, Invio salva), **Archivia** (resta sul disco e sparisce dall'elenco; le archiviate si vedono in fondo)
   ed **Elimina** (chiede conferma e cancella il transcript). Sono sempre
   visibili nella barra laterale. Aprendone una si vedono
-  gli ultimi 40 messaggi con le azioni di Claude e il loro esito, le modifiche ai file (chiuse: si aprono con un
+  gli ultimi 40 messaggi (in cima "Carica i messaggi precedenti" porta gli altri, 40 alla volta, senza spostare
+  quello che si sta leggendo) con le azioni di Claude e il loro esito, le modifiche ai file (chiuse: si aprono con un
   clic sulla riga), i comandi con `/` e la loro uscita; i messaggi dopo la continuano nella sua cartella. Non aprire qui una sessione che è aperta
   anche nell'app desktop.
 - **Cartella di lavoro:** accanto ai permessi c'è la cartella della conversazione; un clic apre le cartelle recenti

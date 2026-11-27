@@ -100,6 +100,7 @@
   function switchTo(c) {
     if (!c || c === active) return
     closeMenu()
+    closeFind()
     save(cur)
     if (active) active.el.hidden = true
     active = c
@@ -1320,6 +1321,7 @@
       section('setAbout')
       row('setVersion', `${st.version || '?'}${st.installed ? '' : ` · ${t('setFromRepo')}`}`)
       row('setShortcut', `${st.shortcut || ''} · ${t('setShortcutNote')}`)
+      row('setKeys', t('setKeysList'))
       button(row('setData', st.dataDir || ''), 'setOpen', () => set('openData'))
     }
     try { updateState = (await api.updateState()) || updateState } catch {}
@@ -2704,30 +2706,68 @@
     run(c, () => fillHistory(c, history, loading))
   }
 
+  // Una cronaca riaperta mostra gli ultimi 40 messaggi (con le azioni in mezzo); quelli prima restano nella
+  // conversazione (c.older) e un pulsante in cima li carica, 40 alla volta, senza spostare quello che si sta leggendo
+  const PAGE = 40
+  function pageStart(items, end) {
+    let texts = 0
+    for (let k = end - 1; k >= 0; k--) if (items[k].role !== 'tool' && ++texts === PAGE) return k
+    return 0
+  }
+  const countTexts = (items) => items.filter((m) => m.role !== 'tool').length
+  function renderHistory(items) {
+    for (const m of items) {
+      if (m.role === 'user') { const y = entry('you'); if (m.uuid) y.dataset.uuid = m.uuid; fillYou(y, m.text, m.images || []) }
+      else if (m.role === 'assistant') setReplyText(entry('claude').querySelector('.text'), m.text)
+      else if (m.role === 'thinking') {
+        const box = thinkingBox(false)
+        box.raw = m.text
+        box.querySelector('.thinking-body').innerHTML = markdown(m.text)
+        label(box.querySelector('.th-text'), 'thinkingPast')
+      }
+      else if (m.role === 'output') add('cmd-output', '').textContent = m.text
+      else if (m.role === 'tool') {
+        addTool(m.id, m.name, m.summary, m.change, m.intent)
+        if (m.error !== null) toolDone(m.id, m.error)
+      }
+    }
+  }
+  function olderButton(c) {
+    const item = add('older', '<button class="older-btn"></button>')
+    const b = item.querySelector('button')
+    label(b, 'olderLoad', { n: countTexts(c.older) })
+    b.addEventListener('click', () => loadOlder(c, item))
+    return item
+  }
+  function loadOlder(c, item) {
+    if (!c.older || !c.older.length) { item.remove(); return }
+    const from = pageStart(c.older, c.older.length)
+    const chunk = c.older.slice(from)
+    c.older = c.older.slice(0, from)
+    const log = part('log')
+    const prevH = log ? log.scrollHeight : 0
+    const prevTop = log ? log.scrollTop : 0
+    // Si disegna in un contenitore a parte, poi si mette tutto subito sotto il pulsante
+    const tmp = document.createElement('div')
+    const real = c.el
+    c.el = tmp
+    const keepStick = stick
+    stick = false
+    try { run(c, () => renderHistory(chunk)) } finally { c.el = real; stick = keepStick }
+    for (const el of tmp.querySelectorAll(':scope > .item.change')) el.hidden = true
+    item.after(...tmp.children)
+    if (c.older.length) label(item.querySelector('button'), 'olderLoad', { n: countTexts(c.older) })
+    else item.remove()
+    if (log) log.scrollTop = prevTop + (log.scrollHeight - prevH)
+  }
+
   function fillHistory(c, history, loading) {
     try {
       loading.remove()
-      // Delle cronache lunghe bastano gli ultimi 40 messaggi, con le azioni che stanno in mezzo
-      let from = 0
-      let texts = 0
-      for (let k = history.length - 1; k >= 0; k--) {
-        if (history[k].role !== 'tool' && ++texts === 40) { from = k; break }
-      }
-      for (const m of history.slice(from)) {
-        if (m.role === 'user') { const y = entry('you'); if (m.uuid) y.dataset.uuid = m.uuid; fillYou(y, m.text, m.images || []) }
-        else if (m.role === 'assistant') setReplyText(entry('claude').querySelector('.text'), m.text)
-        else if (m.role === 'thinking') {
-          const box = thinkingBox(false)
-          box.raw = m.text
-          box.querySelector('.thinking-body').innerHTML = markdown(m.text)
-          label(box.querySelector('.th-text'), 'thinkingPast')
-        }
-        else if (m.role === 'output') add('cmd-output', '').textContent = m.text
-        else if (m.role === 'tool') {
-          addTool(m.id, m.name, m.summary, m.change, m.intent)
-          if (m.error !== null) toolDone(m.id, m.error)
-        }
-      }
+      const from = pageStart(history, history.length)
+      c.older = history.slice(0, from)
+      if (c.older.length) olderButton(c)
+      renderHistory(history.slice(from))
       // Le differenze delle cronache restano chiuse: si aprono con un clic sulla riga dell'azione
       for (const el of logEl().querySelectorAll(':scope > .item.change')) el.hidden = true
       hook('chapter')
@@ -2738,6 +2778,110 @@
       add('error', esc(String(err.message || err)))
     }
     if (part('input')) part('input').focus()
+  }
+
+  // ------------------------------------------------------------------ cercare nella conversazione (Ctrl+F)
+
+  // Una barra in alto a destra della conversazione: le corrispondenze si evidenziano con le Highlight di CSS
+  // (::highlight(find), ::highlight(find-current)), senza toccare il testo; Invio e Maiusc+Invio vanno avanti e
+  // indietro, Esc chiude. Si cerca solo nella conversazione in vista e nel testo che si vede
+  const find = { bar: null, ranges: [], index: 0 }
+  function openFind() {
+    const log = part('log')
+    if (!log) return
+    if (find.bar && find.bar.isConnected) { const i = find.bar.querySelector('input'); i.focus(); i.select(); return }
+    const host = app.querySelector('[data-solid]') || app
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+    const bar = document.createElement('div')
+    bar.className = 'find-bar'
+    bar.innerHTML = '<input type="text" spellcheck="false"><span class="find-count"></span><button class="find-prev">↑</button><button class="find-next">↓</button><button class="find-close">✕</button>'
+    const input = bar.querySelector('input')
+    input.placeholder = t('findPlaceholder')
+    bar.querySelector('.find-prev').title = t('findPrev')
+    bar.querySelector('.find-next').title = t('findNext')
+    bar.querySelector('.find-close').title = t('findClose')
+    const r = log.getBoundingClientRect()
+    const hr = host.getBoundingClientRect()
+    bar.style.top = `${r.top - hr.top + 8}px`
+    bar.style.right = `${hr.right - r.right + 18}px`
+    host.appendChild(bar)
+    find.bar = bar
+    input.addEventListener('input', () => runFind(input.value))
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation()
+      if (e.key === 'Escape') { e.preventDefault(); closeFind() }
+      else if (e.key === 'Enter') { e.preventDefault(); stepFind(e.shiftKey ? -1 : 1) }
+    })
+    bar.querySelector('.find-prev').addEventListener('click', () => stepFind(-1))
+    bar.querySelector('.find-next').addEventListener('click', () => stepFind(1))
+    bar.querySelector('.find-close').addEventListener('click', closeFind)
+    input.focus()
+  }
+  function closeFind() {
+    if (find.bar) find.bar.remove()
+    find.bar = null
+    find.ranges = []
+    if (window.CSS && CSS.highlights) { CSS.highlights.delete('find'); CSS.highlights.delete('find-current') }
+  }
+  function runFind(q) {
+    find.ranges = []
+    find.index = 0
+    const root = active && active.el
+    const needle = q.trim().toLowerCase()
+    if (root && needle) {
+      const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+        acceptNode: (n) => (n.parentElement && n.parentElement.getClientRects().length ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
+      })
+      for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+        const text = n.nodeValue.toLowerCase()
+        let i = text.indexOf(needle)
+        while (i >= 0 && find.ranges.length < 2000) {
+          const r = document.createRange()
+          r.setStart(n, i)
+          r.setEnd(n, i + needle.length)
+          find.ranges.push(r)
+          i = text.indexOf(needle, i + needle.length)
+        }
+      }
+      // Si parte dall'ultima corrispondenza (la più vicina al fondo, dove di solito si legge)
+      find.index = Math.max(0, find.ranges.length - 1)
+    }
+    paintFind()
+  }
+  function stepFind(dir) {
+    if (!find.ranges.length) return
+    find.index = (find.index + dir + find.ranges.length) % find.ranges.length
+    paintFind()
+  }
+  function paintFind() {
+    const count = find.bar && find.bar.querySelector('.find-count')
+    const q = find.bar ? find.bar.querySelector('input').value.trim() : ''
+    if (count) count.textContent = q ? (find.ranges.length ? t('findCount', { i: find.index + 1, n: find.ranges.length }) : t('findNone')) : ''
+    if (!(window.CSS && CSS.highlights && window.Highlight)) return
+    CSS.highlights.set('find', new Highlight(...find.ranges))
+    const cur = find.ranges[find.index]
+    if (cur) {
+      CSS.highlights.set('find-current', new Highlight(cur))
+      // La corrispondenza in vista, a un terzo dall'alto
+      const log = part('log')
+      const rr = cur.getBoundingClientRect()
+      const lr = log.getBoundingClientRect()
+      if (rr.top < lr.top + 20 || rr.bottom > lr.bottom - 20) {
+        stick = false
+        log.scrollTop += rr.top - lr.top - lr.height / 3
+      }
+    } else CSS.highlights.delete('find-current')
+  }
+
+  // L'ultima risposta di Claude, col suo markdown, negli appunti (Ctrl+Maiusc+C)
+  function copyLastReply() {
+    const last = active && [...active.el.querySelectorAll('.entry.claude')].pop()
+    if (last && last.rawText) copyText(last.rawText)
+  }
+  // Ctrl+K: la ricerca negli annali (o gli annali, se il tema li tiene nascosti)
+  function focusSessionsSearch() {
+    if (!sessionsPinned()) showSessions()
+    setTimeout(() => { const s = app.querySelector('[data-part="sessions-search"], .sessions-search'); if (s) { s.focus(); s.select() } }, 50)
   }
 
   // ------------------------------------------------------------------ comandi, delegati al documento
@@ -2768,8 +2912,16 @@
   })
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && document.querySelector('.theme-picker')) { closeThemes(); return }
-    // Ctrl+, apre le impostazioni, come nelle app desktop
-    if (e.key === ',' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); openSettings(); return }
+    // Le scorciatoie, come nell'app desktop: Ctrl+, impostazioni, Ctrl+N nuova conversazione, Ctrl+K cerca negli
+    // annali, Ctrl+F cerca nella conversazione, Ctrl+Maiusc+C copia l'ultima risposta
+    const mod = (e.ctrlKey || e.metaKey) && !e.altKey
+    const k = e.key.toLowerCase()
+    if (mod && e.key === ',') { e.preventDefault(); openSettings(); return }
+    if (mod && !e.shiftKey && k === 'n') { e.preventDefault(); newChapter(); return }
+    if (mod && !e.shiftKey && k === 'k') { e.preventDefault(); focusSessionsSearch(); return }
+    if (mod && !e.shiftKey && k === 'f') { e.preventDefault(); openFind(); return }
+    if (mod && e.shiftKey && k === 'c') { e.preventDefault(); copyLastReply(); return }
+    if (e.key === 'Escape' && find.bar) { closeFind(); return }
     if (e.key === 'Escape' && document.querySelector('.folder-menu')) { closeFolderMenu(); return }
     // F11: schermo intero, e di nuovo per tornare
     if (e.key === 'F11') { e.preventDefault(); api.windowMode('full'); return }
@@ -2995,7 +3147,8 @@
       renameSession: async (id, title) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.title = title; return true },
       archiveSession: async (id, cwd, on) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.archived = !!on; return true },
       deleteSession: async (id) => { const k = fakeSessions.findIndex((x) => x.id === id); if (k >= 0 && confirm('Eliminare?')) { fakeSessions.splice(k, 1); return { deleted: true } } return { deleted: false } },
-      openSession: async () => [
+      // Una cronaca lunga (Backup delle note): 120 messaggi, per provare "Carica i messaggi precedenti"
+      openSession: async (id) => id === 's5' ? Array.from({ length: 120 }, (_, k) => ({ role: k % 2 ? 'assistant' : 'user', text: `Messaggio ${k + 1}`, uuid: k % 2 ? undefined : `00000000-0000-4000-a000-${String(k).padStart(12, '0')}` })) : [
         { role: 'user', text: 'Aggiungi i fiumi alla mappa' },
         { role: 'thinking', text: 'La mappa si disegna in **MapView.cpp**: conviene guardare prima lì.' },
         { role: 'assistant', text: 'Guardo prima come si disegna la mappa.' },

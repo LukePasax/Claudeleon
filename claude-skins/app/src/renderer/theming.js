@@ -75,6 +75,17 @@
     updStep_build: 'Creo l\'installer nuovo, qualche minuto…',
     updStep_install: 'Installo e riapro Claude Skins…',
     updStep_restart: 'Riavvio Claude Skins…',
+    // Cercare nella conversazione e le scorciatoie
+    findPlaceholder: 'Cerca nella conversazione',
+    findCount: '{i} di {n}',
+    findNone: 'nessuna',
+    findPrev: 'Precedente (Maiusc+Invio)',
+    findNext: 'Successiva (Invio)',
+    findClose: 'Chiudi (Esc)',
+    setKeys: 'Scorciatoie della finestra',
+    setKeysList: 'Ctrl+N nuova conversazione · Ctrl+K cerca negli annali · Ctrl+F cerca nella conversazione · Ctrl+Maiusc+C copia l\'ultima risposta · Ctrl+, impostazioni · Esc ferma Claude · F11 schermo intero',
+    // I messaggi precedenti di una cronaca
+    olderLoad: 'Carica i messaggi precedenti ({n})',
     // Le estensioni
     setExtensions: 'Estensioni',
     setExtRow: 'Server MCP e plugin',

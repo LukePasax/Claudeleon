@@ -572,3 +572,20 @@ body.busy .entry .edit-btn { display: none; }
 .update-banner.error .ub-icon { background: var(--red); }
 .upd-commits { margin: 0 0 6px; padding: 4px 0 6px 18px; font-size: var(--small-size); color: var(--ink-soft); border-bottom: var(--line) solid var(--edge-light); }
 .upd-commits li { margin: 1px 0; }
+
+/* Il pulsante per caricare i messaggi precedenti, in cima a una cronaca */
+.item.older { display: flex; justify-content: center; margin: 0 0 16px; }
+.older-btn { cursor: pointer; font: inherit; font-size: var(--small-size); color: var(--ink-soft); background: none; border: var(--line) dashed var(--edge-light); border-radius: 16px; padding: 4px 14px; }
+.older-btn:hover { color: var(--ink); border-color: var(--ink-soft); }
+
+/* Cercare nella conversazione: la barra e le corrispondenze evidenziate */
+.find-bar {
+  position: absolute; z-index: 18; display: flex; align-items: center; gap: 4px; padding: 4px 4px 4px 8px;
+  background: var(--menu-bg); border: var(--line) solid var(--edge-light); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.find-bar input { width: 200px; font: inherit; font-size: 14px; color: var(--ink); background: none; border: none; outline: none; user-select: text; }
+.find-count { min-width: 52px; font-size: var(--small-size); color: var(--ink-soft); text-align: right; white-space: nowrap; }
+.find-bar button { width: 26px; height: 26px; padding: 0; cursor: pointer; background: none; border: none; border-radius: var(--radius-small); color: var(--ink-soft); font-size: 13px; }
+.find-bar button:hover { background: var(--ctl-hover); color: var(--ink); }
+::highlight(find) { background-color: rgba(255, 200, 60, 0.38); color: inherit; }
+::highlight(find-current) { background-color: rgba(255, 150, 30, 0.85); color: #000; }
