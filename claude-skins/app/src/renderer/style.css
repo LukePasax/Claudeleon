@@ -396,7 +396,7 @@ body[data-perm-mode="bypassPermissions"] .mode-btn, body[data-perm-mode="acceptE
 /* Un interruttore in un menu (ultracode): testo a sinistra, levetta a destra */
 .folder-item.toggle-item { flex-direction: row; align-items: center; gap: 12px; margin-top: 4px; border-top: var(--line) solid var(--edge-light); border-radius: 0; padding-top: 8px; }
 .toggle-item .ti-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.switch { flex: none; position: relative; width: 30px; height: 17px; border-radius: 9px; background: var(--edge-light); transition: background 0.15s; }
+.switch { display: block; flex: none; position: relative; width: 30px; height: 17px; border-radius: 9px; background: var(--edge-light); transition: background 0.15s; }
 .switch::after { content: ''; position: absolute; left: 2px; top: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--menu-bg); transition: transform 0.15s; }
 .toggle-item.on .switch { background: var(--btn-bg); }
 .toggle-item.on .switch::after { transform: translateX(13px); }
@@ -518,3 +518,18 @@ body.busy .entry .edit-btn { display: none; }
 .cmd-menu.files .cmd-name { flex: none; font-family: var(--font-code); font-size: var(--code-size); }
 .cmd-menu.files .cmd-desc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; font-size: var(--small-size); color: var(--ink-soft); }
 .cmd-menu.files .cmd.dir .cmd-name { color: var(--gold); }
+
+/* Le impostazioni: il riquadro del selettore dei temi, con sezioni e righe (nome e nota a sinistra, controllo a destra) */
+.settings-box { width: min(620px, calc(100% - 40px)); max-height: calc(100% - 40px); display: flex; flex-direction: column; }
+.settings-body { overflow-y: auto; padding-right: 4px; }
+.set-section { margin: 14px 0 4px; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); }
+.set-section:first-child { margin-top: 0; }
+.set-row { display: flex; align-items: center; gap: 16px; padding: 8px 0; border-bottom: var(--line) solid var(--edge-light); }
+.set-text { flex: 1; min-width: 0; }
+.set-label { color: var(--ink); }
+.set-note { font-size: var(--small-size); color: var(--ink-soft); line-height: 1.35; overflow-wrap: anywhere; user-select: text; }
+.set-control { flex: none; display: flex; gap: 6px; align-items: center; }
+.set-switch { background: none; border: none; padding: 2px; cursor: pointer; }
+.set-switch.on .switch { background: var(--btn-bg); }
+.set-switch.on .switch::after { transform: translateX(13px); }
+.set-select { font: inherit; font-size: 14px; color: var(--ink); background: var(--field); border: var(--line) solid var(--edge-light); border-radius: var(--radius-small); padding: 3px 6px; max-width: 220px; }

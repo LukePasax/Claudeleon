@@ -1097,6 +1097,110 @@
     for (const el of document.querySelectorAll('.theme-picker')) el.remove()
   }
 
+  // ------------------------------------------------------------------ impostazioni
+
+  // Il pannello delle impostazioni, sopra il layout come il selettore dei temi: aspetto, finestra, notifiche,
+  // conversazioni, Claude Code, informazioni. Ogni scelta vale subito (la applica il processo principale)
+  async function openSettings() {
+    closeThemes()
+    closeFolderMenu()
+    let st = {}
+    try { st = (await api.settings()) || {} } catch {}
+    const host = app.querySelector('[data-solid]') || app
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+    const panel = document.createElement('div')
+    panel.className = 'theme-picker settings-panel'
+    panel.innerHTML = '<div class="theme-picker-box settings-box"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="settings-body"></div></div>'
+    label(panel.querySelector('.theme-picker-head span'), 'settingsTitle')
+    const close = panel.querySelector('.theme-picker-head button')
+    label(close, 'themesClose')
+    close.addEventListener('click', closeThemes)
+    panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    const body = panel.querySelector('.settings-body')
+    const set = async (key, value) => { try { st = (await api.setSetting(key, value)) || st } catch {} ; render() }
+    const section = (key) => { const h = document.createElement('div'); h.className = 'set-section'; body.appendChild(label(h, key)) }
+    const row = (key, noteText) => {
+      const r = document.createElement('div')
+      r.className = 'set-row'
+      r.innerHTML = '<div class="set-text"><div class="set-label"></div><div class="set-note"></div></div><div class="set-control"></div>'
+      label(r.querySelector('.set-label'), key)
+      if (noteText) r.querySelector('.set-note').textContent = noteText
+      else r.querySelector('.set-note').remove()
+      body.appendChild(r)
+      return r.querySelector('.set-control')
+    }
+    const toggle = (ctl, on, fn) => {
+      const b = document.createElement('button')
+      b.className = 'set-switch' + (on ? ' on' : '')
+      b.innerHTML = '<span class="switch"></span>'
+      b.addEventListener('click', () => fn(!on))
+      ctl.appendChild(b)
+    }
+    const button = (ctl, key, fn) => {
+      const b = document.createElement('button')
+      b.className = 'btn small deny'
+      label(b, key)
+      b.addEventListener('click', fn)
+      ctl.appendChild(b)
+    }
+    const select = (ctl, options, value, fn) => {
+      const s = document.createElement('select')
+      s.className = 'set-select'
+      for (const [v, text] of options) { const o = document.createElement('option'); o.value = v; o.textContent = text; s.appendChild(o) }
+      s.value = value
+      s.addEventListener('change', () => fn(s.value))
+      ctl.appendChild(s)
+    }
+    function render() {
+      body.innerHTML = ''
+      // Aspetto
+      section('setLook')
+      button(row('setTheme', Theming.current.name), 'setChange', () => { closeThemes(); openThemes() })
+      if (app.querySelector('[data-action="scene"]')) {
+        select(row('setScene'), [['notte', t('setNight')], ['giorno', t('setDay')]], scene, (v) => { if (v !== scene) actions.scene() })
+      }
+      // Finestra
+      section('setWindow')
+      toggle(row('setOnTop'), st.onTop, (v) => set('onTop', v))
+      toggle(row('setLogin', t('setLoginNote')), st.openAtLogin, (v) => set('openAtLogin', v))
+      const pos = row('setPosition')
+      button(pos, 'setCenter', () => set('center'))
+      button(pos, 'setSize', () => set('resetSize'))
+      // Notifiche
+      section('setNotifications')
+      toggle(row('setNotify', t('setNotifyNote')), st.notify, (v) => set('notify', v))
+      // Conversazioni
+      section('setConversations')
+      button(row('setWorkdir', st.workdir || t('setWorkdirNone')), 'setChange', () => set('workdir'))
+      select(row('setMode'), MODES.map(([m, key]) => [m, t(key)]), mode, (v) => { chooseMode(v); st.mode = v })
+      select(row('setModel'), [['', t('modelDefault')], ...models.filter((m) => m.value !== 'default').map((m) => [m.value, m.name])], model || '', (v) => {
+        model = v || null
+        const m = modelInfo()
+        if (effort && m && !m.efforts.includes(effort)) effort = null
+        api.setModel(model, effort, ultracode)
+        renderModel()
+        render()
+      })
+      const levels = (modelInfo() && modelInfo().efforts.length ? modelInfo().efforts : ['low', 'medium', 'high', 'xhigh', 'max'])
+      select(row('effortTitle'), [['', t('effortAuto')], ...levels.map((l) => [l, t(`effort_${l}`)])], effort || '', (v) => { effort = v || null; api.setModel(model, effort, ultracode); renderModel() })
+      toggle(row('ultracode', t('ultracodeDesc')), ultracode, (v) => { ultracode = v; api.setModel(model, effort, ultracode); renderModel(); render() })
+      // Claude Code
+      section('setClaude')
+      const where = row('setClaudePath', `${st.claudePath || ''}${st.claudeFound ? (st.claudeVersion ? ` · ${st.claudeVersion}` : '') : ` · ${t('setClaudeMissing')}`}`)
+      button(where, 'setChange', () => set('chooseClaude'))
+      if (!st.claudeDefault) button(where, 'setReset', () => set('claudePath', ''))
+      select(row('setEntrypoint', t('setEntrypointNote')), [['cli', t('setEntryCli')], ['claude-desktop', t('setEntryDesktop')]], st.entrypoint || 'cli', (v) => set('entrypoint', v))
+      // Informazioni
+      section('setAbout')
+      row('setVersion', `${st.version || '?'}${st.installed ? '' : ` · ${t('setFromRepo')}`}`)
+      row('setShortcut', `${st.shortcut || ''} · ${t('setShortcutNote')}`)
+      button(row('setData', st.dataDir || ''), 'setOpen', () => set('openData'))
+    }
+    render()
+    host.appendChild(panel)
+  }
+  if (api.onSettingsOpen) api.onSettingsOpen(() => openSettings())
+
   // ------------------------------------------------------------------ la finestra: bordi, ingrandire
 
   // Le maniglie invisibili sui lati e sugli angoli della forma del tema (il suo primo elemento data-solid), per
@@ -2373,6 +2477,7 @@
     sessions: showSessions,
     'sessions-close': () => { if (part('sessions') && !sessionsPinned()) part('sessions').hidden = true },
     themes: openThemes,
+    settings: openSettings,
     maximize: () => api.windowMode('max'),
     fullscreen: () => api.windowMode('full'),
     scene: () => { scene = scene === 'notte' ? 'giorno' : 'notte'; api.setScene(scene); paint(); hook('scene', scene) },
@@ -2388,6 +2493,8 @@
   })
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && document.querySelector('.theme-picker')) { closeThemes(); return }
+    // Ctrl+, apre le impostazioni, come nelle app desktop
+    if (e.key === ',' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); openSettings(); return }
     if (e.key === 'Escape' && document.querySelector('.folder-menu')) { closeFolderMenu(); return }
     // F11: schermo intero, e di nuovo per tornare
     if (e.key === 'F11') { e.preventDefault(); api.windowMode('full'); return }
@@ -2583,6 +2690,7 @@
       permesso: () => fire('onAsk', { id: Date.now(), title: 'Claude vuole modificare un file', description: '', detail: 'src/MapView.cpp', canAlways: true }, 0),
     }
     const day = 86400000
+    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '0.1.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claude Skins', shortcut: 'Ctrl+Alt+P' }
     const fakeSessions = [
       { id: 's0', title: 'Allegati e domande con le opzioni', lastModified: Date.now() - 600000, cwd: 'C:/Workspace/Progetti/Claude-desktop-skins', branch: 'main' },
       { id: 's1', title: 'Temi per Claude Skins', lastModified: Date.now() - 3600000, cwd: 'C:/Workspace/Progetti/Claude-desktop-skins', branch: 'main' },
@@ -2640,6 +2748,8 @@
       onUsage: on('onUsage'),
       onModels: on('onModels'), onTodos: on('onTodos'), onContext: on('onContext'),
       onThinkingStart: on('onThinkingStart'), onSuggestion: on('onSuggestion'), onThinking: on('onThinking'), onThinkingEnd: on('onThinkingEnd'),
+      settings: async () => fakeSettings,
+      setSetting: async (k, v) => { if (k in fakeSettings) fakeSettings[k] = v; return fakeSettings },
       suggestFiles: async (q) => ['src/', 'src/MapView.cpp', 'src/MapView.h', 'src/MapLoader.cpp', 'src/RouteFinder.h', 'docs/', 'docs/specifiche.pdf', 'README.md', 'CMakeLists.txt'].filter((f) => f.toLowerCase().includes(q.toLowerCase())).slice(0, 15),
       edit(uuid, msg, restore, conv) {
         if (restore) fireAll('onRewound', { ok: true, files: ['src/MapView.cpp'], insertions: 2, deletions: 1 }, 50, conv)

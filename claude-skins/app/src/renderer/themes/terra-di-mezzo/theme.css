@@ -171,3 +171,4 @@ body:not(.giorno) .candle .glow { opacity: 0.9; }
 .room { flex: 1; min-height: 0; display: flex; }
 .room .sheet { margin-top: 8px; }
 .porthole { margin-top: 10px; }
+.beam .ctl.settings { display: grid; place-items: center; }

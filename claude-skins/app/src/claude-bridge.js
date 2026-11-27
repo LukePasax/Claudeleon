@@ -267,7 +267,7 @@ class ClaudeBridge extends EventEmitter {
       async function* nothing() { await idle }
       const q = query({
         prompt: nothing(),
-        options: { cwd: this.workdir, pathToClaudeCodeExecutable: CLAUDE, permissionMode: this.mode, settings: { disableAllHooks: true } },
+        options: { cwd: this.workdir, pathToClaudeCodeExecutable: this.claudePath || CLAUDE, permissionMode: this.mode, settings: { disableAllHooks: true } },
       })
       try {
         const list = await Promise.race([q.supportedCommands(), new Promise((_, reject) => setTimeout(() => reject(new Error('tempo scaduto')), 60000))])
@@ -483,7 +483,7 @@ class ClaudeBridge extends EventEmitter {
       prompt: inbox,
       options: {
         cwd,
-        pathToClaudeCodeExecutable: CLAUDE,
+        pathToClaudeCodeExecutable: this.claudePath || CLAUDE,
         permissionMode: this.mode,
         model: this.model || undefined,
         effort: this.effort || undefined,
@@ -917,4 +917,4 @@ class ClaudeBridge extends EventEmitter {
   }
 }
 
-module.exports = { ClaudeBridge, MODES, intent }
+module.exports = { ClaudeBridge, MODES, intent, DEFAULT_CLAUDE: CLAUDE }

@@ -3,7 +3,7 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, globalShortcut, shell, dialog, Notification, clipboard } = require('electron')
 const fs = require('fs')
 const path = require('path')
-const { ClaudeBridge } = require('./claude-bridge')
+const { ClaudeBridge, DEFAULT_CLAUDE } = require('./claude-bridge')
 const { listThemes, DEFAULT_THEME } = require('./themes')
 
 // La misura di partenza, simile a quella dell'app desktop, e la minima, per i temi che non dicono le loro
@@ -154,6 +154,7 @@ function makeConv(sessionId, cwd) {
   }, config.workdir, currentTheme().persona, config.permissionMode)
   const b = c.bridge
   b.entrypoint = config.entrypoint || 'cli'
+  b.claudePath = config.claudePath || null
   b.setModel(config.model || null)
   b.ultracode = !!config.ultracode
   b.setEffort(config.effort || null)
@@ -345,18 +346,90 @@ function trayMenu() {
     { label: 'Cartella di lavoro…', click: chooseWorkdir },
     { label: 'Notifiche', type: 'checkbox', checked: config.notify !== false, click: (item) => { config.notify = item.checked; saveConfig() } },
     { label: 'Sempre in primo piano', type: 'checkbox', checked: config.onTop === true, click: (item) => setOnTop(item.checked) },
-    { label: 'Riporta al centro', click: () => { const p = defaultPosition(); const [w, h] = win.getSize(); win.setBounds({ x: p.x, y: p.y, width: w, height: h }); config.position = p; saveConfig() } },
-    { label: 'Dimensione iniziale', click: () => {
-      if (config.sizes) delete config.sizes[currentTheme().id]
-      const { w, h } = defaultSize()
-      const p = defaultPosition()
-      win.setBounds({ x: p.x, y: p.y, width: w, height: h })
-      config.position = p
-      saveConfig()
-    } },
+    { label: 'Riporta al centro', click: centerWindow },
+    { label: 'Dimensione iniziale', click: resetWindowSize },
+    { label: 'Impostazioni…', click: () => { bringBack(); send('settings:open') } },
     { type: 'separator' },
     { label: 'Esci', click: () => app.quit() },
   ])
+}
+
+function centerWindow() {
+  const p = defaultPosition()
+  const [w, h] = win.getSize()
+  win.setBounds({ x: p.x, y: p.y, width: w, height: h })
+  config.position = p
+  saveConfig()
+}
+function resetWindowSize() {
+  if (config.sizes) delete config.sizes[currentTheme().id]
+  const { w, h } = defaultSize()
+  const p = defaultPosition()
+  win.setBounds({ x: p.x, y: p.y, width: w, height: h })
+  config.position = p
+  saveConfig()
+}
+
+// ------------------------------------------------------------------ impostazioni
+
+// Avvio con Windows: l'app installata parte da sola; quella dal repo con electron.exe e la cartella dell'app
+function loginArgs() {
+  return app.isPackaged ? { path: process.execPath, args: [] } : { path: process.execPath, args: [app.getAppPath()] }
+}
+// Claude Code: quello indicato nelle impostazioni o quello di partenza, e la sua versione (claude --version)
+function claudePath() {
+  return config.claudePath || DEFAULT_CLAUDE
+}
+function claudeVersion() {
+  return new Promise((resolve) => {
+    if (!fs.existsSync(claudePath())) return resolve(null)
+    require('child_process').execFile(claudePath(), ['--version'], { timeout: 15000, windowsHide: true }, (err, out) => resolve(err ? null : String(out || '').trim().split(/\s+/)[0] || null))
+  })
+}
+async function settingsState() {
+  let openAtLogin = false
+  try { openAtLogin = app.getLoginItemSettings(loginArgs()).openAtLogin } catch {}
+  return {
+    onTop: config.onTop === true,
+    notify: config.notify !== false,
+    openAtLogin,
+    workdir: config.workdir || '',
+    mode: config.permissionMode || 'auto',
+    entrypoint: config.entrypoint || 'cli',
+    claudePath: claudePath(),
+    claudeDefault: !config.claudePath,
+    claudeFound: fs.existsSync(claudePath()),
+    claudeVersion: await claudeVersion(),
+    version: app.getVersion(),
+    installed: app.isPackaged,
+    dataDir: app.getPath('userData'),
+    shortcut: TOGGLE_SHORTCUT.replace('Control', 'Ctrl'),
+  }
+}
+// Una scelta del pannello: si applica subito e si ricorda
+async function applySetting(key, value) {
+  if (key === 'onTop') setOnTop(!!value)
+  else if (key === 'notify') { config.notify = !!value; saveConfig() }
+  else if (key === 'openAtLogin') { try { app.setLoginItemSettings(Object.assign({ openAtLogin: !!value }, loginArgs())) } catch {} }
+  else if (key === 'entrypoint') {
+    config.entrypoint = value === 'claude-desktop' ? 'claude-desktop' : 'cli'
+    saveConfig()
+    for (const b of [bridge, ...allBridges()]) b.entrypoint = config.entrypoint
+  } else if (key === 'claudePath') {
+    // Vuoto: quello di partenza (~/.local/bin/claude)
+    config.claudePath = value ? String(value) : null
+    saveConfig()
+    for (const b of [bridge, ...allBridges()]) b.claudePath = config.claudePath
+    bridge.loadCommands()
+  } else if (key === 'chooseClaude') {
+    const r = await dialog.showOpenDialog(win, { title: 'Dov\'è Claude Code', defaultPath: path.dirname(claudePath()), properties: ['openFile'], filters: process.platform === 'win32' ? [{ name: 'Claude Code', extensions: ['exe', 'cmd'] }] : [] })
+    if (!r.canceled && r.filePaths[0]) return applySetting('claudePath', r.filePaths[0])
+  } else if (key === 'workdir') await chooseWorkdir()
+  else if (key === 'center') centerWindow()
+  else if (key === 'resetSize') resetWindowSize()
+  else if (key === 'openData') shell.openPath(app.getPath('userData'))
+  refreshTray()
+  return settingsState()
 }
 
 // La cartella in cui nascono le conversazioni nuove (quelle riprese restano nella loro)
@@ -417,6 +490,8 @@ function registerIpc() {
     mode: config.permissionMode || bridge.mode,
   }))
   ipcMain.on('theme:set', (_e, id) => setTheme(String(id)))
+  ipcMain.handle('settings:get', () => settingsState())
+  ipcMain.handle('settings:set', (_e, key, value) => applySetting(String(key), value))
   ipcMain.on('app:icon', (_e, dataUrl) => { if (!captureMode) setAppIcon(String(dataUrl || '')); else if (process.platform !== 'darwin') win.setIcon(nativeImage.createFromDataURL(String(dataUrl || ''))) })
   // Copiare negli appunti (i pulsanti "copia" di codice e risposte)
   ipcMain.on('clipboard:write', (_e, text) => clipboard.writeText(String(text || '')))
@@ -837,6 +912,7 @@ app.whenReady().then(() => {
   // Come si presentano le sessioni a Claude Code (cli: visibili nel /resume e nelle altre app). Si può cambiare in
   // config.json, ad esempio "claude-desktop"
   bridge.entrypoint = config.entrypoint || 'cli'
+  bridge.claudePath = config.claudePath || null
   bridge.setModel(config.model || null)
   captureMode = !!capture
   registerIpc()

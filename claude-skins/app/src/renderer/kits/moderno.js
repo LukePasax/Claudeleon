@@ -56,6 +56,7 @@
       </div>
       <div class="side-foot">
         <button class="link" data-action="themes" data-s="themes"></button>
+        <button class="link" data-action="settings" data-s="settings"></button>
       </div>
     </aside>
     <main class="main">

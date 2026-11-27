@@ -102,6 +102,7 @@ Su un qualunque elemento cliccabile (anche più di uno per azione):
 | `send`, `stop` | Spedisce il messaggio; ferma Claude. Il motore mostra l'uno o l'altro (`hidden`) |
 | `new` | Nuovo capitolo |
 | `sessions`, `sessions-close` | Apre e chiude le cronache in sovrimpressione |
+| `settings` | Apre il pannello delle impostazioni (`.theme-picker.settings-panel`, righe `.set-row`), sopra il layout come il selettore dei temi. Anche Ctrl+, |
 | `themes` | Apre il selettore dei temi: un pannello sopra il layout (dentro il primo elemento `data-solid`) con una scheda per tema, anteprima, nome e `description`. L'anteprima la disegna il motore coi disegni del tema: `paper`, poi `leather` o `roll` per la fascia in alto, e `trayIcon` |
 | `scene` | Notte ↔ giorno. Se l'elemento è vuoto, il motore ci scrive il nome dell'altra scena |
 | `attach` | Sceglie file o immagini dal disco da allegare al prossimo messaggio (incollare e trascinare funzionano sempre) |

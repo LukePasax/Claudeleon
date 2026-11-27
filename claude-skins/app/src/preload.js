@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld('skins', {
   setMode: (mode) => ipcRenderer.send('mode:set', mode),
   openLink: (url) => ipcRenderer.send('link:open', url),
   copy: (text) => ipcRenderer.send('clipboard:write', text),
+  settings: () => ipcRenderer.invoke('settings:get'),
+  setSetting: (key, value) => ipcRenderer.invoke('settings:set', key, value),
+  onSettingsOpen: listen('settings:open'),
   newChapter: () => ipcRenderer.invoke('chapter:new'),
   send: (msg, conv) => ipcRenderer.send('chat:send', msg, conv),
   // La conversazione in vista (le altre continuano a lavorare)

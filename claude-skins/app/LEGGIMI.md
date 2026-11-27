@@ -50,6 +50,11 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
 - **Come un'app:** la finestra sta nella barra delle applicazioni con l'icona del tema, e "–" la riduce a icona lì
   (non sparisce fra le icone nascoste). Non sta sopra le altre finestre, a meno di accendere "Sempre in primo
   piano" dal vassoio. Una domanda di permesso fa lampeggiare l'icona nella barra se la finestra è ridotta o dietro.
+- **Impostazioni:** l'ingranaggio sulla trave (Terra di Mezzo) o "Impostazioni" in fondo alla barra (Metrios e
+  Dream), Ctrl+, o il vassoio. Tutto vale subito: tema e scena; sempre in primo piano, avvio con Windows, riporta al
+  centro e dimensione iniziale; notifiche; cartella di lavoro, permessi, modello, ragionamento e ultracode; il
+  programma di Claude Code (percorso, se c'è e la sua versione, per sceglierne un altro) e come si presentano le
+  sessioni alle altre app (`entrypoint`); versione, scorciatoia e cartella dei dati.
 - **Notifiche:** quando la finestra non è davanti (ridotta a icona o dietro ad altre), una notifica di Windows dice
   che Claude ha finito (con l'inizio della risposta), che chiede un permesso, una scelta o l'approvazione di un piano,
   o che si è fermato; nel titolo c'è il nome della conversazione. Un clic riporta davanti la finestra, e tornandoci le
