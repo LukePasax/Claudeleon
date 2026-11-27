@@ -828,8 +828,14 @@ function setAppIcon(dataUrl) {
 // stesso AppUserModelId. Serve anche ad aprire Claude Skins dal menu Start. Ha l'icona dell'app, così Windows non le
 // lega mai quella di Electron
 function ensureStartMenuShortcut() {
-  // L'app installata ha già il suo collegamento, fatto dall'installer con lo stesso AppUserModelId (appId)
+  // L'app installata ha già il suo collegamento, fatto dall'installer con lo stesso AppUserModelId (appId); e la
+  // versione dal repo non ne fa un secondo se l'app è installata (nella cartella di partenza dell'installer)
   if (app.isPackaged) return
+  const local = process.env.LOCALAPPDATA || ''
+  if (local && ['claude-skins', 'Claude Skins'].some((d) => fs.existsSync(path.join(local, 'Programs', d, 'Claude Skins.exe')))) {
+    iconLog('app installata: nessun collegamento dalla versione del repo')
+    return
+  }
   if (process.platform !== 'win32' || !fs.existsSync(appIconFile())) return
   try {
     const link = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Claude Skins.lnk')
