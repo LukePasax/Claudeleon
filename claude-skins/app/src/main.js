@@ -1,6 +1,6 @@
 // La finestra: trasparente, senza bordi, sempre in primo piano. La sua forma la decide il tema in uso; dove il tema
 // non disegna nulla i clic passano alle finestre sotto, e si trascina dalla parte che il tema indica (data-drag).
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, globalShortcut, shell, dialog, Notification } = require('electron')
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, globalShortcut, shell, dialog, Notification, clipboard } = require('electron')
 const fs = require('fs')
 const path = require('path')
 const { ClaudeBridge } = require('./claude-bridge')
@@ -415,6 +415,8 @@ function registerIpc() {
     mode: config.permissionMode || bridge.mode,
   }))
   ipcMain.on('theme:set', (_e, id) => setTheme(String(id)))
+  // Copiare negli appunti (i pulsanti "copia" di codice e risposte)
+  ipcMain.on('clipboard:write', (_e, text) => clipboard.writeText(String(text || '')))
   // La cartella delle conversazioni nuove, dalla finestra: dal dialogo di sistema o da una cartella recente
   ipcMain.handle('workdir:choose', () => chooseWorkdir())
   ipcMain.handle('workdir:set', (_e, dir) => setWorkdir(String(dir || '')))

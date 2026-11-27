@@ -160,6 +160,43 @@
     textEl.innerHTML = markdown(src)
     const first = textEl.firstElementChild
     textEl.classList.toggle('long-start', !!first && first.tagName === 'P' && first.textContent.length >= 160)
+    // Ogni blocco di codice ha il suo "copia"; la risposta intera ne ha uno sotto (il testo markdown com'è arrivato)
+    for (const pre of textEl.querySelectorAll('pre')) pre.appendChild(copyButton('copyCode', () => pre.querySelector('code') ? pre.querySelector('code').textContent : pre.textContent))
+    const entryEl = textEl.closest('.entry')
+    if (entryEl) {
+      entryEl.rawText = src
+      if (!entryEl.querySelector('.entry-actions')) entryEl.appendChild(entryActions('copyReply', () => entryEl.rawText || ''))
+    }
+  }
+
+  // ------------------------------------------------------------------ copiare
+
+  // Un pulsante "copia": il testo lo dà get al momento del clic; per un attimo dice "Copiato"
+  function copyButton(key, get, withText) {
+    const b = document.createElement('button')
+    b.className = 'copy-btn'
+    b.dataset.sTitle = key
+    b.title = t(key)
+    if (withText) label(b, 'copy')
+    b.addEventListener('click', (e) => {
+      e.stopPropagation()
+      copyText(get())
+      b.classList.add('done')
+      if (withText) label(b, 'copied')
+      clearTimeout(b.timer)
+      b.timer = setTimeout(() => { b.classList.remove('done'); if (withText) label(b, 'copy') }, 1500)
+    })
+    return b
+  }
+  function entryActions(key, get) {
+    const row = document.createElement('div')
+    row.className = 'entry-actions'
+    row.appendChild(copyButton(key, get, true))
+    return row
+  }
+  function copyText(text) {
+    if (api.copy) api.copy(text)
+    else if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {})
   }
 
   // ------------------------------------------------------------------ la conversazione nel log
@@ -1150,6 +1187,7 @@
       el.appendChild(box)
     }
     if (text) el.appendChild(document.createTextNode(text))
+    if (text && !d.querySelector('.entry-actions')) d.appendChild(entryActions('copyMessage', () => text))
   }
   function fileChip(p) {
     const chip = document.createElement('span')

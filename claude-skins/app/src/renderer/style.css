@@ -444,3 +444,26 @@ body[data-perm-mode="bypassPermissions"] .mode-btn, body[data-perm-mode="acceptE
 .session-row.running:hover::after, .session-row.attention:hover::after, .session-row.unread:hover::after { display: none; }
 .session-row.unread .title { font-weight: 600; }
 .convo[hidden] { display: none; }
+
+/* Copiare: un pulsante nell'angolo di ogni blocco di codice (si vede passandoci sopra) e uno sotto ogni messaggio */
+.text pre { position: relative; }
+.copy-btn {
+  cursor: pointer; font: inherit; font-size: 12px; color: var(--ink-soft); background: var(--menu-bg);
+  border: var(--line) solid var(--edge-light); border-radius: var(--radius-small); padding: 2px 8px; line-height: 1.4;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.copy-btn::before {
+  content: ''; flex: none; width: 9px; height: 10px; border: 1.4px solid currentColor; border-radius: 2px;
+  box-shadow: 2.5px -2.5px 0 -1.2px var(--menu-bg), 2.5px -2.5px 0 0 currentColor;
+}
+.copy-btn.done::before { width: 9px; height: 5px; border-width: 0 0 1.8px 1.8px; border-radius: 0; box-shadow: none; transform: rotate(-45deg) translate(1px, -1px); }
+.copy-btn:hover { color: var(--ink); }
+.text pre > .copy-btn { position: absolute; top: 6px; right: 6px; opacity: 0; transition: opacity 0.12s; padding: 3px 6px; }
+.text pre:hover > .copy-btn, .text pre > .copy-btn.done { opacity: 1; }
+.text pre[data-lang]:hover::before { opacity: 0; }
+.entry.you { flex-direction: column; align-items: flex-end; }
+.entry-actions { display: flex; gap: 6px; margin-top: 4px; opacity: 0; transition: opacity 0.12s; }
+.entry-actions .copy-btn { background: none; border-color: transparent; padding: 1px 6px; }
+.entry-actions .copy-btn:hover { border-color: var(--edge-light); }
+.entry:hover .entry-actions, .entry-actions:has(.done) { opacity: 1; }
+.entry.you .entry-actions { justify-content: flex-end; }

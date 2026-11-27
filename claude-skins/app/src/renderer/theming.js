@@ -77,6 +77,12 @@
     effort_high: 'High',
     effort_xhigh: 'Extra',
     effort_max: 'Max',
+    // Copiare
+    copy: 'Copia',
+    copied: 'Copiato',
+    copyCode: 'Copia il codice',
+    copyReply: 'Copia la risposta',
+    copyMessage: 'Copia il messaggio',
     // Il ragionamento di Claude
     thinkingNow: 'Sta ragionando…',
     thinkingDone: 'Ha ragionato per {s} s',

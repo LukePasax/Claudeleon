@@ -55,6 +55,9 @@ npm 11 altrimenti non arriva.
   mette a disposizione (letto all'avvio, poi ricordato), i livelli di ragionamento coi nomi dell'app desktop (Low,
   Medium, High, Extra, Max) e l'interruttore **Ultracode** (orchestrazione dinamica dei flussi di lavoro). Valgono
   subito, anche a conversazione accesa, e si ricordano (`model`, `effort`, `ultracode` in config.json). I modi dei permessi stanno in un menu a tendina, come nell'app desktop.
+- **Copiare:** ogni blocco di codice ha un pulsante "copia" nell'angolo (passandoci sopra) che copia solo il suo
+  contenuto, per esempio una bozza da incollare in una mail; sotto ogni risposta e ogni domanda, passandoci sopra,
+  "Copia" copia il messaggio intero (le risposte col loro markdown).
 - **Ragionamento:** quando Claude ragiona prima di rispondere compare una riga "Sta ragionando…" col testo che
   scorre sotto; finito, diventa "Ha ragionato per N s" e si riapre con un clic. Anche nelle cronache riaperte. Il
   testo è il riassunto che Claude Code chiede all'API (`showThinkingSummaries`): con un modello che non lo manda
