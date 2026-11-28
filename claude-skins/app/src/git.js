@@ -3,6 +3,7 @@
 // la pagina di confronto del sito nel browser). Tutto passa dal comando git del sistema; niente qui chiede nulla da
 // terminale (GIT_TERMINAL_PROMPT=0: le credenziali le chiede Git Credential Manager con la sua finestra, se serve)
 const { execFile } = require('child_process')
+const { tr } = require('./i18n')
 const fs = require('fs')
 const path = require('path')
 
@@ -26,7 +27,7 @@ const git = (args, cwd, timeout) => run('git', args, cwd, timeout)
 // Il messaggio di un errore di git, senza le righe di contorno ("hint: ...")
 function clean(err) {
   const lines = String(err || '').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !/^hint:/i.test(l))
-  return lines.slice(0, 6).join('\n') || 'git non ha funzionato'
+  return lines.slice(0, 6).join('\n') || tr('git non ha funzionato')
 }
 
 async function rootOf(cwd) {
@@ -193,10 +194,10 @@ async function branches(cwd) {
 
 async function checkout(cwd, name, create) {
   const root = await rootOf(cwd)
-  if (!root) return { ok: false, error: 'Non è un repo git' }
+  if (!root) return { ok: false, error: tr('Non è un repo git') }
   name = String(name || '').trim()
   const valid = await git(['check-ref-format', '--branch', name], root)
-  if (!name || !valid.ok) return { ok: false, error: `«${name}» non va bene come nome di un branch` }
+  if (!name || !valid.ok) return { ok: false, error: tr('«{x}» non va bene come nome di un branch', { x: name }) }
   const r = await git(create ? ['checkout', '-b', name] : ['checkout', name], root)
   return r.ok ? { ok: true } : { ok: false, error: clean(r.err) }
 }
@@ -204,9 +205,9 @@ async function checkout(cwd, name, create) {
 // Commit di tutte le modifiche (come l'app desktop: anche i file nuovi), e a scelta il push
 async function commit(cwd, message, andPush) {
   const root = await rootOf(cwd)
-  if (!root) return { ok: false, error: 'Non è un repo git' }
+  if (!root) return { ok: false, error: tr('Non è un repo git') }
   message = String(message || '').trim()
-  if (!message) return { ok: false, error: 'Serve un messaggio per il commit' }
+  if (!message) return { ok: false, error: tr('Serve un messaggio per il commit') }
   const add = await git(['add', '-A'], root)
   if (!add.ok) return { ok: false, error: clean(add.err) }
   const c = await git(['commit', '-m', message], root, 120000)
@@ -218,9 +219,9 @@ async function commit(cwd, message, andPush) {
 // Il push del branch; la prima volta lo collega a origin
 async function push(cwd) {
   const root = await rootOf(cwd)
-  if (!root) return { ok: false, error: 'Non è un repo git' }
+  if (!root) return { ok: false, error: tr('Non è un repo git') }
   const up = await git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'], root)
-  if (!up.ok && !(await git(['remote', 'get-url', 'origin'], root)).ok) return { ok: false, error: 'Questo repo non ha un remoto (origin) dove fare il push' }
+  if (!up.ok && !(await git(['remote', 'get-url', 'origin'], root)).ok) return { ok: false, error: tr('Questo repo non ha un remoto (origin) dove fare il push') }
   const r = await git(up.ok ? ['push'] : ['push', '-u', 'origin', 'HEAD'], root, 180000)
   return r.ok ? { ok: true } : { ok: false, error: clean(r.err) }
 }
@@ -238,9 +239,9 @@ async function prInfo(cwd) {
 // ce la fa, resta l'indirizzo della pagina di confronto da aprire nel browser
 async function createPr(cwd, opts = {}) {
   const st = await status(cwd)
-  if (!st.repo) return { ok: false, error: 'Non è un repo git' }
-  if (!st.branch || st.detached) return { ok: false, error: 'Serve un branch per la pull request' }
-  if (st.base && st.branch === st.base) return { ok: false, error: `Sei su ${st.base}: crea prima un branch per la pull request` }
+  if (!st.repo) return { ok: false, error: tr('Non è un repo git') }
+  if (!st.branch || st.detached) return { ok: false, error: tr('Serve un branch per la pull request') }
+  if (st.base && st.branch === st.base) return { ok: false, error: tr('Sei su {x}: crea prima un branch per la pull request', { x: st.base }) }
   const p = await push(cwd)
   if (!p.ok) return Object.assign(p, { compare: st.compare })
   if (!st.gh) return { ok: false, compare: st.compare, noGh: true }
@@ -285,9 +286,9 @@ async function worktreeInfo(cwd) {
 
 async function createWorktree(cwd, hint) {
   const info = await worktreeInfo(cwd)
-  if (!info) return { ok: false, error: 'Non è un repo git' }
+  if (!info) return { ok: false, error: tr('Non è un repo git') }
   const head = await git(['rev-parse', '--verify', '--quiet', 'HEAD'], info.main)
-  if (!head.ok) return { ok: false, error: 'Il repo non ha ancora commit: il worktree parte da un commit' }
+  if (!head.ok) return { ok: false, error: tr('Il repo non ha ancora commit: il worktree parte da un commit') }
   const name = slug(hint)
   const branch = `claude/${name}`
   const dir = path.join(info.main, '.claude', 'worktrees', name)
@@ -328,15 +329,15 @@ async function worktreeStatus(cwd) {
 // salvate del worktree non passano: prima il commit
 async function mergeWorktree(cwd) {
   const wt = await worktreeStatus(cwd)
-  if (!wt) return { ok: false, error: 'Questa conversazione non lavora in un worktree' }
+  if (!wt) return { ok: false, error: tr('Questa conversazione non lavora in un worktree') }
   const dirty = await git(['status', '--porcelain', '--untracked-files=all'], wt.path)
-  if (dirty.out.trim()) return { ok: false, error: 'Ci sono modifiche senza commit nel worktree: fai prima il commit' }
-  if (wt.mainBranch !== wt.base) return { ok: false, error: `La cartella principale è su ${wt.mainBranch}, non su ${wt.base}: torna su ${wt.base} per unire` }
+  if (dirty.out.trim()) return { ok: false, error: tr('Ci sono modifiche senza commit nel worktree: fai prima il commit') }
+  if (wt.mainBranch !== wt.base) return { ok: false, error: tr('La cartella principale è su {x}, non su {y}: torna su {y} per unire', { x: wt.mainBranch, y: wt.base }) }
   if (!wt.unmerged) return { ok: true, nothing: true }
   const r = await git(['merge', '--no-ff', '--no-edit', wt.branch], wt.main, 120000)
   if (!r.ok) {
     await git(['merge', '--abort'], wt.main)
-    return { ok: false, error: `Unione non riuscita (conflitti o modifiche nella cartella principale), annullata:\n${clean(r.err || r.out)}` }
+    return { ok: false, error: tr('Unione non riuscita (conflitti o modifiche nella cartella principale), annullata:\n{x}', { x: clean(r.err || r.out) }) }
   }
   return { ok: true }
 }
@@ -345,7 +346,7 @@ async function mergeWorktree(cwd) {
 // è già unito
 async function removeWorktree(cwd, force) {
   const wt = await worktreeStatus(cwd)
-  if (!wt) return { ok: false, error: 'Questa conversazione non lavora in un worktree' }
+  if (!wt) return { ok: false, error: tr('Questa conversazione non lavora in un worktree') }
   const dirty = (await git(['status', '--porcelain', '--untracked-files=all'], wt.path)).out.trim()
   if (!force && (dirty || wt.unmerged)) return { ok: false, needsForce: true, dirty: !!dirty, unmerged: wt.unmerged }
   const r = await git(['worktree', 'remove', ...(force ? ['--force'] : []), wt.path], wt.main, 120000)

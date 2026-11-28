@@ -299,6 +299,54 @@ alfanumerico del cwd diventa -) e carica il ponte con `query()` sostituita da un
 fallisce deve spegnere le conversazioni accese (`after`), altrimenti il processo non finisce. `listFiles`/`rankFiles`
 stanno in `src/files.js`, `plainSnippet` in `src/text.js`.
 
+## Lingue
+
+Inglese di partenza (`config.language`, `en` | `it`). Finestra: le scritte italiane sono `STRINGS` in theming.js, le
+inglesi `renderer/lang/en.js` (caricato prima di theming.js; stesso elenco di chiavi, una che manca ripiega
+sull'italiano); `Theming.setLanguage`, `months()`/`days()`, `plainDate` col formato della lingua, `nameOf(theme)`
+(campi `names`/`descriptions` per lingua). Le scritte di un tema possono essere per lingua (`strings: { en, it }`,
+come il kit moderno) o uguali per tutte (come Casa Baggins). Processo principale: `src/i18n.js` con `tr('frase
+italiana {x}', { x })` e il dizionario `EN` con la frase italiana come chiave, usato da main.js, git.js,
+permissions.js, memory.js, themes.js, updater.js, release-updater.js e claude-bridge.js (anche i messaggi a Claude);
+`pick()` per i campi per lingua dei temi (`persona` del kit è `{ en, it }`). `language:set` alla pagina, che
+rimonta il tema e riapre le impostazioni. Prove: `test/unit/lingue.test.js` (ogni `tr()` ha la traduzione, le
+scritte della finestra ci sono tutte e due con gli stessi segnaposto); le altre prove si mettono in italiano
+(`setLanguage('it')`, `?lingua=it`), una della finestra prova l'inglese e il cambio. Il tema di partenza si chiama
+"Essential" ("Essenziale" in italiano).
+
+## Benvenuto e novità
+
+`claude:status` (main.js `claudeStatus()`): il programma (`claudePath()`: quello scelto, `~/.local/bin/claude(.exe)` o
+il primo del PATH con `where`/`which`, su Windows solo .exe), la versione e il login stimato (`claudeLoggedIn()`:
+variabili d'ambiente, `~/.claude/.credentials.json`, `oauthAccount` in `~/.claude.json`). La pagina apre il
+benvenuto (`openWelcome`) se `config.welcomed` manca o se manca Claude Code o il login; "Comincia"/"Continua
+comunque" mette `welcomed`. Novità: all'avvio, se `config.lastVersion` è diversa da `app.getVersion()` (o manca ma
+la configurazione c'era già: le versioni di prima della 1.1 non la ricordavano), `whatsNew`; `whatsnew:get` prende
+le note dalla API di GitHub (`releases/tags/v<versione>`, repo da `package.json` `repository`) una volta sola. La
+pagina le mostra dopo il benvenuto. Versione finta: `?benvenuto=si`, `?claude=manca`, `?login=no`, `?novita=si`.
+
+## Ricerca nelle conversazioni
+
+`src/search.js`: legge i `.jsonl` di `~/.claude/projects/*/` (o `CLAUDE_CONFIG_DIR`), solo le righe `user`/`assistant`
+non `isSidechain`/`isMeta`, il testo senza blocchi `<attached_files>`/`<diff_comments>` e senza messaggi di sistema;
+cache per id con data e misura del file (la prima lettura su una sessione enorme è ~0,6 s, poi ~1 ms; `warm()` 20 s
+dopo l'avvio). `search(q)`: tutte le parole (senza accenti, minuscole, almeno 2 lettere) nella conversazione; dà
+`{ id, count, snippet }`. IPC `sessions:search`; la pagina la chiama 250 ms dopo l'ultima lettera (da 3 lettere) e
+mostra `.session-snippet` con `<mark>`.
+
+## Immagini del README
+
+`docs/claudeleon-light.png` e `-dark.png`: la versione finta con `?tema=essenziale&lingua=en&demo=en` (dati finti in
+inglese: conversazioni, risposta, branch `rivers`), 1280×800 a scala 2, sfondo trasparente, con Playwright e
+`colorScheme` light/dark; si manda "Draw the rivers before the roads…" e si fotografa a risposta finita. Da rifare
+quando l'aspetto cambia molto.
+
+## Impostazioni
+
+Pannello a categorie (`SETTINGS_PAGES`, `settingsPage` in localStorage); permessi, memoria ed estensioni sono gli
+stessi pannelli aperti con `openPermissions(body)` ecc. (parametro `inside`: dentro un altro contenitore, classe
+`.panel-embed`, senza titolo né cornice). Le scorciatoie sono una tabella (`KEYS`).
+
 ## Release su GitHub
 
 `.github/workflows/release.yml`: a mano (Run workflow) o con un tag `v<versione>`; prove della logica su
@@ -441,6 +489,24 @@ etichette `.attachment.review` nella striscia degli allegati e una `.review-bar`
 (`.sent-comments`), anche nelle cronache riaperte; la modifica di un messaggio lo conserva (`d.reviewBlock`). Il titolo
 di una sessione dal primo messaggio toglie questi blocchi e quelli dei file allegati (`promptTitle` nel ponte).
 Nella riga della penna cartella, branch e modello si stringono (prima il modello) invece di andare a capo.
+
+## La skill dei temi e i temi dal vivo
+
+Claudeleon dà a ogni conversazione un plugin suo, `app/src/plugin/claudeleon/` (`PLUGIN_DIR` nel ponte, che nell'app
+installata punta ad `app.asar.unpacked`, perché `asarUnpack` comprende `src/plugin/**`): nelle opzioni di `query()`
+`plugins: [{ type: 'local', path }]`, la variabile `CLAUDELEON_THEMES_DIR` con la cartella `temi` dei dati e la stessa
+cartella in `additionalDirectories`. Il plugin ha una sola skill, `claudeleon-theme` (`SKILL.md`: quale tipo di tema
+scegliere, come scriverlo, dove; `reference/guide.md` è una copia di `docs/themes.md`, da ricopiare quando cambia,
+c'è una prova che lo controlla; `reference/variables.md`; tre esempi: `dusk.json` di soli colori, `harbor/` con
+`kit.adaptive`, `terminal/` con forma, CSS e un aggancio). Nell'init della sessione compare come
+`claudeleon:claudeleon-theme`, skill e comando.
+
+Il processo principale tiene d'occhio la cartella `temi` (`watchThemes`, `fs.watch` ricorsivo, 300 ms di attesa) e
+manda `themes:changed` con `themesSnapshot()`: i temi con codice con un `stamp` (l'ultima modifica di un loro file) e
+quelli di colori. La pagina (`api.onThemesChanged`) ricarica i temi con codice il cui stamp è cambiato
+(`Theming.load(…, true)`, che aggiunge `?v=` al `theme.css`), registra quelli di colori nuovi o cambiati (confronto su
+`__spec`), toglie quelli spariti (non quello in uso) e rimonta il tema in uso se è cambiato e l'editor non è aperto. Il
+protocollo `skins-theme://` risponde con `Cache-Control: no-store`.
 
 ## Prossimi passi possibili
 

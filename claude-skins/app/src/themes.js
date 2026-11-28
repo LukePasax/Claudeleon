@@ -1,6 +1,7 @@
 // I temi dal lato del processo principale: quali ci sono (le cartelle di renderer/themes con un theme.js) e, di
 // ciascuno, il nome per il menu, le misure della finestra e la "personalità" da aggiungere al prompt di sistema di
 // Claude Code. Il resto del tema (layout, colori, scritte, disegni) lo usa solo la pagina.
+const { tr } = require('./i18n')
 const fs = require('fs')
 const path = require('path')
 
@@ -22,7 +23,7 @@ function listThemes() {
     try {
       // theme.js si registra nella pagina, ma qui (CommonJS) esporta lo stesso oggetto
       const t = require(file)
-      if (t && t.id === dir) themes.push({ id: t.id, name: t.name || t.id, description: t.description || '', persona: t.persona || '', window: t.window || null })
+      if (t && t.id === dir) themes.push({ id: t.id, name: t.name || t.id, names: t.names || null, description: t.description || '', persona: t.persona || '', window: t.window || null })
       else console.warn(`Tema ${dir}: l'id in theme.js deve essere uguale al nome della cartella`)
     } catch (err) {
       console.warn(`Tema ${dir} non leggibile: ${err.message}`)
@@ -102,7 +103,7 @@ function cleanManifest(m, id) {
   const num = (v, lo, hi) => (Number.isFinite(Number(v)) ? Math.max(lo, Math.min(hi, Math.round(Number(v)))) : undefined)
   const win = w ? { width: num(w.width, 400, 4000), height: num(w.height, 300, 3000), minWidth: num(w.minWidth, 300, 4000), minHeight: num(w.minHeight, 200, 3000) } : null
   if (win) for (const k of Object.keys(win)) if (win[k] === undefined) delete win[k]
-  return { id, name: str(m && m.name, 60) || id, description: str(m && m.description, 300), persona: str(m && m.persona, 4000), window: win && Object.keys(win).length ? win : null }
+  return { id, name: str(m && m.name, 60) || id, description: str(m && m.description, 300), persona: m && m.persona && typeof m.persona === 'object' ? { en: str(m.persona.en, 4000), it: str(m.persona.it, 4000) } : str(m && m.persona, 4000), window: win && Object.keys(win).length ? win : null }
 }
 
 // I temi con codice importati (cartelle con theme.json)
@@ -146,20 +147,20 @@ function bundleFor(id, userDir) {
 
 // Controlla un pacchetto letto da un file: { ok, kind, id, name, error }
 function checkBundle(b) {
-  if (!b || b.format !== FORMAT) return { ok: false, error: 'Non è un tema di Claudeleon' }
-  if (b.kind === 'colors') return b.spec && typeof b.spec === 'object' ? { ok: true, kind: 'colors', name: kit.normalizeSpec(b.spec).name } : { ok: false, error: 'Il tema non ha i colori' }
-  if (b.kind !== 'code') return { ok: false, error: 'Tipo di tema sconosciuto' }
+  if (!b || b.format !== FORMAT) return { ok: false, error: tr('Non è un tema di Claudeleon') }
+  if (b.kind === 'colors') return b.spec && typeof b.spec === 'object' ? { ok: true, kind: 'colors', name: kit.normalizeSpec(b.spec).name } : { ok: false, error: tr('Il tema non ha i colori') }
+  if (b.kind !== 'code') return { ok: false, error: tr('Tipo di tema sconosciuto') }
   const id = b.manifest && b.manifest.id
-  if (!validId(id)) return { ok: false, error: 'L\'id del tema non va bene (minuscole, numeri e trattini)' }
+  if (!validId(id)) return { ok: false, error: tr('L\'id del tema non va bene (minuscole, numeri e trattini)') }
   const files = b.files && typeof b.files === 'object' ? b.files : {}
-  if (typeof files['theme.js'] !== 'string') return { ok: false, error: 'Manca theme.js' }
+  if (typeof files['theme.js'] !== 'string') return { ok: false, error: tr('Manca theme.js') }
   let size = 0
   for (const [rel, data] of Object.entries(files)) {
     const parts = rel.split('/')
-    if (typeof data !== 'string' || !ALLOWED.test(rel) || rel.startsWith('/') || /[\\:]/.test(rel) || parts.some((x) => !x || x === '.' || x === '..')) return { ok: false, error: `File non ammesso: ${rel}` }
+    if (typeof data !== 'string' || !ALLOWED.test(rel) || rel.startsWith('/') || /[\\:]/.test(rel) || parts.some((x) => !x || x === '.' || x === '..')) return { ok: false, error: tr('File non ammesso: {x}', { x: rel }) }
     size += data.length * 0.75
   }
-  if (size > MAX_BUNDLE) return { ok: false, error: 'Il tema è troppo grande (oltre 25 MB)' }
+  if (size > MAX_BUNDLE) return { ok: false, error: tr('Il tema è troppo grande (oltre 25 MB)') }
   return { ok: true, kind: 'code', id, name: cleanManifest(b.manifest, id).name }
 }
 
@@ -174,7 +175,7 @@ function installBundle(userDir, b, replace) {
     const saved = saveUserTheme(userDir, spec)
     return { ok: true, kind: 'colors', id: saved.id, spec: saved }
   }
-  if (BUILTIN().has(c.id)) return { ok: false, error: `C'è già un tema del programma con l'id «${c.id}»` }
+  if (BUILTIN().has(c.id)) return { ok: false, error: tr('C\'è già un tema del programma con l\'id «{x}»', { x: c.id }) }
   const target = path.join(userDir, c.id)
   const exists = fs.existsSync(target) || fs.existsSync(path.join(userDir, `${c.id}.json`))
   if (exists && !replace) return { ok: false, exists: true, id: c.id, name: c.name }

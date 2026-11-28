@@ -1,0 +1,7 @@
+{
+  "id": "terminal",
+  "name": "Terminal",
+  "description": "Green phosphor on black, square corners, scanlines",
+  "persona": "Answer tersely, like output on an old terminal. Plain sentences, no flourishes. Code and facts stay exact.",
+  "window": { "width": 1100, "height": 760, "minWidth": 560, "minHeight": 440 }
+}

@@ -769,3 +769,49 @@ body.busy .entry .edit-btn { display: none; }
 .safe-banner .ub-icon { background: var(--minus); }
 /* Il messaggio dell'elenco vuoto va a capo (non è il titolo di una conversazione) */
 .session-row.note, .session-row.note .when { white-space: normal; overflow: visible; }
+
+/* Le impostazioni: categorie a sinistra, la pagina a destra; i pannelli (permessi, memoria, estensioni) dentro */
+.settings-box.set-wide { width: min(900px, calc(100% - 40px)); height: min(640px, calc(100% - 40px)); }
+.set-layout { flex: 1; min-height: 0; display: flex; gap: 18px; }
+.set-nav { flex: none; width: 178px; display: flex; flex-direction: column; gap: 2px; padding-right: 12px; border-right: var(--line) solid var(--edge-light); overflow-y: auto; }
+.set-nav-item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 10px; font: inherit; font-size: 14px; text-align: left; color: var(--ink-soft); background: none; border: none; border-radius: var(--radius-small); cursor: pointer; }
+.set-nav-item:hover { color: var(--ink); background: var(--code); }
+.set-nav-item.on { color: var(--strong, var(--ink)); background: var(--code); box-shadow: inset 3px 0 0 var(--gold); }
+.set-nav-item svg { flex: none; opacity: 0.85; }
+.set-page { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.set-page-title { font-size: 17px; font-weight: 600; color: var(--strong, var(--ink)); margin: 0 0 8px; }
+.set-page .settings-body { flex: 1; min-height: 0; }
+.set-page .set-section:first-child { margin-top: 2px; }
+.set-keys { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; align-items: center; padding: 4px 0 10px; }
+.set-keys kbd { justify-self: start; font-family: var(--font-code); font-size: 12px; padding: 2px 7px; color: var(--ink); background: var(--code); border: var(--line) solid var(--edge-light); border-bottom-width: 2px; border-radius: 5px; }
+.set-keys span { font-size: var(--small-size); color: var(--ink-soft); }
+/* Un pannello dentro un'altra pagina: senza la sua cornice né il suo titolo */
+.panel-embed > .theme-picker-box { width: auto; max-width: none; height: auto; max-height: none; padding: 0; background: none; border: none; box-shadow: none; }
+.panel-embed > .theme-picker-box > .theme-picker-head { display: none; }
+.panel-embed .settings-body { overflow: visible; padding-right: 0; }
+.panel-embed .mem-text, .panel-embed .mem-view { height: 340px; }
+@media (max-width: 760px) { .set-nav { width: 44px; } .set-nav-item span { display: none; } }
+
+/* Il benvenuto del primo avvio */
+.welcome-box { width: min(600px, calc(100% - 40px)); display: flex; flex-direction: column; }
+.wel-intro { font-size: 14.5px; line-height: 1.5; color: var(--ink); margin: 0 0 10px; }
+.wel-step { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: var(--line) solid var(--edge-light); }
+.wel-mark { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; font-weight: 700; font-size: 13px; color: var(--btn-ink); background: var(--plus); }
+.wel-step.todo .wel-mark { background: var(--gold); }
+.wel-text { flex: 1; min-width: 0; }
+.wel-label { font-weight: 600; color: var(--strong, var(--ink)); margin-bottom: 3px; }
+.wel-note { font-size: var(--small-size); color: var(--ink-soft); line-height: 1.45; overflow-wrap: anywhere; user-select: text; }
+.wel-code { display: flex; align-items: center; gap: 8px; margin: 6px 0; padding: 6px 8px 6px 12px; background: var(--code); border: var(--line) solid var(--edge-light); border-radius: var(--radius-small); }
+.wel-code code { flex: 1; min-width: 0; font-family: var(--font-code); font-size: var(--code-size); color: var(--ink); overflow-wrap: anywhere; user-select: text; }
+.wel-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.wel-tip { padding: 10px 0 0; border-top: var(--line) solid var(--edge-light); }
+.wel-foot { display: flex; justify-content: flex-end; gap: 8px; padding-top: 14px; }
+/* Le novità dopo un aggiornamento */
+.news-box { width: min(620px, calc(100% - 40px)); display: flex; flex-direction: column; }
+.news-body { max-height: 52vh; overflow-y: auto; font-size: 14.5px; line-height: 1.55; user-select: text; }
+.news-body ul { padding-left: 20px; }
+
+/* Una conversazione trovata nei messaggi: un pezzo del testo, con le parole evidenziate */
+.session-snippet { font-size: 12px; line-height: 1.35; color: var(--ink-soft); margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; }
+.session-snippet mark { background: color-mix(in srgb, var(--gold) 28%, transparent); color: var(--ink); border-radius: 2px; padding: 0 1px; }
+.session-snippet .ss-count { opacity: 0.8; }

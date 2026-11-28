@@ -42,6 +42,7 @@
     themesImportDesc: 'Da un file .skin: un tema passato da qualcun altro',
     themesExported: 'Tema esportato in {x}',
     themesFail: 'Non riuscito: {x}',
+    themesNotRegistered: 'il file del tema non registra «{x}»',
     // L'editor dei temi
     teTitleNew: 'Nuovo tema',
     teTitleEdit: 'Modifica il tema',
@@ -190,6 +191,56 @@
     reviewMany: '{n} commenti pronti per Claude',
     reviewSend: 'Manda a Claude',
     reviewClear: 'Togli tutti',
+    // Le impostazioni: categorie e righe nuove
+    setNav_general: 'Generale',
+    setNav_claude: 'Claude',
+    setNav_conversations: 'Conversazioni',
+    setNav_permissions: 'Permessi',
+    setNav_memory: 'Memoria',
+    setNav_extensions: 'Estensioni',
+    setNav_updates: 'Aggiornamenti',
+    setNav_about: 'Informazioni',
+    setLanguage: 'Lingua',
+    setLanguageNote: 'La lingua della finestra; Claude risponde in quella in cui gli scrivi',
+    setImport: 'Importa',
+    setOpen: 'Apri',
+    setModelSection: 'Modello e ragionamento',
+    setRepo: 'Pagina del progetto',
+    keyShift: 'Maiusc',
+    keyNew: 'Nuova conversazione',
+    keySearch: 'Cerca fra le conversazioni',
+    keyFind: 'Cerca nella conversazione',
+    keySettings: 'Impostazioni',
+    keyCopy: 'Copia l\'ultima risposta',
+    keyPreview: 'Apre e chiude l\'anteprima',
+    keyBackground: 'Manda in background quello che Claude sta facendo',
+    keyStop: 'Ferma Claude',
+    keyFull: 'Schermo intero',
+    // Le novità dopo un aggiornamento
+    newsTitle: "Le novità di Claudeleon {v}",
+    newsNone: "Claudeleon è aggiornata alla versione {v}.",
+    newsAll: "Vedi su GitHub",
+    newsOk: "Va bene",
+    // Il benvenuto del primo avvio
+    welTitle: "Benvenuto in Claudeleon",
+    welIntro: "Claudeleon è una finestra per Claude Code: serve Claude Code installato su questo computer, col login fatto. Qui sotto vedi se è tutto pronto.",
+    welNeedTitle: "Serve Claude Code",
+    welNeedIntro: "Prima di cominciare manca ancora qualcosa:",
+    welStepInstall: "Claude Code installato",
+    welInstalled: "Versione {v} · {x}",
+    welFoundAt: "Trovato: {x}",
+    welNotFound: "Non trovato. Per installarlo apri PowerShell e scrivi:",
+    welNotFoundUnix: "Non trovato. Per installarlo apri il terminale e scrivi:",
+    welChoose: "È installato altrove? Scegli il programma…",
+    welDocs: "Guida di installazione",
+    welStepLogin: "Login fatto",
+    welLoggedIn: "Claude Code ha un account collegato.",
+    welNotLogged: "Apri un terminale e scrivi claude, poi /login: si apre il browser per entrare col tuo account Claude.",
+    welLoginWait: "Prima installa Claude Code.",
+    welTip: "La cartella in cui lavora Claude si sceglie col pulsante della cartella, sotto la casella.",
+    welCheck: "Controlla di nuovo",
+    welStart: "Comincia",
+    welAnyway: "Continua comunque",
     // Avvio sicuro
     safe_config: 'La configurazione era rovinata: l\'app è ripartita da capo (la vecchia è in config.rotto.json).',
     safe_crash: 'Avvio sicuro: le ultime volte l\'app non partiva col tema «{x}», ora usa quello di partenza.',
@@ -469,6 +520,7 @@
     // Gli annali: ricerca, gruppi, menu di ogni conversazione
     sessionsSearch: 'Cerca…',
     sessionsNoMatch: 'Nessuna conversazione con «{q}».',
+    sessionsHits: '{n} messaggi',
     sessionsArchived: 'Archiviate ({n})',
     sessionsHideArchived: 'Nascondi le archiviate',
     groupToday: 'Oggi',
@@ -567,8 +619,22 @@
     },
   }
 
+  // La lingua della finestra: inglese (lang/en.js, quella di partenza) o italiano (le scritte qui sopra). Una scritta
+  // che manca in inglese viene dall'italiano
+  const IT = { strings: STRINGS, months: MONTHS, days: ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'] }
+  let language = 'en'
+  const pack = () => (language === 'it' ? IT : (window.SkinsLang && window.SkinsLang.en) || IT)
+  function setLanguage(l) {
+    language = l === 'it' ? 'it' : 'en'
+    document.documentElement.lang = language
+  }
+  // Il nome e la descrizione di un tema nella lingua della finestra (names / descriptions, se il tema li dà)
+  const nameOf = (th) => (th && th.names && th.names[language]) || (th && th.name) || (th && th.id) || ''
+  const descriptionOf = (th) => (th && th.descriptions && th.descriptions[language]) || (th && th.description) || ''
+
   function plainDate(d) {
-    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
+    const p = pack()
+    return language === 'it' ? `${d.getDate()} ${p.months[d.getMonth()]} ${d.getFullYear()}` : `${p.months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
   }
 
   const registry = new Map()
@@ -589,6 +655,8 @@
   // Da dove viene ogni tema: la cartella del programma (themes/<id>/) o, per quelli importati con codice,
   // skins-theme://<id>/ (la cartella temi nei dati dell'app). Lì stanno theme.js, theme.css e i suoi file
   const bases = new Map()
+  // Un tema ricaricato (fresh): i suoi file si chiedono di nuovo, senza la copia del browser
+  const versions = new Map()
   const baseOf = (theme) => bases.get(theme.id) || `themes/${theme.id}/`
   // entries: gli id dei temi del programma, o { id, base } per quelli importati. Ogni theme.js si registra in
   // window.SkinsThemes. fresh: ricaricare anche se c'è già (un tema importato di nuovo, al posto del vecchio)
@@ -597,7 +665,7 @@
     const list = entries.map((e) => (typeof e === 'string' ? { id: e, base: `themes/${e}/` } : e)).filter((e) => e && e.id)
     for (const e of list) {
       bases.set(e.id, e.base)
-      if (fresh) { registry.delete(e.id); window.SkinsThemes = window.SkinsThemes.filter((th) => th.id !== e.id) }
+      if (fresh) { registry.delete(e.id); window.SkinsThemes = window.SkinsThemes.filter((th) => th.id !== e.id); versions.set(e.id, Date.now()) }
     }
     await Promise.all(list.map((e) => loadScript(`${e.base}theme.js${fresh ? `?v=${Date.now()}` : ''}`)))
     // Nell'ordine dato (il predefinito per primo, poi per nome), non in quello in cui i file finiscono di caricarsi
@@ -613,7 +681,8 @@
     current = registry.get(id) || registry.values().next().value || { id: 'nessuno' }
     document.body.dataset.theme = current.id
     for (const old of document.querySelectorAll('link[data-theme-css]')) old.remove()
-    const sheets = [...(current.kits || []).map((k) => `kits/${k}.css`), ...(current.css ? [`${baseOf(current)}theme.css`] : [])]
+    const ver = versions.get(current.id)
+    const sheets = [...(current.kits || []).map((k) => `kits/${k}.css`), ...(current.css ? [`${baseOf(current)}theme.css${ver ? `?v=${ver}` : ''}`] : [])]
     return Promise.all(sheets.map((href) => new Promise((resolve) => {
       const link = document.createElement('link')
       link.rel = 'stylesheet'
@@ -658,7 +727,10 @@
   }
 
   function t(key, vars) {
-    const s = (current.strings && current.strings[key]) ?? STRINGS[key] ?? key
+    // Le scritte del tema: per lingua ({ en: {...}, it: {...} }) o le stesse per tutte
+    const ts = current.strings || {}
+    const own = ts.en || ts.it ? ts[language] || {} : ts
+    const s = own[key] ?? pack().strings[key] ?? STRINGS[key] ?? key
     return vars ? s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m)) : s
   }
 
@@ -792,8 +864,10 @@
     installed: (id) => String(bases.get(id) || '').startsWith('skins-theme:'),
     preview,
     // I temi caricati, per il selettore: id, nome, descrizione
-    list: () => [...registry.values()].filter((th) => !String(th.id).startsWith('__')).map((th) => ({ id: th.id, name: th.name || th.id, description: th.description || '' })),
+    list: () => [...registry.values()].filter((th) => !String(th.id).startsWith('__')).map((th) => ({ id: th.id, name: nameOf(th), description: descriptionOf(th) })),
     load, use, applyScene, t, chapterDate, plainDate, art, icon, trayIcon, appIcon, hook, asset, artScale, MONTHS,
+    setLanguage, nameOf, months: () => pack().months, days: () => pack().days,
+    get language() { return language },
     get current() { return current },
     palette: (name) => paletteOf(current, name),
   }

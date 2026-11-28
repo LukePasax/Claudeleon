@@ -1,0 +1,18 @@
+{
+  "name": "Dusk",
+  "description": "Warm evening colors with an amber accent",
+  "colors": {
+    "bg": "#1b1a20",
+    "side": "#221f28",
+    "surface": "#2a2631",
+    "ink": "#ece6dc",
+    "inkSoft": "#a59d93",
+    "accent": "#e8a04c",
+    "onAccent": "#1b1a20",
+    "line": "#3a3442",
+    "bubble": "#3b2f2a"
+  },
+  "font": "sistema",
+  "textSize": 15,
+  "radius": 10
+}

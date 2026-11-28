@@ -3,6 +3,7 @@
 // poi quante novità ha il branch remoto e se il repo è più avanti dell'app installata. Aggiornare: git pull
 // --ff-only, npm install se sono cambiate le dipendenze, e per l'app installata le prove (npm test) e un installer nuovo lanciato in
 // silenzio (--updated /S --force-run: si installa sopra lasciando collegamenti e pulsante fissato, e riapre l'app); per quella dal repo basta riavviarsi.
+const { tr } = require('./i18n')
 const { execFile, spawn } = require('child_process')
 const fs = require('fs')
 const path = require('path')
@@ -55,7 +56,7 @@ class Updater extends EventEmitter {
   // Ci sono novità? Le modifiche locali nel repo (escluso package-lock.json, che npm riscrive) bloccano l'aggiornamento
   async check() {
     if (!this.repo || !fs.existsSync(path.join(this.repo, '.git'))) {
-      this.set({ state: 'unavailable', error: this.installed ? 'L\'app è stata installata senza sapere da quale repo: rifai l\'installer con crea-installer.cmd.' : 'La cartella dell\'app non è in un repo git.' })
+      this.set({ state: 'unavailable', error: this.installed ? tr('L\'app è stata installata senza sapere da quale repo: rifai l\'installer con crea-installer.cmd.') : tr('La cartella dell\'app non è in un repo git.') })
       return this.state
     }
     if (this.state.state === 'updating') return this.state
@@ -69,7 +70,7 @@ class Updater extends EventEmitter {
         behind = Number(await this.git('rev-list', '--count', 'HEAD..@{u}')) || 0
         if (behind) commits = (await this.git('log', '--format=%s', '-n', '15', 'HEAD..@{u}')).split('\n').filter(Boolean)
       } catch {
-        this.set({ state: 'error', error: `Il branch ${branch} non segue un branch remoto: aggiornalo a mano.`, checkedAt: Date.now() })
+        this.set({ state: 'error', error: tr('Il branch {x} non segue un branch remoto: aggiornalo a mano.', { x: branch }), checkedAt: Date.now() })
         return this.state
       }
       const head = await this.git('rev-parse', 'HEAD')
@@ -91,7 +92,7 @@ class Updater extends EventEmitter {
 
   async update() {
     if (this.state.state === 'updating') return
-    if (this.state.dirty) { this.set({ state: 'error', error: 'Nel repo ci sono modifiche non salvate: aggiorna a mano (git pull).' }); return }
+    if (this.state.dirty) { this.set({ state: 'error', error: tr('Nel repo ci sono modifiche non salvate: aggiorna a mano (git pull).') }); return }
     try { fs.writeFileSync(this.logFile, '') } catch {}
     try {
       const before = await this.git('rev-parse', 'HEAD')
@@ -118,14 +119,14 @@ class Updater extends EventEmitter {
       }
       // Prima di reinstallare, le prove della logica: se una fallisce l'app installata resta com'è
       this.set({ state: 'updating', step: 'test' })
-      await this.run('npm', ['test'], this.appDir).catch((err) => { throw new Error(`Le prove automatiche non passano, l'aggiornamento si ferma: ${err.message}`) })
+      await this.run('npm', ['test'], this.appDir).catch((err) => { throw new Error(tr('Le prove automatiche non passano, l\'aggiornamento si ferma: {x}', { x: err.message })) })
       this.set({ state: 'updating', step: 'build' })
       await this.run('npm', ['run', 'dist'], this.appDir)
       const dist = path.join(this.appDir, 'dist')
       // L'installer più recente (Claudeleon; prima si chiamava Claude Skins)
       const setup = fs.readdirSync(dist).filter((f) => /^(Claudeleon|Claude Skins)[ -]Setup[ -].*\.exe$/.test(f))
         .map((f) => ({ f, t: fs.statSync(path.join(dist, f)).mtimeMs + (f.startsWith('Claudeleon') ? 1 : 0) })).sort((a, b) => b.t - a.t)[0]
-      if (!setup) throw new Error('L\'installer nuovo non c\'è nella cartella dist.')
+      if (!setup) throw new Error(tr('L\'installer nuovo non c\'è nella cartella dist.'))
       this.set({ state: 'updating', step: 'install' })
       this.log('installo', setup.f)
       // L'installer si stacca dall'app: si installa sopra (stessa cartella) e la riapre

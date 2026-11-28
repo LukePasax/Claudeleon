@@ -15,7 +15,8 @@
   // Gli errori della pagina finiscono in errori.log (cartella dei dati), per capire cosa non va
   window.addEventListener('error', (e) => { if (api.logError) api.logError(`${e.message} (${(e.filename || '').split('/').pop()}:${e.lineno})${e.error && e.error.stack ? `\n${e.error.stack}` : ''}`) })
   window.addEventListener('unhandledrejection', (e) => { if (api.logError) api.logError(`promessa: ${(e.reason && e.reason.stack) || e.reason}`) })
-  const MONTHS = Theming.MONTHS
+  // I mesi nella lingua della finestra
+  const month = (i) => Theming.months()[i]
   const part = (name) => app.querySelector(`[data-part="${name}"]`)
   const all = (sel) => app.querySelectorAll(sel)
 
@@ -629,8 +630,9 @@
     const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
     const today = new Date()
     if (d.toDateString() === today.toDateString()) return t('usageAt', { when: hm })
-    const days = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab']
-    return t('usageAt', { when: `${days[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}, ${hm}` })
+    const day = Theming.days()[d.getDay()]
+    const mon = month(d.getMonth()).slice(0, 3)
+    return t('usageAt', { when: Theming.language === 'it' ? `${day} ${d.getDate()} ${mon}, ${hm}` : `${day} ${mon} ${d.getDate()}, ${hm}` })
   }
   function usageSection(menu) {
     const head = document.createElement('div')
@@ -1195,6 +1197,38 @@
     }
     host.appendChild(panel)
   }
+  // I temi cambiati sul disco (la skill dei temi di Claude li scrive nella cartella dell'app, o qualcuno a mano): quelli
+  // nuovi o cambiati si ricaricano, quelli spariti si tolgono; se è cambiato quello in uso la finestra lo rimonta, così
+  // si vede subito ogni ritocco. Il selettore dei temi, se è aperto, si ridisegna
+  const themeStamps = new Map()
+  if (api.onThemesChanged) api.onThemesChanged(async ({ code = [], colors = [] } = {}) => {
+    const cur = Theming.current.id
+    let curChanged = false
+    for (const e of code) {
+      if (Theming.get(e.id) && themeStamps.get(e.id) === e.stamp) continue
+      themeStamps.set(e.id, e.stamp)
+      await Theming.load([{ id: e.id, base: e.base }], true)
+      if (e.id === cur) curChanged = true
+    }
+    const kit = window.SkinsKits && window.SkinsKits.moderno
+    for (const spec of colors) {
+      const json = JSON.stringify(spec)
+      const old = Theming.get(spec.id)
+      if (!kit || (old && old.__spec === json)) continue
+      const th = kit.fromColors(spec)
+      th.__spec = json
+      Theming.register(th)
+      if (spec.id === cur) curChanged = true
+    }
+    const alive = new Set([...code.map((e) => e.id), ...colors.map((x) => x.id)])
+    for (const th of Theming.list()) {
+      const full = Theming.get(th.id)
+      if (full && (full.custom || Theming.installed(th.id)) && !alive.has(th.id) && th.id !== cur) Theming.unregister(th.id)
+    }
+    if (curChanged && !themeEditor) await mount(cur)
+    if (document.querySelector('.theme-picker .theme-cards')) openThemes()
+  })
+
   // Un tema da un file .skin: il processo principale lo controlla, chiede conferma e lo installa; qui si carica e si
   // mette in uso
   async function importTheme() {
@@ -1203,8 +1237,129 @@
     if (r.kind === 'code') await Theming.load([{ id: r.id, base: r.base }], true)
     else Theming.register(window.SkinsKits.moderno.fromColors(r.spec))
     closeThemes()
-    if (!Theming.get(r.id)) { labelled('error', 'themesFail', { x: `il file del tema non registra «${r.id}»` }); return }
+    if (!Theming.get(r.id)) { labelled('error', 'themesFail', { x: t('themesNotRegistered', { x: r.id }) }); return }
     api.setTheme(r.id)
+  }
+
+  // ------------------------------------------------------------------ benvenuto
+
+  // Il primo avvio guidato: la lingua, e se Claude Code è installato e ha il login fatto (con i comandi da copiare
+  // se manca qualcosa). Compare la prima volta e, dopo, ogni volta che all'avvio manca Claude Code o il login. Non
+  // blocca: "Continua comunque" lo chiude (il controllo del login è una stima)
+  let welcomeFirst = false
+  async function checkWelcome(info) {
+    if (!api.claudeStatus) return
+    let st = null
+    try { st = await api.claudeStatus() } catch {}
+    if (!st) return
+    welcomeFirst = !info.welcomed
+    if (welcomeFirst || !st.found || !st.loggedIn) { openWelcome(st); return true }
+    return false
+  }
+
+  // Le novità della versione appena installata (le note della sua release su GitHub), una volta sola: dopo il
+  // benvenuto, se c'è anche quello
+  async function showWhatsNew() {
+    if (!api.whatsNew || document.querySelector('.theme-picker')) return
+    let w = null
+    try { w = await api.whatsNew() } catch {}
+    if (!w || document.querySelector('.theme-picker')) return
+    const host = app.querySelector('[data-solid]') || app
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+    const panel = document.createElement('div')
+    panel.className = 'theme-picker news-panel'
+    panel.innerHTML = '<div class="theme-picker-box settings-box news-box"><div class="theme-picker-head"><span></span></div><div class="settings-body news-body text"></div><div class="wel-foot"></div></div>'
+    label(panel.querySelector('.theme-picker-head span'), 'newsTitle', { v: w.to })
+    const body = panel.querySelector('.news-body')
+    // Le note generate da GitHub cominciano con "What's Changed": il titolo c'è già
+    const notes = String(w.notes || '').replace(/^\s*#+\s*What's Changed\s*\n/i, '').trim()
+    if (notes) body.innerHTML = Markdown.render(notes)
+    else body.appendChild(label(document.createElement('p'), 'newsNone', { v: w.to }))
+    const foot = panel.querySelector('.wel-foot')
+    const btn = (key, fn, cls) => { const b = document.createElement('button'); b.className = `btn small ${cls}`; label(b, key); b.addEventListener('click', fn); foot.appendChild(b) }
+    if (w.url) btn('newsAll', () => api.openLink(w.url), 'deny')
+    btn('newsOk', closeThemes, '')
+    panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    host.appendChild(panel)
+  }
+  function openWelcome(st) {
+    closeThemes()
+    const host = app.querySelector('[data-solid]') || app
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+    const panel = document.createElement('div')
+    panel.className = 'theme-picker welcome-panel'
+    panel.innerHTML = '<div class="theme-picker-box settings-box welcome-box"><div class="theme-picker-head"><span></span></div><div class="settings-body"></div><div class="wel-foot"></div></div>'
+    const body = panel.querySelector('.settings-body')
+    const foot = panel.querySelector('.wel-foot')
+    const ready = () => st.found && st.loggedIn
+    const fill = () => {
+      label(panel.querySelector('.theme-picker-head span'), welcomeFirst ? 'welTitle' : 'welNeedTitle')
+      body.innerHTML = ''
+      const intro = document.createElement('div')
+      intro.className = 'wel-intro'
+      body.appendChild(label(intro, welcomeFirst ? 'welIntro' : 'welNeedIntro'))
+      if (welcomeFirst && api.setSetting) {
+        const r = document.createElement('div')
+        r.className = 'set-row'
+        r.innerHTML = '<div class="set-text"><div class="set-label"></div></div><div class="set-control"><select class="set-select"></select></div>'
+        label(r.querySelector('.set-label'), 'setLanguage')
+        const sel = r.querySelector('select')
+        for (const [v, n] of [['en', 'English'], ['it', 'Italiano']]) sel.appendChild(Object.assign(document.createElement('option'), { value: v, textContent: n, selected: v === Theming.language }))
+        sel.addEventListener('change', () => api.setSetting('language', sel.value))
+        body.appendChild(r)
+      }
+      const step = (ok, key, fillNote) => {
+        const s = document.createElement('div')
+        s.className = `wel-step ${ok ? 'ok' : 'todo'}`
+        s.innerHTML = '<span class="wel-mark"></span><div class="wel-text"><div class="wel-label"></div><div class="wel-note"></div></div>'
+        s.querySelector('.wel-mark').textContent = ok ? '✓' : '!'
+        label(s.querySelector('.wel-label'), key)
+        fillNote(s.querySelector('.wel-note'))
+        body.appendChild(s)
+      }
+      const code = (box, text) => {
+        const c = document.createElement('div')
+        c.className = 'wel-code'
+        c.innerHTML = '<code></code><button class="btn small deny"></button>'
+        c.querySelector('code').textContent = text
+        const b = c.querySelector('button')
+        label(b, 'copy')
+        b.addEventListener('click', () => { copyText(text); label(b, 'copied'); setTimeout(() => label(b, 'copy'), 1500) })
+        box.appendChild(c)
+      }
+      const linkBtn = (box, key, fn) => { const b = document.createElement('button'); b.className = 'btn small deny'; label(b, key); b.addEventListener('click', fn); box.appendChild(b); return b }
+      step(st.found, 'welStepInstall', (n) => {
+        if (st.found) { n.textContent = st.version ? t('welInstalled', { v: st.version, x: st.path }) : t('welFoundAt', { x: st.path }); return }
+        n.appendChild(label(document.createElement('div'), st.platform === 'win32' ? 'welNotFound' : 'welNotFoundUnix'))
+        code(n, st.platform === 'win32' ? 'irm https://claude.ai/install.ps1 | iex' : 'curl -fsSL https://claude.ai/install.sh | bash')
+        const row = document.createElement('div')
+        row.className = 'wel-links'
+        linkBtn(row, 'welChoose', async () => { await api.setSetting('chooseClaude'); recheck() })
+        linkBtn(row, 'welDocs', () => api.openLink('https://code.claude.com/docs/en/setup'))
+        n.appendChild(row)
+      })
+      step(st.loggedIn, 'welStepLogin', (n) => {
+        if (st.loggedIn) { label(n, 'welLoggedIn'); return }
+        if (!st.found) { label(n, 'welLoginWait'); return }
+        n.appendChild(label(document.createElement('div'), 'welNotLogged'))
+        code(n, 'claude')
+      })
+      if (welcomeFirst) { const tip = document.createElement('div'); tip.className = 'folder-note wel-tip'; body.appendChild(label(tip, 'welTip')) }
+      foot.innerHTML = ''
+      if (!ready()) linkBtn(foot, 'welCheck', recheck)
+      const go = document.createElement('button')
+      go.className = `btn small${ready() ? '' : ' deny'}`
+      label(go, ready() ? 'welStart' : 'welAnyway')
+      go.addEventListener('click', () => { if (api.setSetting) api.setSetting('welcomed', true); welcomeFirst = false; closeThemes(); if (part('input')) part('input').focus(); showWhatsNew() })
+      foot.appendChild(go)
+    }
+    async function recheck() {
+      try { st = (await api.claudeStatus()) || st } catch {}
+      if (panel.isConnected) fill()
+    }
+    panel.reopen = () => openWelcome(st)
+    fill()
+    host.appendChild(panel)
   }
 
   // ------------------------------------------------------------------ editor dei temi
@@ -1864,26 +2019,53 @@
     } else if (r && r.error) labelled('error', 'wtFailed', { err: r.error })
   })
   if (api.settings) api.settings().then((st) => { worktreeOn = !!(st && st.worktree); renderFolder() }).catch(() => {})
+  // La lingua cambiata dalle impostazioni: tutto si ridisegna nella nuova (le voci già scritte nella conversazione
+  // restano come sono); le impostazioni, se erano aperte, si riaprono sulla stessa pagina
+  if (api.onLanguage) api.onLanguage(async (l) => {
+    const settingsOpen = !!document.querySelector('.theme-picker.settings-panel')
+    const welcome = document.querySelector('.theme-picker.welcome-panel')
+    Theming.setLanguage(l)
+    await mount(Theming.current.id)
+    if (sessionsPinned()) refreshSessions()
+    if (settingsOpen) openSettings()
+    if (welcome && welcome.reopen) welcome.reopen()
+  })
 
   // ------------------------------------------------------------------ impostazioni
 
-  // Il pannello delle impostazioni, sopra il layout come il selettore dei temi: aspetto, finestra, notifiche,
-  // conversazioni, Claude Code, informazioni. Ogni scelta vale subito (la applica il processo principale)
-  async function openSettings() {
+  // Il pannello delle impostazioni, come quello dell'app desktop: le categorie a sinistra, il contenuto a destra.
+  // Permessi, memoria ed estensioni si vedono qui dentro (gli stessi pannelli che si aprono anche da soli). Ogni
+  // scelta vale subito (la applica il processo principale); l'ultima categoria aperta si ricorda
+  const SETTINGS_PAGES = [
+    ['general', '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'],
+    ['claude', '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'],
+    ['conversations', '<path d="M4 5h16v10H9l-5 4z"/>'],
+    ['permissions', '<path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>'],
+    ['memory', '<path d="M6 3h9l3 3v15H6z"/><path d="M9 9h6M9 13h6M9 17h4"/>'],
+    ['extensions', '<path d="M10 3h4v4h-4zM3 10h4v4H3zM17 10h4v4h-4zM10 17h4v4h-4z"/><path d="M12 7v10M7 12h10"/>'],
+    ['updates', '<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/>'],
+    ['about', '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>'],
+  ]
+  const KEYS = [['Ctrl+N', 'keyNew'], ['Ctrl+K', 'keySearch'], ['Ctrl+F', 'keyFind'], ['Ctrl+,', 'keySettings'], ['Ctrl+Shift+C', 'keyCopy'], ['Ctrl+Shift+P', 'keyPreview'], ['Ctrl+B', 'keyBackground'], ['Esc', 'keyStop'], ['F11', 'keyFull']]
+  let settingsPage = (() => { try { return localStorage.getItem('skins.settingsPage') || 'general' } catch { return 'general' } })()
+  async function openSettings(page) {
     closeThemes()
     closeFolderMenu()
+    if (typeof page === 'string' && SETTINGS_PAGES.some(([p]) => p === page)) settingsPage = page
     let st = {}
     try { st = (await api.settings()) || {} } catch {}
     const host = app.querySelector('[data-solid]') || app
     if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
     const panel = document.createElement('div')
     panel.className = 'theme-picker settings-panel'
-    panel.innerHTML = '<div class="theme-picker-box settings-box"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="settings-body"></div></div>'
+    panel.innerHTML = '<div class="theme-picker-box settings-box set-wide"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="set-layout"><nav class="set-nav"></nav><div class="set-page"><div class="set-page-title"></div><div class="settings-body"></div></div></div></div>'
     label(panel.querySelector('.theme-picker-head span'), 'settingsTitle')
     const close = panel.querySelector('.theme-picker-head button')
     label(close, 'themesClose')
     close.addEventListener('click', closeThemes)
     panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    const nav = panel.querySelector('.set-nav')
+    const pageTitle = panel.querySelector('.set-page-title')
     const body = panel.querySelector('.settings-body')
     const set = async (key, value) => { try { st = (await api.setSetting(key, value)) || st } catch {} ; render() }
     const section = (key) => { const h = document.createElement('div'); h.className = 'set-section'; body.appendChild(label(h, key)) }
@@ -1904,12 +2086,13 @@
       b.addEventListener('click', () => fn(!on))
       ctl.appendChild(b)
     }
-    const button = (ctl, key, fn) => {
+    const button = (ctl, key, fn, cls = 'deny') => {
       const b = document.createElement('button')
-      b.className = 'btn small deny'
+      b.className = `btn small ${cls}`
       label(b, key)
       b.addEventListener('click', fn)
       ctl.appendChild(b)
+      return b
     }
     const select = (ctl, options, value, fn) => {
       const s = document.createElement('select')
@@ -1919,85 +2102,117 @@
       s.addEventListener('change', () => fn(s.value))
       ctl.appendChild(s)
     }
+    const pages = {
+      general() {
+        section('setLook')
+        if (api.setSetting) select(row('setLanguage', t('setLanguageNote')), [['en', 'English'], ['it', 'Italiano']], st.language || 'en', (v) => set('language', v))
+        const th = row('setTheme', Theming.nameOf(Theming.current))
+        button(th, 'setChange', () => { closeThemes(); openThemes() })
+        if (api.saveTheme) button(th, 'themesNew', () => { closeThemes(); openThemeEditor(null) })
+        if (api.importTheme) button(th, 'setImport', () => importTheme())
+        if (app.querySelector('[data-action="scene"]')) {
+          select(row('setScene'), [['notte', t('setNight')], ['giorno', t('setDay')]], scene, (v) => { if (v !== scene) actions.scene() })
+        }
+        section('setWindow')
+        toggle(row('setOnTop'), st.onTop, (v) => set('onTop', v))
+        toggle(row('setLogin', t('setLoginNote')), st.openAtLogin, (v) => set('openAtLogin', v))
+        const pos = row('setPosition')
+        button(pos, 'setCenter', () => set('center'))
+        button(pos, 'setSize', () => set('resetSize'))
+        section('setNotifications')
+        toggle(row('setNotify', t('setNotifyNote')), st.notify, (v) => set('notify', v))
+      },
+      claude() {
+        section('setModelSection')
+        select(row('setModel'), [['', t('modelDefault')], ...models.filter((m) => m.value !== 'default').map((m) => [m.value, m.name])], model || '', (v) => {
+          model = v || null
+          const m = modelInfo()
+          if (effort && m && !m.efforts.includes(effort)) effort = null
+          api.setModel(model, effort, ultracode)
+          renderModel()
+          render()
+        })
+        const levels = (modelInfo() && modelInfo().efforts.length ? modelInfo().efforts : ['low', 'medium', 'high', 'xhigh', 'max'])
+        select(row('effortTitle'), [['', t('effortAuto')], ...levels.map((l) => [l, t(`effort_${l}`)])], effort || '', (v) => { effort = v || null; api.setModel(model, effort, ultracode); renderModel() })
+        toggle(row('ultracode', t('ultracodeDesc')), ultracode, (v) => { ultracode = v; api.setModel(model, effort, ultracode); renderModel(); render() })
+        select(row('setMode'), MODES.map(([m, key]) => [m, t(key)]), mode, (v) => { chooseMode(v); st.mode = v })
+        section('setClaude')
+        const where = row('setClaudePath', `${st.claudePath || ''}${st.claudeFound ? (st.claudeVersion ? ` · ${st.claudeVersion}` : '') : ` · ${t('setClaudeMissing')}`}`)
+        button(where, 'setChange', () => set('chooseClaude'))
+        if (!st.claudeDefault) button(where, 'setReset', () => set('claudePath', ''))
+        select(row('setEntrypoint', t('setEntrypointNote')), [['cli', t('setEntryCli')], ['claude-desktop', t('setEntryDesktop')]], st.entrypoint || 'cli', (v) => set('entrypoint', v))
+      },
+      conversations() {
+        section('setConversations')
+        button(row('setWorkdir', st.workdir || t('setWorkdirNone')), 'setChange', () => set('workdir'))
+        toggle(row('setWorktree', t('setWorktreeNote')), st.worktree, (v) => { worktreeOn = v; set('worktree', v); renderFolder() })
+      },
+      permissions() { if (api.permissions) openPermissions(body) },
+      memory() { if (api.memoryFiles) openMemory(body) },
+      extensions() { openExtensions(body) },
+      updates() {
+        section('updTitle')
+        const u = updateState || {}
+        const status = row('updStatus', updateText(u))
+        if (u.state !== 'updating' && u.state !== 'unavailable') button(status, 'updCheck', async () => { updateState = await api.checkUpdate(); render() })
+        if (u.state === 'available' && !u.dirty) button(status, 'updApply', () => { api.applyUpdate(); closeThemes() }, '')
+        if (u.state === 'available' && u.commits && u.commits.length) {
+          const list = document.createElement('ul')
+          list.className = 'upd-commits'
+          for (const c of u.commits.slice(0, 10)) { const li = document.createElement('li'); li.textContent = c; list.appendChild(li) }
+          body.appendChild(list)
+        }
+        // Da dove: solo se ci sono tutte e due le strade (l'app installata da un installer fatto col repo)
+        if (Array.isArray(st.updateSources) && st.updateSources.length > 1) {
+          select(row('updSource', t('updSourceNote')), st.updateSources.map((x) => [x, t(`updSource_${x}`)]), st.updateSource, async (v) => { await set('updateSource', v); try { updateState = await api.updateState() } catch {} ; render() })
+        }
+        toggle(row('updAuto', t(st.updateSource === 'github' ? 'updAutoNoteGithub' : 'updAutoNote')), st.autoUpdate !== false, (v) => set('autoUpdate', v))
+      },
+      about() {
+        const ver = row('setVersion', `${st.version || '?'}${st.installed ? '' : ` · ${t('setFromRepo')}`}`)
+        button(ver, 'setRepo', () => api.openLink('https://github.com/LukePasax/Claudeleon'))
+        const data = row('setData', st.dataDir || '')
+        button(data, 'setOpen', () => set('openData'))
+        if (api.openErrorLog) button(data, 'safeLog', () => api.openErrorLog())
+        section('setKeys')
+        row('setShortcut', `${st.shortcut || ''} · ${t('setShortcutNote')}`)
+        const table = document.createElement('div')
+        table.className = 'set-keys'
+        for (const [combo, key] of KEYS) {
+          const k = document.createElement('kbd')
+          k.textContent = combo.replace('Shift', t('keyShift'))
+          const d = document.createElement('span')
+          label(d, key)
+          table.append(k, d)
+        }
+        body.appendChild(table)
+      },
+    }
     function render() {
-      body.innerHTML = ''
-      // Aspetto
-      section('setLook')
-      button(row('setTheme', Theming.current.name), 'setChange', () => { closeThemes(); openThemes() })
-      if (app.querySelector('[data-action="scene"]')) {
-        select(row('setScene'), [['notte', t('setNight')], ['giorno', t('setDay')]], scene, (v) => { if (v !== scene) actions.scene() })
-      }
-      // Finestra
-      section('setWindow')
-      toggle(row('setOnTop'), st.onTop, (v) => set('onTop', v))
-      toggle(row('setLogin', t('setLoginNote')), st.openAtLogin, (v) => set('openAtLogin', v))
-      const pos = row('setPosition')
-      button(pos, 'setCenter', () => set('center'))
-      button(pos, 'setSize', () => set('resetSize'))
-      // Notifiche
-      section('setNotifications')
-      toggle(row('setNotify', t('setNotifyNote')), st.notify, (v) => set('notify', v))
-      // Conversazioni
-      section('setConversations')
-      button(row('setWorkdir', st.workdir || t('setWorkdirNone')), 'setChange', () => set('workdir'))
-      toggle(row('setWorktree', t('setWorktreeNote')), st.worktree, (v) => { worktreeOn = v; set('worktree', v); renderFolder() })
-      select(row('setMode'), MODES.map(([m, key]) => [m, t(key)]), mode, (v) => { chooseMode(v); st.mode = v })
-      if (api.memoryFiles) button(row('setMemory', t('setMemoryNote')), 'setOpenPanel', () => { closeThemes(); openMemory() })
-      if (api.permissions) button(row('setPermissions', t('setPermissionsNote')), 'setOpenPanel', () => { closeThemes(); openPermissions() })
-      select(row('setModel'), [['', t('modelDefault')], ...models.filter((m) => m.value !== 'default').map((m) => [m.value, m.name])], model || '', (v) => {
-        model = v || null
-        const m = modelInfo()
-        if (effort && m && !m.efforts.includes(effort)) effort = null
-        api.setModel(model, effort, ultracode)
-        renderModel()
-        render()
-      })
-      const levels = (modelInfo() && modelInfo().efforts.length ? modelInfo().efforts : ['low', 'medium', 'high', 'xhigh', 'max'])
-      select(row('effortTitle'), [['', t('effortAuto')], ...levels.map((l) => [l, t(`effort_${l}`)])], effort || '', (v) => { effort = v || null; api.setModel(model, effort, ultracode); renderModel() })
-      toggle(row('ultracode', t('ultracodeDesc')), ultracode, (v) => { ultracode = v; api.setModel(model, effort, ultracode); renderModel(); render() })
-      // Estensioni
-      section('setExtensions')
-      button(row('setExtRow', t('setExtNote')), 'setOpenPanel', () => { closeThemes(); openExtensions() })
-      // Claude Code
-      section('setClaude')
-      const where = row('setClaudePath', `${st.claudePath || ''}${st.claudeFound ? (st.claudeVersion ? ` · ${st.claudeVersion}` : '') : ` · ${t('setClaudeMissing')}`}`)
-      button(where, 'setChange', () => set('chooseClaude'))
-      if (!st.claudeDefault) button(where, 'setReset', () => set('claudePath', ''))
-      select(row('setEntrypoint', t('setEntrypointNote')), [['cli', t('setEntryCli')], ['claude-desktop', t('setEntryDesktop')]], st.entrypoint || 'cli', (v) => set('entrypoint', v))
-      // Aggiornamenti
-      section('updTitle')
-      const u = updateState || {}
-      const status = row('updStatus', updateText(u))
-      if (u.state !== 'updating' && u.state !== 'unavailable') button(status, 'updCheck', async () => { updateState = await api.checkUpdate(); render() })
-      if (u.state === 'available' && !u.dirty) {
+      nav.innerHTML = ''
+      for (const [p, icon] of SETTINGS_PAGES) {
         const b = document.createElement('button')
-        b.className = 'btn small'
-        label(b, 'updApply')
-        b.addEventListener('click', () => { api.applyUpdate(); closeThemes() })
-        status.appendChild(b)
+        b.className = `set-nav-item${p === settingsPage ? ' on' : ''}`
+        b.dataset.page = p
+        b.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icon}</svg><span></span>`
+        label(b.querySelector('span'), `setNav_${p}`)
+        b.addEventListener('click', () => {
+          settingsPage = p
+          try { localStorage.setItem('skins.settingsPage', p) } catch {}
+          render()
+        })
+        nav.appendChild(b)
       }
-      if (u.state === 'available' && u.commits && u.commits.length) {
-        const list = document.createElement('ul')
-        list.className = 'upd-commits'
-        for (const c of u.commits.slice(0, 10)) { const li = document.createElement('li'); li.textContent = c; list.appendChild(li) }
-        body.appendChild(list)
-      }
-      // Da dove: solo se ci sono tutte e due le strade (l'app installata da un installer fatto col repo)
-      if (Array.isArray(st.updateSources) && st.updateSources.length > 1) {
-        select(row('updSource', t('updSourceNote')), st.updateSources.map((x) => [x, t(`updSource_${x}`)]), st.updateSource, async (v) => { await set('updateSource', v); try { updateState = await api.updateState() } catch {} ; render() })
-      }
-      toggle(row('updAuto', t(st.updateSource === 'github' ? 'updAutoNoteGithub' : 'updAutoNote')), st.autoUpdate !== false, (v) => set('autoUpdate', v))
-      // Informazioni
-      section('setAbout')
-      row('setVersion', `${st.version || '?'}${st.installed ? '' : ` · ${t('setFromRepo')}`}`)
-      row('setShortcut', `${st.shortcut || ''} · ${t('setShortcutNote')}`)
-      row('setKeys', t('setKeysList'))
-      button(row('setData', st.dataDir || ''), 'setOpen', () => set('openData'))
+      label(pageTitle, `setNav_${settingsPage}`)
+      body.innerHTML = ''
+      body.scrollTop = 0
+      ;(pages[settingsPage] || pages.general)()
     }
     try { updateState = (await api.updateState()) || updateState } catch {}
     render()
     host.appendChild(panel)
-    settingsRender = () => { if (panel.isConnected) render() }
+    // Ridisegnare solo le pagine semplici: quelle coi pannelli dentro (permessi, memoria, estensioni) si aggiornano da sé
+    settingsRender = () => { if (panel.isConnected && !['permissions', 'memory', 'extensions'].includes(settingsPage)) render() }
   }
   if (api.onSettingsOpen) api.onSettingsOpen(() => openSettings())
 
@@ -2070,21 +2285,21 @@
   // Il pannello delle estensioni: i server MCP (stato, strumenti, da dove vengono; accendere, spegnere, riconnettere)
   // e i plugin (accesi, spenti, errori). Le risposte le dà Claude Code: quello della conversazione in vista se è acceso,
   // altrimenti uno temporaneo (qualche secondo)
-  async function openExtensions() {
-    closeThemes()
-    closeFolderMenu()
+  // inside: dentro un'altra pagina (le impostazioni) invece che sopra la finestra
+  async function openExtensions(inside) {
+    if (!inside) { closeThemes(); closeFolderMenu() }
     const host = app.querySelector('[data-solid]') || app
     if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
     const panel = document.createElement('div')
-    panel.className = 'theme-picker settings-panel ext-panel'
+    panel.className = inside ? 'panel-embed settings-panel ext-panel' : 'theme-picker settings-panel ext-panel'
     panel.innerHTML = '<div class="theme-picker-box settings-box"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="settings-body"></div></div>'
     label(panel.querySelector('.theme-picker-head span'), 'extTitle')
     const close = panel.querySelector('.theme-picker-head button')
     label(close, 'themesClose')
     close.addEventListener('click', closeThemes)
-    panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    if (!inside) panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
     const body = panel.querySelector('.settings-body')
-    host.appendChild(panel)
+    ;(inside || host).appendChild(panel)
     const note = (key, vars) => { const n = document.createElement('div'); n.className = 'folder-note'; body.appendChild(label(n, key, vars)); return n }
     async function load() {
       body.innerHTML = ''
@@ -2585,19 +2800,19 @@
   // modifiche non salvate restano finché l'app è aperta (anche chiudendo il pannello)
   const memDrafts = new Map()
   let memCurrent = ''
-  async function openMemory() {
-    closeThemes()
-    closeFolderMenu()
+  // inside: dentro un'altra pagina (le impostazioni) invece che sopra la finestra
+  async function openMemory(inside) {
+    if (!inside) { closeThemes(); closeFolderMenu() }
     const host = app.querySelector('[data-solid]') || app
     if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
     const panel = document.createElement('div')
-    panel.className = 'theme-picker mem-panel'
+    panel.className = inside ? 'panel-embed mem-panel' : 'theme-picker mem-panel'
     panel.innerHTML = '<div class="theme-picker-box settings-box"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="perm-tabs"></div><div class="mem-body"></div></div>'
     label(panel.querySelector('.theme-picker-head span'), 'memTitle')
     const close = panel.querySelector('.theme-picker-head button')
     label(close, 'themesClose')
     close.addEventListener('click', closeThemes)
-    panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    if (!inside) panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
     const tabs = panel.querySelector('.perm-tabs')
     const body = panel.querySelector('.mem-body')
     const conv = active && active.id
@@ -2692,7 +2907,7 @@
       update()
       if (!previewing) area.focus()
     }
-    host.appendChild(panel)
+    ;(inside || host).appendChild(panel)
     await show(files.some((x) => x.file === memCurrent) ? memCurrent : ((files.find((x) => x.id === 'project') || files[0] || {}).file))
   }
 
@@ -2703,19 +2918,19 @@
   // "chiede sempre" (ask), "mai" (deny) e le cartelle in più. Una regola si aggiunge, si toglie o si sposta in un'altra
   // lista; le conversazioni ripartono con le regole nuove al prossimo messaggio
   let permScope = 'local'
-  async function openPermissions() {
-    closeThemes()
-    closeFolderMenu()
+  // inside: dentro un'altra pagina (le impostazioni) invece che sopra la finestra
+  async function openPermissions(inside) {
+    if (!inside) { closeThemes(); closeFolderMenu() }
     const host = app.querySelector('[data-solid]') || app
     if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
     const panel = document.createElement('div')
-    panel.className = 'theme-picker perm-panel'
+    panel.className = inside ? 'panel-embed perm-panel' : 'theme-picker perm-panel'
     panel.innerHTML = '<div class="theme-picker-box settings-box"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="perm-tabs"></div><div class="settings-body"></div></div>'
     label(panel.querySelector('.theme-picker-head span'), 'permTitle')
     const close = panel.querySelector('.theme-picker-head button')
     label(close, 'themesClose')
     close.addEventListener('click', closeThemes)
-    panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    if (!inside) panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
     const tabs = panel.querySelector('.perm-tabs')
     const body = panel.querySelector('.settings-body')
     const conv = active && active.id
@@ -2799,7 +3014,7 @@
     }
     await load()
     fill()
-    host.appendChild(panel)
+    ;(inside || host).appendChild(panel)
   }
 
   // ------------------------------------------------------------------ anteprima
@@ -2940,13 +3155,15 @@
   // una barra nei pannelli) e partono con il prossimo messaggio, in un blocco <diff_comments> in fondo al testo che
   // Claude legge (file, riga, lato, codice, commento) e che qui torna una lista. Valgono per la conversazione in vista
   let reviewSeq = 0
-  const REVIEW_INTRO = 'Commenti sulle righe delle modifiche: per ognuno il file, la riga (side "+" aggiunta, "-" tolta, " " invariata), il codice di quella riga e il commento.'
+  const reviewIntro = () => (Theming.language === 'it'
+    ? 'Commenti sulle righe delle modifiche: per ognuno il file, la riga (side "+" aggiunta, "-" tolta, " " invariata), il codice di quella riga e il commento.'
+    : 'Comments on the lines of the changes: for each one the file, the line (side "+" added, "-" removed, " " unchanged), the code of that line and the comment.')
   const attr = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
   const unattr = (x) => String(x).replace(/&quot;/g, '"').replace(/&amp;/g, '&')
   function reviewBlock(list) {
     if (!list.length) return ''
     const items = list.map((r) => `<comment file="${attr(r.file)}" line="${attr(r.line)}" side="${attr(r.side)}">\n<code>${r.code}</code>\n${r.text}\n</comment>`)
-    return `\n\n<diff_comments>\n${REVIEW_INTRO}\n${items.join('\n')}\n</diff_comments>`
+    return `\n\n<diff_comments>\n${reviewIntro()}\n${items.join('\n')}\n</diff_comments>`
   }
   function parseReviews(block) {
     const out = []
@@ -3728,7 +3945,7 @@
 
   function formatWhen(ms) {
     const d = new Date(ms)
-    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    return `${Theming.plainDate(d)}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   }
 
   // Il pannello delle cronache: in sovrimpressione (si apre col pulsante, hidden altrimenti) o fisso nel layout, con
@@ -3782,8 +3999,26 @@
     input.dataset.sPlaceholder = 'sessionsSearch'
     input.placeholder = t('sessionsSearch')
     input.value = sessionsQuery
-    input.addEventListener('input', () => { sessionsQuery = input.value; renderSessionList() })
-    input.addEventListener('keydown', (e) => { if (e.key === 'Escape') { input.value = ''; sessionsQuery = ''; renderSessionList() } })
+    input.addEventListener('input', () => { sessionsQuery = input.value; renderSessionList(); searchContents() })
+    input.addEventListener('keydown', (e) => { if (e.key === 'Escape') { input.value = ''; sessionsQuery = ''; contentHits = new Map(); renderSessionList() } })
+  }
+  // La ricerca anche dentro i messaggi (dal processo principale), poco dopo l'ultima lettera: le conversazioni che
+  // contengono le parole compaiono con un pezzo del messaggio
+  let contentHits = new Map()
+  let contentTimer = null
+  let contentSeq = 0
+  function searchContents() {
+    clearTimeout(contentTimer)
+    const q = sessionsQuery.trim()
+    if (!api.searchSessions || fold(q).replace(/\s/g, '').length < 3) { if (contentHits.size) { contentHits = new Map(); renderSessionList() } return }
+    const seq = ++contentSeq
+    contentTimer = setTimeout(async () => {
+      let r = []
+      try { r = (await api.searchSessions(q)) || [] } catch {}
+      if (seq !== contentSeq) return
+      contentHits = new Map(r.map((x) => [x.id, x]))
+      renderSessionList()
+    }, 250)
   }
 
   // Oggi, ieri, ultimi 7 giorni, ultimi 30, più vecchie
@@ -3803,7 +4038,9 @@
     const d = new Date(ms)
     const g = sessionGroup(ms)
     if (g === 'groupToday' || g === 'groupYesterday') return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-    return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}${d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : ''}`
+    const mon = month(d.getMonth()).slice(0, 3)
+    const year = d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : ''
+    return Theming.language === 'it' ? `${d.getDate()} ${mon}${year}` : `${mon} ${d.getDate()}${year}`
   }
   const fold = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
@@ -3811,7 +4048,8 @@
     const list = part('sessions-list')
     if (!list) return
     const q = fold(sessionsQuery.trim())
-    const match = (s) => !q || fold(s.title).includes(q) || fold(s.cwd).includes(q) || fold(s.branch).includes(q)
+    const inMeta = (s) => fold(s.title).includes(q) || fold(s.cwd).includes(q) || fold(s.branch).includes(q)
+    const match = (s) => !q || inMeta(s) || contentHits.has(s.id)
     // Le fissate in cima, le archiviate tutte in fondo, ognuna sotto la sua testata
     const rank = (s) => (s.archived ? 2 : s.pinned ? 0 : 1)
     const visible = sessionsCache.filter((s) => (showArchived || !s.archived) && match(s)).sort((x, y) => rank(x) - rank(y))
@@ -3828,7 +4066,32 @@
         h.className = 'session-group'
         list.appendChild(label(h, g))
       }
-      list.appendChild(sessionRow(s))
+      const row = sessionRow(s)
+      // Trovata nei messaggi: un pezzo di quello che contiene le parole, con le parole evidenziate
+      const hit = q && contentHits.get(s.id)
+      if (hit) {
+        const sn = document.createElement('div')
+        sn.className = 'session-snippet'
+        const words = fold(sessionsQuery).split(/\s+/).filter((w) => w.length >= 2)
+        const text = hit.snippet
+        const folded = fold(text)
+        const marks = []
+        for (const w of words) { let i = folded.indexOf(w); while (i >= 0) { marks.push([i, i + w.length]); i = folded.indexOf(w, i + w.length) } }
+        marks.sort((a, b) => a[0] - b[0])
+        let at = 0
+        for (const [a, b] of marks) {
+          if (a < at) continue
+          sn.appendChild(document.createTextNode(text.slice(at, a)))
+          const m = document.createElement('mark')
+          m.textContent = text.slice(a, b)
+          sn.appendChild(m)
+          at = b
+        }
+        sn.appendChild(document.createTextNode(text.slice(at)))
+        if (hit.count > 1) { const c = document.createElement('span'); c.className = 'ss-count'; c.textContent = ` · ${t('sessionsHits', { n: hit.count })}`; sn.appendChild(c) }
+        row.querySelector('.when').after(sn)
+      }
+      list.appendChild(row)
     }
     if (archivedCount) {
       const more = document.createElement('button')
@@ -4307,6 +4570,7 @@
 
   api.info().then(async (info) => {
     scene = info.scene === 'giorno' ? 'giorno' : 'notte'
+    Theming.setLanguage(info.language || 'en')
     workdir = info.workdir || ''
     chapter = info.chapter || 1
     mode = info.mode || 'auto'
@@ -4325,13 +4589,15 @@
     // I comandi della cache; l'elenco aggiornato arriva poi da onCommands
     api.commands().then((list) => { if (!commands.length) commands = list || [] }).catch(() => {})
     await Theming.load(info.themes || [])
+    for (const e of info.themes || []) if (e && e.stamp) themeStamps.set(e.id, e.stamp)
     // I temi dell'editor si costruiscono dai loro colori
-    for (const spec of info.userThemes || []) Theming.register(window.SkinsKits.moderno.fromColors(spec))
+    for (const spec of info.userThemes || []) { const th = window.SkinsKits.moderno.fromColors(spec); th.__spec = JSON.stringify(spec); Theming.register(th) }
     await mount(info.theme)
     if (part('input')) part('input').focus()
     // La pagina è partita: l'avvio sicuro non serve
     if (api.ready) api.ready()
     if (api.safeState) api.safeState().then(showSafe).catch(() => {})
+    checkWelcome(info).then((shown) => { if (!shown) showWhatsNew() }).catch(() => {})
   })
 
   // ------------------------------------------------------------------ anteprima senza Electron
@@ -4364,6 +4630,22 @@
   ]
 
   // Una risposta finta che usa tutto il markdown
+  // ?demo=en: i dati finti in inglese, per le immagini del README
+  // (una funzione: la versione finta nasce prima che questa parte del file sia letta)
+  function demoEn() { return new URLSearchParams(location.search).get('demo') === 'en' }
+  const FAKE_ANSWER_EN = [
+    'Rivers are now drawn **before the roads**, so they no longer cover them.',
+    '',
+    '- `DrawRivers()` in `MapView.cpp`, called right before `DrawRoads()`',
+    '- a **Rivers** switch in the *View* menu, on by default',
+    '',
+    '| File | Lines | Status |',
+    '|:-----|------:|:------:|',
+    '| `MapView.cpp` | +2 −1 | done |',
+    '| `RouteFinder.h` | +18 | to review |',
+    '',
+    'The test map now shows the river under the bridge. Want me to add fords on the trails too?',
+  ].join('\n')
   const FAKE_ANSWER = [
     'Ecco quanto mi chiedi: "{text}". La risposta arriva a pezzi, con **grassetto**, *corsivo*, ~~barrato~~ e `codice`.',
     '## Il piano',
@@ -4445,6 +4727,10 @@
       remote: 'git@github.com:luca/MapEditor.git', web: 'https://github.com/luca/MapEditor', base: 'main', last: { hash: 'a1b2c3d', subject: 'Le strade sopra i sentieri' },
       compare: 'https://github.com/luca/MapEditor/compare/main...fiumi?expand=1', gh: true,
     }
+    if (demoEn()) {
+      Object.assign(fakeGit, { branch: 'rivers', upstream: 'origin/rivers', root: 'C:/Projects/MapEditor', remote: 'git@github.com:example/MapEditor.git', web: 'https://github.com/example/MapEditor', compare: '' })
+      fakeGit.files[2].path = 'docs/old-notes.md'
+    }
     const gitTotals = () => { fakeGit.totals = fakeGit.files.reduce((t, f) => ({ files: t.files + 1, added: t.added + f.added, removed: t.removed + f.removed }), { files: 0, added: 0, removed: 0 }) }
     gitTotals()
     const fakeBranches = ['fiumi', 'main', 'sentieri']
@@ -4463,9 +4749,16 @@
     ])
     const fakeMemFiles = () => ({ cwd: 'C:/Users/luca/MapEditor', files: [['user', 'C:/Users/luca/.claude/CLAUDE.md'], ['project', 'C:/Users/luca/MapEditor/CLAUDE.md'], ['local', 'C:/Users/luca/MapEditor/CLAUDE.local.md'], ['parent', 'C:/Users/luca/CLAUDE.md']].filter(([id, f]) => id !== 'parent' || fakeMemory.has(f)).map(([id, file]) => ({ id, file, exists: fakeMemory.has(file), size: (fakeMemory.get(file) || '').length })) })
     const fakePermFiles = { user: 'C:/Users/luca/.claude/settings.json', project: 'C:/Users/luca/MapEditor/.claude/settings.json', local: 'C:/Users/luca/MapEditor/.claude/settings.local.json' }
-    const fakeUpdate = { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/luca/Claudeleon', installed: true }
-    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '0.1.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claudeleon', shortcut: 'Ctrl+Alt+P', worktree: false }
-    const fakeSessions = [
+    const fakeUpdate = demoEn() ? { state: 'uptodate', checkedAt: Date.now() } : { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/luca/Claudeleon', installed: true }
+    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '1.0.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claudeleon', shortcut: 'Ctrl+Alt+P', worktree: false, language: new URLSearchParams(location.search).get('lingua') || 'en' }
+    const fakeSessions = demoEn() ? [
+      { id: 's0', title: 'Theme editor with live preview', lastModified: Date.now() - 600000, cwd: 'C:/Projects/Claudeleon', branch: 'main' },
+      { id: 's1', title: 'Shortest path in RouteFinder', lastModified: Date.now() - 3600000, cwd: 'C:/Projects/MapEditor', branch: 'rivers' },
+      { id: 's2', title: 'Fix the flaky export test', lastModified: Date.now() - day, cwd: 'C:/Projects/MapEditor' },
+      { id: 's3', title: 'Windows Terminal profile', lastModified: Date.now() - 4 * day, cwd: 'C:/Users/me' },
+      { id: 's4', title: 'Release notes for 1.1', lastModified: Date.now() - 9 * day, cwd: 'C:/Projects/Claudeleon', pinned: true },
+      { id: 's5', title: 'Backup script for notes', lastModified: Date.now() - 45 * day, cwd: 'C:/Users/me/Documents' },
+    ] : [
       { id: 's0', title: 'Allegati e domande con le opzioni', lastModified: Date.now() - 600000, cwd: 'C:/Workspace/Progetti/Claudeleon', branch: 'main' },
       { id: 's1', title: 'Temi per Claudeleon', lastModified: Date.now() - 3600000, cwd: 'C:/Workspace/Progetti/Claudeleon', branch: 'main' },
       { id: 's2', title: 'Il calcolo dei sentieri in RouteFinder', lastModified: Date.now() - day, cwd: 'C:/Workspace/MapEditor' },
@@ -4478,7 +4771,7 @@
       // ?tema=<id>&scena=giorno nell'indirizzo per guardare un tema
       info: async () => {
         const q = new URLSearchParams(location.search)
-        return { scene: q.get('scena') || 'notte', chapter: n, theme: q.get('tema') || 'essenziale', themes: ['essenziale'], userThemes: fakeUserThemes, workdir: 'C:/Workspace', workdirChosen: q.get('cartella') !== 'no', mode: q.get('modo') || 'auto' }
+        return { scene: q.get('scena') || 'notte', language: q.get('lingua') || 'en', welcomed: q.get('benvenuto') !== 'si', chapter: n, theme: q.get('tema') || 'essenziale', themes: ['essenziale'], userThemes: fakeUserThemes, workdir: demoEn() ? 'C:/Projects/MapEditor' : 'C:/Workspace', workdirChosen: q.get('cartella') !== 'no', mode: q.get('modo') || 'auto' }
       },
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
       setMode: (m) => fire('onMode', m, 0),
@@ -4491,6 +4784,7 @@
       commands: async () => FAKE_COMMANDS,
       sessions: async () => fakeSessions.map((s) => Object.assign({}, s)),
       renameSession: async (id, title) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.title = title; return true },
+      searchSessions: async (q) => { const f = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); return f(q).includes('guad') ? [{ id: 's2', count: 3, snippet: 'Poi i guadi: dove un sentiero attraversa un fiume, il costo del passo raddoppia…', role: 'assistant' }] : [] },
       pinSession: async (id, on) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.pinned = !!on; return true },
       exportSession: async (id, cwd, title) => (id ? { ok: true, file: `C:/Users/luca/Documents/${title || 'Conversazione'}.md` } : { ok: false, error: 'nessuna sessione' }),
       archiveSession: async (id, cwd, on) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.archived = !!on; return true },
@@ -4541,6 +4835,8 @@
       writeMemory: async (_c, f, text) => { fakeMemory.set(f, text); return { ok: true } },
       openMemory: async () => true,
       dictate: async () => true,
+      whatsNew: async () => (new URLSearchParams(location.search).get('novita') === 'si' ? { from: '1.0.0', to: '1.1.0', url: 'https://github.com/LukePasax/Claudeleon/releases/tag/v1.1.0', notes: "## What's Changed\n* Settings with categories, with permissions, memory and extensions inside by @LukePasax in https://github.com/LukePasax/Claudeleon/pull/3\n* English by default, Italian from the settings by @LukePasax in https://github.com/LukePasax/Claudeleon/pull/3\n* First-run welcome and what's new after an update\n\n**Full Changelog**: https://github.com/LukePasax/Claudeleon/compare/v1.0.0...v1.1.0" } : null),
+      claudeStatus: async () => { const q = new URLSearchParams(location.search); const found = q.get('claude') !== 'manca'; return { found, path: 'C:/Users/luca/.local/bin/claude.exe', version: found ? '2.1.330' : null, loggedIn: found && q.get('login') !== 'no', platform: 'win32' } },
       retrySafeTheme: () => fireAll('onTheme', 'notturno', 0),
       dismissSafe() {},
       saveTheme: async (spec) => { const id = spec.id || String(spec.name || 'tema').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'tema'; return { ok: true, spec: Object.assign(window.SkinsKits.moderno.normalizeSpec(spec), { id }) } },
@@ -4572,9 +4868,9 @@
       onUpdate: on('onUpdate'),
       stopTask: async () => true,
       backgroundNow: async () => true,
-      onTasks: on('onTasks'), onWorktree: on('onWorktree'), onSafeState: on('onSafeState'),
+      onTasks: on('onTasks'), onWorktree: on('onWorktree'), onSafeState: on('onSafeState'), onLanguage: on('onLanguage'),
       settings: async () => fakeSettings,
-      setSetting: async (k, v) => { if (k in fakeSettings) fakeSettings[k] = v; return fakeSettings },
+      setSetting: async (k, v) => { if (k in fakeSettings) fakeSettings[k] = v; if (k === 'language') fireAll('onLanguage', v, 0); return fakeSettings },
       suggestFiles: async (q) => ['src/', 'src/MapView.cpp', 'src/MapView.h', 'src/MapLoader.cpp', 'src/RouteFinder.h', 'docs/', 'docs/specifiche.pdf', 'README.md', 'CMakeLists.txt'].filter((f) => f.toLowerCase().includes(q.toLowerCase())).slice(0, 15),
       edit(uuid, msg, restore, conv) {
         if (restore) fireAll('onRewound', { ok: true, files: ['src/MapView.cpp'], insertions: 2, deletions: 1 }, 50, conv)
@@ -4591,8 +4887,8 @@
           fire('onWorktree', wt, 10)
         }
         if (conv && !fakeSessions.some((x) => x.conv === conv)) {
-          fakeSessions.unshift({ id: `fs-${conv}`, conv, title: (typeof msg === 'string' ? msg : msg.text.replace(/\s*<diff_comments>[\s\S]*$/, '') || 'Commenti sulle modifiche').slice(0, 40), lastModified: Date.now(), cwd: 'C:/Workspace' })
-          fire('onConvSession', { id: `fs-${conv}`, cwd: 'C:/Workspace' }, 30)
+          fakeSessions.unshift({ id: `fs-${conv}`, conv, title: (typeof msg === 'string' ? msg : msg.text.replace(/\s*<diff_comments>[\s\S]*$/, '') || 'Commenti sulle modifiche').slice(0, 40), lastModified: Date.now(), cwd: demoEn() ? 'C:/Projects/MapEditor' : 'C:/Workspace' })
+          fire('onConvSession', { id: `fs-${conv}`, cwd: demoEn() ? 'C:/Projects/MapEditor' : 'C:/Workspace' }, 30)
         }
         const text = typeof msg === 'string' ? msg : msg.text || '(allegati)'
         if (text.startsWith('/')) {
@@ -4604,20 +4900,20 @@
           return
         }
         fire('onThinkingStart', null, 60)
-        ;['Devo capire **dove** si disegnano le strade. ', 'Cerco DrawRoads nel codice, poi leggo MapView.cpp ', 'e aggiungo i fiumi prima delle strade.'].forEach((x, i) => fire('onThinking', x, 80 + i * 40))
+        ;(demoEn() ? ['I need to find **where** roads are drawn. ', 'Search for DrawRoads, then read MapView.cpp ', 'and draw rivers before the roads.'] : ['Devo capire **dove** si disegnano le strade. ', 'Cerco DrawRoads nel codice, poi leggo MapView.cpp ', 'e aggiungo i fiumi prima delle strade.']).forEach((x, i) => fire('onThinking', x, 80 + i * 40))
         fire('onThinkingEnd', null, 190)
         fire('onTool', { id: 't0', name: 'Grep', summary: 'DrawRoads', intent: { verb: 'grep', target: 'DrawRoads' } }, 200)
         fire('onToolDone', { id: 't0', error: false }, 260)
         fire('onTool', { id: 't1', name: 'Read', summary: 'src/MapView.cpp', intent: { verb: 'read', target: 'MapView.cpp' } }, 300)
         fire('onToolDone', { id: 't1', error: false }, 380)
-        fire('onToolSummary', { summary: 'Ha trovato dove si disegnano le strade', ids: ['t0', 't1'] }, 420)
+        fire('onToolSummary', { summary: demoEn() ? 'Found where the roads are drawn' : 'Ha trovato dove si disegnano le strade', ids: ['t0', 't1'] }, 420)
         fire('onTool', { id: 't2', name: 'Edit', summary: 'src/MapView.cpp', intent: { verb: 'edit', target: 'MapView.cpp' }, change: FAKE_EDIT }, 600)
         fire('onToolDone', { id: 't2', error: false }, 800)
-        const answer = FAKE_ANSWER.replace('{text}', text)
+        const answer = demoEn() ? FAKE_ANSWER_EN : FAKE_ANSWER.replace('{text}', text)
         ;[...answer].forEach((ch, i) => fire('onDelta', ch, 900 + i * 15))
         fire('onDone', { durationMs: 2400 }, 900 + answer.length * 15 + 100)
-        fire('onSuggestion', 'Aggiungi anche i guadi sui sentieri', 900 + answer.length * 15 + 150)
-        fire('onAsk', { id: 1, title: 'Claude vuole creare un file', description: '', detail: 'src/RouteFinder.h', change: FAKE_WRITE, canAlways: true }, 900 + answer.length * 15 + 200)
+        fire('onSuggestion', demoEn() ? 'Yes, add fords on the trails too' : 'Aggiungi anche i guadi sui sentieri', 900 + answer.length * 15 + 150)
+        if (!demoEn()) fire('onAsk', { id: 1, title: 'Claude vuole creare un file', description: '', detail: 'src/RouteFinder.h', change: FAKE_WRITE, canAlways: true }, 900 + answer.length * 15 + 200)
       },
       onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'), onMode: on('onMode'), onToolSummary: on('onToolSummary'), onWindowState: on('onWindowState'), onWorkdir: on('onWorkdir'), onCommands: on('onCommands'), onCommandsError: on('onCommandsError'), onCommandOutput: on('onCommandOutput'), onCompacted: on('onCompacted'), onTitle: on('onTitle'), onStatus: on('onStatus'),
     }

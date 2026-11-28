@@ -161,6 +161,19 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   stato, da quanto, quanti strumenti ha usato, l'ultimo e il riassunto finale, con "Ferma" e "Uscita" (il file con
   l'uscita). Mentre Claude lavora, "Manda in background" (o Ctrl+B) sposta in background il comando o il sotto-agente
   in corso, come nel terminale, e Claude va avanti. Con attività in corso la conversazione non si spegne da sola.
+- **Benvenuto:** al primo avvio un riquadro fa scegliere la lingua e controlla che Claude Code sia installato (anche
+  fuori dal posto solito, se è nel PATH) e che abbia il login fatto; se manca qualcosa dà il comando da copiare
+  (`irm https://claude.ai/install.ps1 | iex`, poi `claude` e `/login`), "Scegli il programma…" e "Controlla di
+  nuovo". Ricompare a ogni avvio in cui manca Claude Code o il login; "Continua comunque" lo chiude.
+- **Novità:** al primo avvio dopo un aggiornamento, un riquadro con le note della release di quella versione (da
+  GitHub) e il link alla sua pagina.
+- **Lingua:** l'inglese è la lingua di partenza; Impostazioni → Generale → Lingua passa all'italiano (e viceversa)
+  sul posto: finestra, menu del vassoio, finestre di dialogo, notifiche, messaggi d'errore e la "personalità" che il
+  tema dà a Claude. Le voci già scritte nella conversazione restano come sono; Claude risponde nella lingua in cui
+  gli scrivi.
+- **Impostazioni:** un pannello con le categorie a sinistra (Generale, Claude, Conversazioni, Permessi, Memoria,
+  Estensioni, Aggiornamenti, Informazioni); permessi, memoria ed estensioni si vedono lì dentro. L'ultima categoria
+  aperta si ricorda.
 - **Avvio sicuro:** se un tema impedisce all'app di partire, la finestra torna al tema di partenza (Essenziale) e
   un avviso spiega cosa è successo, con "Riprova «tema»", "Errori" (apre `errori.log`) e "Va bene". Succede quando un
   tema dà errore mentre si monta o non ha la conversazione e la casella, quando la pagina non finisce di partire
@@ -175,6 +188,12 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   (un file JSON nella cartella `temi` dei dati dell'app, che resta con gli aggiornamenti); sulle schede dei tuoi temi
   ci sono "Modifica" ed "Elimina". I temi dell'editor hanno la struttura del kit moderno (come Essenziale): per
   forme diverse serve un tema scritto a mano (si passa poi come file `.skin`).
+- **Temi chiesti a Claude:** in una conversazione basta scrivere per esempio "fammi un tema come un vecchio
+  terminale" o "un tema coi colori della mia azienda, chiaro e scuro". Claudeleon dà a Claude una skill,
+  `claudeleon-theme` (anche come comando `/claudeleon:claudeleon-theme`), con la guida dei temi, tre esempi e la
+  cartella dove scriverli (`CLAUDELEON_THEMES_DIR`); Claude scrive il tema nella cartella `temi` dei dati dell'app e
+  il tema compare subito nel selettore. L'app tiene d'occhio quella cartella: un tema nuovo compare da solo, e quello
+  in uso si ricarica a ogni file salvato, così si vedono le modifiche di Claude man mano.
 - **Dettatura:** su Windows, accanto a "+" c'è un microfono: mette il cursore in fondo alla casella e accende la
   digitazione vocale di Windows (la stessa di Win+H), che scrive quello che dici; un altro clic (o Win+H) la ferma.
   La lingua è quella scelta in Windows (Impostazioni → Ora e lingua → Voce). Il riconoscimento vocale di Chromium
@@ -275,6 +294,10 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
     piano" (Claude procede, nel modo di prima) e "Continua a pianificare".
 
   Le domande compaiono nella conversazione con Permetti, Sempre e Nega, e con le differenze se riguardano un file.
+- **Ricerca nelle conversazioni:** il campo di ricerca dell'elenco guarda titoli, cartelle e branch e, da tre lettere,
+  anche il testo dei messaggi (le domande e le risposte, senza strumenti né promemoria): una conversazione trovata
+  così mostra un pezzo del messaggio con le parole evidenziate e quanti messaggi le contengono. Accenti e maiuscole
+  non contano; con più parole, le vuole tutte (anche in messaggi diversi).
 - **Elenco delle conversazioni:** le sessioni di Claude Code di tutte le cartelle, le più recenti prima, come nella barra
   laterale dell'app desktop (le sue comprese, coi loro titoli), raggruppate per giorno (oggi, ieri, ultimi 7 e 30
   giorni, più vecchie); accanto all'ora c'è la cartella e il branch git. In cima un campo di ricerca filtra per

@@ -1,6 +1,8 @@
 // Il ponte, le parti che non chiamano Claude Code: intenzioni, allegati, attività, domande, stima del contesto
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
+// Queste prove controllano i messaggi in italiano
+require('../../src/i18n').setLanguage('it')
 const { intent, _internals: I, ClaudeBridge } = require('../../src/claude-bridge')
 
 test('intenzioni: la descrizione scritta da Claude vince, altrimenti verbo e oggetto', () => {

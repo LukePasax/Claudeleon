@@ -7,7 +7,9 @@ pagina li carica da `skins-theme://<id>/`. Il tema si sceglie dalla finestra o d
 
 Per scrivere un tema nuovo: si crea la sua cartella qui, si prova (vedi "Provare un tema"), poi dal selettore dei
 temi "Esporta" lo mette in un file `.skin` da passare a chi vuole, che lo installa con "Importa un tema". Un tema di
-soli colori si fa senza codice con l'editor dei temi.
+soli colori si fa senza codice con l'editor dei temi. Oppure si chiede a Claude in una conversazione di
+Claudeleon: l'app gli dà la skill `claudeleon-theme` (in `src/plugin/claudeleon/`, con la guida inglese
+`docs/themes.md` copiata in `reference/guide.md` e tre esempi), e Claude scrive il tema nella cartella dei temi.
 
 Un tema decide **tutto quello che si vede**, e non deve per forza essere in pixel art:
 - la forma della finestra (il suo HTML e il suo CSS);
@@ -259,6 +261,13 @@ col modo dei permessi, `body[data-theme]` col tema. Un aggancio che va in errore
 - Un carattere nuovo va nella cartella del tema e si dichiara con `@font-face` nel `theme.css`, con un percorso
   relativo. Sono ammessi solo file locali.
 
+## Lingue
+
+L'app è in inglese o in italiano. Le `strings` di un tema possono essere per lingua (`strings: { en: {...}, it:
+{...} }`) o le stesse per tutte; quelle che il tema non dà vengono dal motore nella lingua scelta. Anche nome e
+descrizione possono avere la versione per lingua (`names: { it: '...' }`, `descriptions: { it: '...' }`) e la
+`persona` può essere `{ en: '...', it: '...' }`.
+
 ## Passare un tema ad altri: il file `.skin`
 
 "Esporta" (sulla scheda del tema, nel selettore) salva un JSON `{ format: 'claude-skins-theme', version: 1, kind, … }`:
@@ -287,3 +296,7 @@ description, light, dark })` fa un tema chiaro/scuro che segue Windows (`followS
   anche la misura minima.
 - **Nella finestra vera:** `electron . --cattura prova.png giorno chat --tema <id>`, con la misura del tema, oppure
   aggiungendo per esempio `900x640` dopo `chat`.
+- **Dal vivo, nell'app installata:** si mette il tema nella cartella `temi` dei dati dell'app
+  (`%APPDATA%\Claudeleon\temi\<id>\` con `theme.json` e `theme.js`, oppure un solo `<id>.json`). Compare nel
+  selettore entro un secondo; se è il tema in uso, ogni file salvato lì si ricarica nella finestra. È così che lavora
+  Claude con la skill.

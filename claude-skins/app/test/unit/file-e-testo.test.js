@@ -79,15 +79,15 @@ test('temi in file .skin: esporta, controlla, installa (con codice e di colori)'
   const b = t.bundleFor('essenziale', d)
   assert.equal(b.format, 'claude-skins-theme')
   assert.equal(b.kind, 'code')
-  assert.equal(b.manifest.name, 'Essenziale')
+  assert.equal(b.manifest.name, 'Essential')
   assert.deepEqual(Object.keys(b.files), ['theme.js'])
   // ...e non si reinstalla al suo posto
-  assert.match(t.installBundle(d, b).error, /programma/)
+  assert.match(t.installBundle(d, b).error, /built-in/)
   // Un tema con codice importato: nella sua cartella, con theme.json; una seconda volta chiede di sostituire
   const own = JSON.parse(JSON.stringify(b))
   own.manifest.id = 'mio'
   own.files['fonts/x.woff2'] = Buffer.from('font').toString('base64')
-  assert.deepEqual(t.installBundle(d, own), { ok: true, kind: 'code', id: 'mio', name: 'Essenziale' })
+  assert.deepEqual(t.installBundle(d, own), { ok: true, kind: 'code', id: 'mio', name: 'Essential' })
   assert.ok(fs.existsSync(path.join(d, 'mio', 'fonts', 'x.woff2')))
   assert.deepEqual(t.installedThemes(d).map((x) => [x.id, x.code]), [['mio', true]])
   assert.equal(t.installBundle(d, own).exists, true)

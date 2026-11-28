@@ -2,6 +2,8 @@
 // "nudo" in una cartella accanto), più le parti che leggono l'uscita di git
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
+// Queste prove controllano i messaggi in italiano
+require('../../src/i18n').setLanguage('it')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')

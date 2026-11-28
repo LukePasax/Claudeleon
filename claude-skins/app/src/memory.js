@@ -2,6 +2,7 @@
 // conversazione. Le istruzioni personali (~/.claude/CLAUDE.md, per tutti i progetti), quelle del progetto
 // (CLAUDE.md nella cartella, o .claude/CLAUDE.md), quelle solo tue nel progetto (CLAUDE.local.md) e i CLAUDE.md delle
 // cartelle sopra quella del progetto (Claude Code legge anche quelli). Si leggono e si scrivono solo questi file
+const { tr } = require('./i18n')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
@@ -48,10 +49,10 @@ function allowed(cwd, file) {
 }
 
 function read(cwd, file) {
-  if (!allowed(cwd, file)) return { ok: false, error: 'Non è un file della memoria' }
+  if (!allowed(cwd, file)) return { ok: false, error: tr('Non è un file della memoria') }
   try {
     if (!fs.existsSync(file)) return { ok: true, text: '', exists: false }
-    if (fs.statSync(file).size > MAX) return { ok: false, error: 'Il file è troppo grande per modificarlo qui' }
+    if (fs.statSync(file).size > MAX) return { ok: false, error: tr('Il file è troppo grande per modificarlo qui') }
     return { ok: true, text: fs.readFileSync(file, 'utf8'), exists: true }
   } catch (err) {
     return { ok: false, error: err.message }
@@ -59,9 +60,9 @@ function read(cwd, file) {
 }
 
 function write(cwd, file, text) {
-  if (!allowed(cwd, file)) return { ok: false, error: 'Non è un file della memoria' }
+  if (!allowed(cwd, file)) return { ok: false, error: tr('Non è un file della memoria') }
   text = String(text ?? '')
-  if (Buffer.byteLength(text) > MAX) return { ok: false, error: 'Il testo è troppo lungo' }
+  if (Buffer.byteLength(text) > MAX) return { ok: false, error: tr('Il testo è troppo lungo') }
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true })
     fs.writeFileSync(file, text)

@@ -23,9 +23,10 @@ before(async () => {
 after(async () => { if (app) await app.close() })
 
 // Una pagina pulita col tema dato
-async function open(tema) {
+// Le prove leggono le scritte italiane; quella della lingua apre anche in inglese
+async function open(tema, lingua = 'it', extra = '') {
   errors = []
-  const url = require('url').pathToFileURL(INDEX).href + `?tema=${tema}&scena=giorno&veloce=1`
+  const url = require('url').pathToFileURL(INDEX).href + `?tema=${tema}&scena=giorno&veloce=1&lingua=${lingua}${extra}`
   await page.goto(url)
   await page.waitForSelector('[data-part="input"]')
   await page.waitForTimeout(150)
@@ -247,7 +248,7 @@ for (const tema of TEMI) {
     await open(tema)
     await page.keyboard.press('Control+,')
     await page.waitForSelector('.settings-panel')
-    await page.click('.settings-panel .set-row:has-text("Regole dei permessi") .btn')
+    await page.click('.settings-panel .set-nav-item[data-page="permissions"]')
     await page.waitForSelector('.perm-panel .perm-rule')
     await page.click('.perm-tab:has-text("Questo progetto")')
     await page.fill('.perm-allow .perm-input', 'Bash(cmake --build:*)')
@@ -376,15 +377,55 @@ for (const tema of TEMI) {
     assert.deepEqual(errors, [])
   })
 
+  test(`${tema}: in inglese di partenza, e il cambio di lingua dalle impostazioni`, async () => {
+    await open(tema, 'en')
+    assert.equal(await page.getAttribute('[data-part="input"]', 'placeholder'), 'Write to Claude…')
+    assert.equal(await page.textContent('[data-action="send"]'), 'Send')
+    await page.keyboard.press('Control+,')
+    await page.waitForSelector('.set-nav-item[data-page="general"]:has-text("General")')
+    await page.click('.set-nav-item[data-page="general"]')
+    await page.selectOption('.settings-panel .set-row:has-text("Language") select', 'it')
+    // Tutto si ridisegna in italiano, e le impostazioni restano aperte
+    await page.waitForFunction(() => document.querySelector('[data-part="input"]').placeholder === 'Scrivi a Claude…')
+    await page.waitForSelector('.set-nav-item[data-page="general"]:has-text("Generale")')
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'it')
+    assert.deepEqual(errors, [])
+  })
+
+  test(`${tema}: benvenuto senza Claude Code, poi le novità della versione`, async () => {
+    await open(tema, 'it', '&benvenuto=si&claude=manca&novita=si')
+    await page.waitForSelector('.welcome-panel')
+    assert.match(await page.textContent('.welcome-panel'), /irm https:\/\/claude\.ai\/install\.ps1 \| iex/)
+    assert.equal(await page.$$eval('.welcome-panel .wel-step.todo', (x) => x.length), 2)
+    // Le novità aspettano che il benvenuto sia chiuso
+    assert.equal(await page.$('.news-panel'), null)
+    await page.click('.welcome-panel .wel-foot .btn:has-text("Continua comunque")')
+    await page.waitForSelector('.news-panel')
+    assert.match(await page.textContent('.news-panel'), /Claudeleon 1\.1\.0/)
+    await page.click('.news-panel .btn:has-text("Va bene")')
+    assert.equal(await page.$('.theme-picker'), null)
+    assert.deepEqual(errors, [])
+  })
+
+  test(`${tema}: la ricerca trova anche le parole nei messaggi`, async () => {
+    await open(tema)
+    await page.fill('.sessions-search, [data-part="sessions-search"]', 'guadi')
+    await page.waitForSelector('.session-row[data-id="s2"] .session-snippet mark')
+    assert.equal(await page.textContent('.session-row[data-id="s2"] .session-snippet mark'), 'guadi')
+    assert.equal(await page.$$eval('.session-row:not(.note)', (r) => r.length), 1)
+    assert.deepEqual(errors, [])
+  })
+
   test(`${tema}: impostazioni, estensioni, contesto, cambio di tema che tiene la conversazione`, async () => {
     await open(tema)
     await send('Ciao')
     await done()
     await page.keyboard.press('Control+,')
+    await page.click('.settings-panel .set-nav-item[data-page="general"]')
     await page.waitForSelector('.settings-panel .set-switch .switch')
     const box = await page.$eval('.settings-panel .set-switch .switch', (e) => e.getBoundingClientRect().width)
     assert.ok(box > 10, 'gli interruttori si vedono')
-    await page.click('.set-row:has-text("Server MCP e plugin") .btn')
+    await page.click('.settings-panel .set-nav-item[data-page="extensions"]')
     await page.waitForSelector('.ext-panel .ext-dot')
     await page.keyboard.press('Escape')
     await page.evaluate(() => anteprima.contesto(64))

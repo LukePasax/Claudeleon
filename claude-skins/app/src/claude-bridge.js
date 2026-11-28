@@ -1,11 +1,15 @@
 // Il messaggero: comanda Claude Code con l'Agent SDK. Testo e azioni arrivano man mano; quando Claude chiede un
 // permesso, la domanda passa alla finestra e la risposta torna indietro. La sessione continua con resume.
+const { tr } = require('./i18n')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const { EventEmitter } = require('events')
 const crypto = require('crypto')
 
+// Il plugin con le skill di Claudeleon. Nell'app installata sta fuori dall'archivio asar (asarUnpack), perché lo
+// legge Claude Code, che è un altro programma
+const PLUGIN_DIR = path.join(__dirname, 'plugin', 'claudeleon').replace(/app\.asar([\\/])/, 'app.asar.unpacked$1')
 const CLAUDE = path.join(os.homedir(), '.local', 'bin', process.platform === 'win32' ? 'claude.exe' : 'claude')
 
 // La personalità che si aggiunge al prompt di sistema viene dal tema (campo persona del suo theme.js); questa vale per
@@ -223,19 +227,19 @@ function outputTail(file, max = 32768) {
 // ciascuna, col nome dello strumento e cosa ha toccato). I blocchi che la pagina aggiunge ai messaggi diventano
 // leggibili (file allegati, commenti sulle differenze); promemoria di sistema e sotto-agenti restano fuori
 function transcriptMarkdown(messages, meta = {}) {
-  const out = [`# ${meta.title || 'Conversazione'}`, '']
+  const out = [`# ${meta.title || tr('Conversazione')}`, '']
   const when = meta.when ? new Date(meta.when).toLocaleString('it-IT', { dateStyle: 'long', timeStyle: 'short' }) : ''
   out.push(`*Claude Code${when ? ` · ${when}` : ''}${meta.cwd ? ` · ${meta.cwd}` : ''}*`, '')
   let last = ''
   const head = (who) => { if (last !== who) { out.push('---', '', `## ${who}`, ''); last = who } }
   const tidy = (text) => text
-    .replace(/<attached_files>\n([\s\S]*?)\n?<\/attached_files>/g, (_m, list) => `*File allegati:* ${list.split('\n').map((x) => `\`${x.trim()}\``).filter((x) => x !== '``').join(', ')}`)
+    .replace(/<attached_files>\n([\s\S]*?)\n?<\/attached_files>/g, (_m, list) => tr('*File allegati:* {x}', { x: list.split('\n').map((x) => `\`${x.trim()}\``).filter((x) => x !== '``').join(', ') }))
     .replace(/<diff_comments>[\s\S]*?<\/diff_comments>/g, (block) => {
       const items = []
       const re = /<comment file="([^"]*)" line="([^"]*)" side="[^"]*">\n<code>([\s\S]*?)<\/code>\n([\s\S]*?)\n<\/comment>/g
       let m
       while ((m = re.exec(block))) items.push(`- \`${m[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&')}${m[2] ? `:${m[2]}` : ''}\` — ${m[4]}`)
-      return `*Commenti sulle modifiche:*\n\n${items.join('\n')}`
+      return `${tr('*Commenti sulle modifiche:*')}\n\n${items.join('\n')}`
     })
     .trim()
   for (const m of messages) {
@@ -255,7 +259,7 @@ function transcriptMarkdown(messages, meta = {}) {
     if (!text || /^<(local-command|system-reminder|task-notification)/.test(text)) continue
     const name = /<command-name>\s*\/?([^<\s]+)\s*<\/command-name>/.exec(text)
     if (/^<command/.test(text) && !name) continue
-    head('Tu')
+    head(tr('Tu'))
     if (name) { const args = /<command-args>([\s\S]*?)<\/command-args>/.exec(text); out.push(`\`/${name[1]}${args && args[1].trim() ? ` ${args[1].trim()}` : ''}\``, '') } else out.push(tidy(text), '')
   }
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n'
@@ -267,7 +271,7 @@ function promptTitle(text) {
   const s = String(text || '')
   const clean = s.replace(/\s*<(attached_files|diff_comments)>[\s\S]*?(<\/\1>|$)/g, '').trim()
   if (clean) return clean
-  return /<diff_comments>/.test(s) ? 'Commenti sulle modifiche' : /<attached_files>/.test(s) ? 'File allegati' : ''
+  return /<diff_comments>/.test(s) ? tr('Commenti sulle modifiche') : /<attached_files>/.test(s) ? tr('File allegati') : ''
 }
 
 // I file allegati: in fondo al testo, un percorso per riga dentro <attached_files>. La pagina li riconosce e li mostra
@@ -467,14 +471,14 @@ class ClaudeBridge extends EventEmitter {
     const q = this.questions.get(id)
     this.questions.delete(id)
     if (q) {
-      if (!allow || !answers || typeof answers !== 'object') return resolve({ behavior: 'deny', message: 'La persona ha chiuso le domande senza rispondere: chiedile in un messaggio come vuole procedere.' })
+      if (!allow || !answers || typeof answers !== 'object') return resolve({ behavior: 'deny', message: tr('La persona ha chiuso le domande senza rispondere: chiedile in un messaggio come vuole procedere.') })
       return resolve({ behavior: 'allow', updatedInput: Object.assign({}, q, { answers }) })
     }
     const plan = this.plans.get(id)
     this.plans.delete(id)
     if (plan) {
       // Un piano approvato: Claude esce dal modo piano e torna a quello di prima (se era già piano, chiedi sempre)
-      if (!allow) return resolve({ behavior: 'deny', message: 'La persona non approva ancora il piano: continua a pianificare e chiedile che cosa vuole cambiare.' })
+      if (!allow) return resolve({ behavior: 'deny', message: tr('La persona non approva ancora il piano: continua a pianificare e chiedile che cosa vuole cambiare.') })
       const back = this.beforePlan && this.beforePlan !== 'plan' ? this.beforePlan : 'default'
       resolve({ behavior: 'allow', updatedInput: plan, updatedPermissions: [{ type: 'setMode', mode: back, destination: 'session' }] })
       this.beforePlan = null
@@ -482,7 +486,7 @@ class ClaudeBridge extends EventEmitter {
       this.emit('mode', back)
       return
     }
-    resolve(allow ? { behavior: 'allow', updatedPermissions: always ? this.suggestions.get(id) : undefined } : { behavior: 'deny', message: 'La persona ha negato il permesso.' })
+    resolve(allow ? { behavior: 'allow', updatedPermissions: always ? this.suggestions.get(id) : undefined } : { behavior: 'deny', message: tr('La persona ha negato il permesso.') })
   }
 
   // Il messaggio della persona: testo, immagini ({ mediaType, data } in base64) e file (percorsi, che Claude apre da
@@ -500,7 +504,7 @@ class ClaudeBridge extends EventEmitter {
     try {
       live = await this.ensureLive()
     } catch (err) {
-      this.emit('error', `Claude Code non risponde: ${err.message}`)
+      this.emit('error', tr('Claude Code non risponde: {x}', { x: err.message }))
       return
     }
     const busy = live.turn.open
@@ -521,10 +525,10 @@ class ClaudeBridge extends EventEmitter {
     let messages = []
     try { messages = await getSessionMessages(sessionId, this.sessionCwd ? { dir: this.sessionCwd } : {}) } catch {}
     const k = messages.findIndex((m) => m.uuid === uuid)
-    if (k < 0) { this.emit('error', 'Non trovo il messaggio da modificare nella sessione salvata.'); return }
+    if (k < 0) { this.emit('error', tr('Non trovo il messaggio da modificare nella sessione salvata.')); return }
     // I file: si chiede al Claude Code acceso su quella sessione di riportarli a prima del messaggio
     if (restoreFiles) {
-      let report = { canRewind: false, error: 'Salvataggi dei file non disponibili.' }
+      let report = { canRewind: false, error: tr('Salvataggi dei file non disponibili.') }
       try {
         const live = await this.ensureLive()
         if (live.query.rewindFiles) report = await live.query.rewindFiles(uuid)
@@ -582,9 +586,15 @@ class ClaudeBridge extends EventEmitter {
           // Senza questa l'SDK segna la sessione come "programmatica" (sdk-ts) e gli elenchi delle sessioni di
           // Claude (il /resume del terminale, le app) la nascondono
           CLAUDE_CODE_ENTRYPOINT: this.entrypoint || 'cli',
+          // La cartella dei temi di Claudeleon, per la skill che li crea
+          ...(this.themesDir ? { CLAUDELEON_THEMES_DIR: this.themesDir } : {}),
         }),
         // Lo strumento con cui Claude dà un titolo alla conversazione, con lo stesso nome che ha nell'app desktop
         mcpServers: { [TITLE_SERVER]: await this.titleServer() },
+        // Le skill di Claudeleon (creare i temi), solo nelle sue conversazioni: un plugin locale, fuori dall'asar
+        ...(fs.existsSync(PLUGIN_DIR) ? { plugins: [{ type: 'local', path: PLUGIN_DIR }] } : {}),
+        // La cartella dei temi è fra quelle dove Claude può lavorare (coi soliti permessi), per la skill dei temi
+        ...(this.themesDir ? { additionalDirectories: [this.themesDir] } : {}),
         includePartialMessages: true,
         // Dopo ogni risposta, una previsione del prossimo messaggio della persona (Tab o un clic per usarla)
         promptSuggestions: true,
@@ -617,13 +627,13 @@ class ClaudeBridge extends EventEmitter {
         this.handle(live, msg)
       }
     } catch (err) {
-      if (this.live === live && live.turn.open && !live.turn.stopped) this.emit('error', `Claude Code non risponde: ${err.message}`)
+      if (this.live === live && live.turn.open && !live.turn.stopped) this.emit('error', tr('Claude Code non risponde: {x}', { x: err.message }))
     } finally {
       live.ended = true
       clearTimeout(live.idle)
       if (this.live === live) {
         // Il processo si è chiuso a metà di un turno: la finestra non resta in attesa
-        if (live.turn.open && !live.turn.stopped) this.emit('error', 'Claude Code si è chiuso.')
+        if (live.turn.open && !live.turn.stopped) this.emit('error', tr('Claude Code si è chiuso.'))
         this.live = null
         this.query = null
       }
@@ -723,7 +733,7 @@ class ClaudeBridge extends EventEmitter {
       }
     } else if (msg.type === 'result') {
       live.turn = { open: false }
-      if (msg.is_error || msg.subtype !== 'success') this.emit('error', msg.result || `Il messaggero si è fermato (${msg.subtype}).`)
+      if (msg.is_error || msg.subtype !== 'success') this.emit('error', msg.result || tr('Claude Code si è fermato ({x}).', { x: msg.subtype }))
       else {
         // Un comando che non ha fatto scrivere Claude né mandato un'uscita: il suo esito è nel risultato
         if (!turn.wroteText && !turn.sawOutput && msg.result) this.emit('commandOutput', plainOutput(msg.result))
@@ -855,7 +865,7 @@ class ClaudeBridge extends EventEmitter {
 
   // Ferma la risposta in corso: le domande aperte si chiudono e Claude Code interrompe il turno, ma resta acceso
   stop() {
-    for (const resolve of this.pending.values()) resolve({ behavior: 'deny', message: 'La persona ha fermato il messaggero.', interrupt: true })
+    for (const resolve of this.pending.values()) resolve({ behavior: 'deny', message: tr('La persona ha fermato la risposta.'), interrupt: true })
     this.pending.clear()
     this.plans.clear()
     this.questions.clear()
@@ -895,12 +905,12 @@ class ClaudeBridge extends EventEmitter {
         async ({ title, session_id }) => {
           const id = session_id && session_id !== 'self' ? session_id : this.session.getSession()
           const clean = String(title || '').replace(/\s+/g, ' ').trim().slice(0, 200)
-          if (!id || !clean) return { content: [{ type: 'text', text: 'Nessuna sessione o titolo vuoto.' }], isError: true }
+          if (!id || !clean) return { content: [{ type: 'text', text: tr('Nessuna sessione o titolo vuoto.') }], isError: true }
           try {
             await renameSession(id, clean, this.sessionCwd ? { dir: this.sessionCwd } : {})
               .catch(() => renameSession(id, clean))
           } catch (err) {
-            return { content: [{ type: 'text', text: `Titolo non salvato: ${err.message}` }], isError: true }
+            return { content: [{ type: 'text', text: tr('Titolo non salvato: {x}', { x: err.message }) }], isError: true }
           }
           this.emit('title', { id, title: clean })
           return { content: [{ type: 'text', text: `Titolo impostato: ${clean}` }] }
@@ -921,12 +931,12 @@ class ClaudeBridge extends EventEmitter {
     return new Promise((resolve) => {
       this.pending.set(id, resolve)
       options.signal?.addEventListener('abort', () => {
-        if (this.pending.delete(id)) resolve({ behavior: 'deny', message: 'Richiesta annullata.' })
+        if (this.pending.delete(id)) resolve({ behavior: 'deny', message: tr('Richiesta annullata.') })
         this.emit('askClosed', { id })
       })
       this.emit('ask', {
         id,
-        title: options.title || `Claude vuole usare ${toolName}`,
+        title: options.title || tr('Claude vuole usare {x}', { x: toolName }),
         description: options.description || options.decisionReason || '',
         detail: summary(input),
         change: this.change(toolName, input),
@@ -942,7 +952,7 @@ class ClaudeBridge extends EventEmitter {
       this.pending.set(id, resolve)
       options.signal?.addEventListener('abort', () => {
         this.questions.delete(id)
-        if (this.pending.delete(id)) resolve({ behavior: 'deny', message: 'Richiesta annullata.' })
+        if (this.pending.delete(id)) resolve({ behavior: 'deny', message: tr('Richiesta annullata.') })
         this.emit('askClosed', { id })
       })
       const questions = input.questions.map((q) => ({
@@ -962,7 +972,7 @@ class ClaudeBridge extends EventEmitter {
       this.pending.set(id, resolve)
       options.signal?.addEventListener('abort', () => {
         this.plans.delete(id)
-        if (this.pending.delete(id)) resolve({ behavior: 'deny', message: 'Richiesta annullata.' })
+        if (this.pending.delete(id)) resolve({ behavior: 'deny', message: tr('Richiesta annullata.') })
         this.emit('askClosed', { id })
       })
       this.emit('ask', { id, kind: 'plan', plan: planText(input) })
@@ -1174,7 +1184,7 @@ function savedContextMax() {
 }
 
 module.exports = {
-  ClaudeBridge, MODES, intent, DEFAULT_CLAUDE: CLAUDE, loadContextMax, savedContextMax,
+  ClaudeBridge, MODES, intent, DEFAULT_CLAUDE: CLAUDE, PLUGIN_DIR, loadContextMax, savedContextMax,
   // Per le prove (test/unit)
   _internals: { promptTitle, localUrls, transcriptMarkdown, applyTodo, settleTodo, withFiles, imagesOf, guessContextMax, Inbox },
 }
