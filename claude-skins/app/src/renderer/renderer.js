@@ -1867,23 +1867,39 @@
 
   // ------------------------------------------------------------------ impostazioni
 
-  // Il pannello delle impostazioni, sopra il layout come il selettore dei temi: aspetto, finestra, notifiche,
-  // conversazioni, Claude Code, informazioni. Ogni scelta vale subito (la applica il processo principale)
-  async function openSettings() {
+  // Il pannello delle impostazioni, come quello dell'app desktop: le categorie a sinistra, il contenuto a destra.
+  // Permessi, memoria ed estensioni si vedono qui dentro (gli stessi pannelli che si aprono anche da soli). Ogni
+  // scelta vale subito (la applica il processo principale); l'ultima categoria aperta si ricorda
+  const SETTINGS_PAGES = [
+    ['general', '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'],
+    ['claude', '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'],
+    ['conversations', '<path d="M4 5h16v10H9l-5 4z"/>'],
+    ['permissions', '<path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>'],
+    ['memory', '<path d="M6 3h9l3 3v15H6z"/><path d="M9 9h6M9 13h6M9 17h4"/>'],
+    ['extensions', '<path d="M10 3h4v4h-4zM3 10h4v4H3zM17 10h4v4h-4zM10 17h4v4h-4z"/><path d="M12 7v10M7 12h10"/>'],
+    ['updates', '<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/>'],
+    ['about', '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>'],
+  ]
+  const KEYS = [['Ctrl+N', 'keyNew'], ['Ctrl+K', 'keySearch'], ['Ctrl+F', 'keyFind'], ['Ctrl+,', 'keySettings'], ['Ctrl+Shift+C', 'keyCopy'], ['Ctrl+Shift+P', 'keyPreview'], ['Ctrl+B', 'keyBackground'], ['Esc', 'keyStop'], ['F11', 'keyFull']]
+  let settingsPage = (() => { try { return localStorage.getItem('skins.settingsPage') || 'general' } catch { return 'general' } })()
+  async function openSettings(page) {
     closeThemes()
     closeFolderMenu()
+    if (typeof page === 'string' && SETTINGS_PAGES.some(([p]) => p === page)) settingsPage = page
     let st = {}
     try { st = (await api.settings()) || {} } catch {}
     const host = app.querySelector('[data-solid]') || app
     if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
     const panel = document.createElement('div')
     panel.className = 'theme-picker settings-panel'
-    panel.innerHTML = '<div class="theme-picker-box settings-box"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="settings-body"></div></div>'
+    panel.innerHTML = '<div class="theme-picker-box settings-box set-wide"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="set-layout"><nav class="set-nav"></nav><div class="set-page"><div class="set-page-title"></div><div class="settings-body"></div></div></div></div>'
     label(panel.querySelector('.theme-picker-head span'), 'settingsTitle')
     const close = panel.querySelector('.theme-picker-head button')
     label(close, 'themesClose')
     close.addEventListener('click', closeThemes)
     panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    const nav = panel.querySelector('.set-nav')
+    const pageTitle = panel.querySelector('.set-page-title')
     const body = panel.querySelector('.settings-body')
     const set = async (key, value) => { try { st = (await api.setSetting(key, value)) || st } catch {} ; render() }
     const section = (key) => { const h = document.createElement('div'); h.className = 'set-section'; body.appendChild(label(h, key)) }
@@ -1904,12 +1920,13 @@
       b.addEventListener('click', () => fn(!on))
       ctl.appendChild(b)
     }
-    const button = (ctl, key, fn) => {
+    const button = (ctl, key, fn, cls = 'deny') => {
       const b = document.createElement('button')
-      b.className = 'btn small deny'
+      b.className = `btn small ${cls}`
       label(b, key)
       b.addEventListener('click', fn)
       ctl.appendChild(b)
+      return b
     }
     const select = (ctl, options, value, fn) => {
       const s = document.createElement('select')
@@ -1919,85 +1936,117 @@
       s.addEventListener('change', () => fn(s.value))
       ctl.appendChild(s)
     }
+    const pages = {
+      general() {
+        section('setLook')
+        if (api.setSetting) select(row('setLanguage', t('setLanguageNote')), [['en', 'English'], ['it', 'Italiano']], st.language || 'en', (v) => set('language', v))
+        const th = row('setTheme', Theming.current.name)
+        button(th, 'setChange', () => { closeThemes(); openThemes() })
+        if (api.saveTheme) button(th, 'themesNew', () => { closeThemes(); openThemeEditor(null) })
+        if (api.importTheme) button(th, 'setImport', () => importTheme())
+        if (app.querySelector('[data-action="scene"]')) {
+          select(row('setScene'), [['notte', t('setNight')], ['giorno', t('setDay')]], scene, (v) => { if (v !== scene) actions.scene() })
+        }
+        section('setWindow')
+        toggle(row('setOnTop'), st.onTop, (v) => set('onTop', v))
+        toggle(row('setLogin', t('setLoginNote')), st.openAtLogin, (v) => set('openAtLogin', v))
+        const pos = row('setPosition')
+        button(pos, 'setCenter', () => set('center'))
+        button(pos, 'setSize', () => set('resetSize'))
+        section('setNotifications')
+        toggle(row('setNotify', t('setNotifyNote')), st.notify, (v) => set('notify', v))
+      },
+      claude() {
+        section('setModelSection')
+        select(row('setModel'), [['', t('modelDefault')], ...models.filter((m) => m.value !== 'default').map((m) => [m.value, m.name])], model || '', (v) => {
+          model = v || null
+          const m = modelInfo()
+          if (effort && m && !m.efforts.includes(effort)) effort = null
+          api.setModel(model, effort, ultracode)
+          renderModel()
+          render()
+        })
+        const levels = (modelInfo() && modelInfo().efforts.length ? modelInfo().efforts : ['low', 'medium', 'high', 'xhigh', 'max'])
+        select(row('effortTitle'), [['', t('effortAuto')], ...levels.map((l) => [l, t(`effort_${l}`)])], effort || '', (v) => { effort = v || null; api.setModel(model, effort, ultracode); renderModel() })
+        toggle(row('ultracode', t('ultracodeDesc')), ultracode, (v) => { ultracode = v; api.setModel(model, effort, ultracode); renderModel(); render() })
+        select(row('setMode'), MODES.map(([m, key]) => [m, t(key)]), mode, (v) => { chooseMode(v); st.mode = v })
+        section('setClaude')
+        const where = row('setClaudePath', `${st.claudePath || ''}${st.claudeFound ? (st.claudeVersion ? ` · ${st.claudeVersion}` : '') : ` · ${t('setClaudeMissing')}`}`)
+        button(where, 'setChange', () => set('chooseClaude'))
+        if (!st.claudeDefault) button(where, 'setReset', () => set('claudePath', ''))
+        select(row('setEntrypoint', t('setEntrypointNote')), [['cli', t('setEntryCli')], ['claude-desktop', t('setEntryDesktop')]], st.entrypoint || 'cli', (v) => set('entrypoint', v))
+      },
+      conversations() {
+        section('setConversations')
+        button(row('setWorkdir', st.workdir || t('setWorkdirNone')), 'setChange', () => set('workdir'))
+        toggle(row('setWorktree', t('setWorktreeNote')), st.worktree, (v) => { worktreeOn = v; set('worktree', v); renderFolder() })
+      },
+      permissions() { if (api.permissions) openPermissions(body) },
+      memory() { if (api.memoryFiles) openMemory(body) },
+      extensions() { openExtensions(body) },
+      updates() {
+        section('updTitle')
+        const u = updateState || {}
+        const status = row('updStatus', updateText(u))
+        if (u.state !== 'updating' && u.state !== 'unavailable') button(status, 'updCheck', async () => { updateState = await api.checkUpdate(); render() })
+        if (u.state === 'available' && !u.dirty) button(status, 'updApply', () => { api.applyUpdate(); closeThemes() }, '')
+        if (u.state === 'available' && u.commits && u.commits.length) {
+          const list = document.createElement('ul')
+          list.className = 'upd-commits'
+          for (const c of u.commits.slice(0, 10)) { const li = document.createElement('li'); li.textContent = c; list.appendChild(li) }
+          body.appendChild(list)
+        }
+        // Da dove: solo se ci sono tutte e due le strade (l'app installata da un installer fatto col repo)
+        if (Array.isArray(st.updateSources) && st.updateSources.length > 1) {
+          select(row('updSource', t('updSourceNote')), st.updateSources.map((x) => [x, t(`updSource_${x}`)]), st.updateSource, async (v) => { await set('updateSource', v); try { updateState = await api.updateState() } catch {} ; render() })
+        }
+        toggle(row('updAuto', t(st.updateSource === 'github' ? 'updAutoNoteGithub' : 'updAutoNote')), st.autoUpdate !== false, (v) => set('autoUpdate', v))
+      },
+      about() {
+        const ver = row('setVersion', `${st.version || '?'}${st.installed ? '' : ` · ${t('setFromRepo')}`}`)
+        button(ver, 'setRepo', () => api.openLink('https://github.com/LukePasax/Claudeleon'))
+        const data = row('setData', st.dataDir || '')
+        button(data, 'setOpen', () => set('openData'))
+        if (api.openErrorLog) button(data, 'safeLog', () => api.openErrorLog())
+        section('setKeys')
+        row('setShortcut', `${st.shortcut || ''} · ${t('setShortcutNote')}`)
+        const table = document.createElement('div')
+        table.className = 'set-keys'
+        for (const [combo, key] of KEYS) {
+          const k = document.createElement('kbd')
+          k.textContent = combo.replace('Shift', t('keyShift'))
+          const d = document.createElement('span')
+          label(d, key)
+          table.append(k, d)
+        }
+        body.appendChild(table)
+      },
+    }
     function render() {
-      body.innerHTML = ''
-      // Aspetto
-      section('setLook')
-      button(row('setTheme', Theming.current.name), 'setChange', () => { closeThemes(); openThemes() })
-      if (app.querySelector('[data-action="scene"]')) {
-        select(row('setScene'), [['notte', t('setNight')], ['giorno', t('setDay')]], scene, (v) => { if (v !== scene) actions.scene() })
-      }
-      // Finestra
-      section('setWindow')
-      toggle(row('setOnTop'), st.onTop, (v) => set('onTop', v))
-      toggle(row('setLogin', t('setLoginNote')), st.openAtLogin, (v) => set('openAtLogin', v))
-      const pos = row('setPosition')
-      button(pos, 'setCenter', () => set('center'))
-      button(pos, 'setSize', () => set('resetSize'))
-      // Notifiche
-      section('setNotifications')
-      toggle(row('setNotify', t('setNotifyNote')), st.notify, (v) => set('notify', v))
-      // Conversazioni
-      section('setConversations')
-      button(row('setWorkdir', st.workdir || t('setWorkdirNone')), 'setChange', () => set('workdir'))
-      toggle(row('setWorktree', t('setWorktreeNote')), st.worktree, (v) => { worktreeOn = v; set('worktree', v); renderFolder() })
-      select(row('setMode'), MODES.map(([m, key]) => [m, t(key)]), mode, (v) => { chooseMode(v); st.mode = v })
-      if (api.memoryFiles) button(row('setMemory', t('setMemoryNote')), 'setOpenPanel', () => { closeThemes(); openMemory() })
-      if (api.permissions) button(row('setPermissions', t('setPermissionsNote')), 'setOpenPanel', () => { closeThemes(); openPermissions() })
-      select(row('setModel'), [['', t('modelDefault')], ...models.filter((m) => m.value !== 'default').map((m) => [m.value, m.name])], model || '', (v) => {
-        model = v || null
-        const m = modelInfo()
-        if (effort && m && !m.efforts.includes(effort)) effort = null
-        api.setModel(model, effort, ultracode)
-        renderModel()
-        render()
-      })
-      const levels = (modelInfo() && modelInfo().efforts.length ? modelInfo().efforts : ['low', 'medium', 'high', 'xhigh', 'max'])
-      select(row('effortTitle'), [['', t('effortAuto')], ...levels.map((l) => [l, t(`effort_${l}`)])], effort || '', (v) => { effort = v || null; api.setModel(model, effort, ultracode); renderModel() })
-      toggle(row('ultracode', t('ultracodeDesc')), ultracode, (v) => { ultracode = v; api.setModel(model, effort, ultracode); renderModel(); render() })
-      // Estensioni
-      section('setExtensions')
-      button(row('setExtRow', t('setExtNote')), 'setOpenPanel', () => { closeThemes(); openExtensions() })
-      // Claude Code
-      section('setClaude')
-      const where = row('setClaudePath', `${st.claudePath || ''}${st.claudeFound ? (st.claudeVersion ? ` · ${st.claudeVersion}` : '') : ` · ${t('setClaudeMissing')}`}`)
-      button(where, 'setChange', () => set('chooseClaude'))
-      if (!st.claudeDefault) button(where, 'setReset', () => set('claudePath', ''))
-      select(row('setEntrypoint', t('setEntrypointNote')), [['cli', t('setEntryCli')], ['claude-desktop', t('setEntryDesktop')]], st.entrypoint || 'cli', (v) => set('entrypoint', v))
-      // Aggiornamenti
-      section('updTitle')
-      const u = updateState || {}
-      const status = row('updStatus', updateText(u))
-      if (u.state !== 'updating' && u.state !== 'unavailable') button(status, 'updCheck', async () => { updateState = await api.checkUpdate(); render() })
-      if (u.state === 'available' && !u.dirty) {
+      nav.innerHTML = ''
+      for (const [p, icon] of SETTINGS_PAGES) {
         const b = document.createElement('button')
-        b.className = 'btn small'
-        label(b, 'updApply')
-        b.addEventListener('click', () => { api.applyUpdate(); closeThemes() })
-        status.appendChild(b)
+        b.className = `set-nav-item${p === settingsPage ? ' on' : ''}`
+        b.dataset.page = p
+        b.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icon}</svg><span></span>`
+        label(b.querySelector('span'), `setNav_${p}`)
+        b.addEventListener('click', () => {
+          settingsPage = p
+          try { localStorage.setItem('skins.settingsPage', p) } catch {}
+          render()
+        })
+        nav.appendChild(b)
       }
-      if (u.state === 'available' && u.commits && u.commits.length) {
-        const list = document.createElement('ul')
-        list.className = 'upd-commits'
-        for (const c of u.commits.slice(0, 10)) { const li = document.createElement('li'); li.textContent = c; list.appendChild(li) }
-        body.appendChild(list)
-      }
-      // Da dove: solo se ci sono tutte e due le strade (l'app installata da un installer fatto col repo)
-      if (Array.isArray(st.updateSources) && st.updateSources.length > 1) {
-        select(row('updSource', t('updSourceNote')), st.updateSources.map((x) => [x, t(`updSource_${x}`)]), st.updateSource, async (v) => { await set('updateSource', v); try { updateState = await api.updateState() } catch {} ; render() })
-      }
-      toggle(row('updAuto', t(st.updateSource === 'github' ? 'updAutoNoteGithub' : 'updAutoNote')), st.autoUpdate !== false, (v) => set('autoUpdate', v))
-      // Informazioni
-      section('setAbout')
-      row('setVersion', `${st.version || '?'}${st.installed ? '' : ` · ${t('setFromRepo')}`}`)
-      row('setShortcut', `${st.shortcut || ''} · ${t('setShortcutNote')}`)
-      row('setKeys', t('setKeysList'))
-      button(row('setData', st.dataDir || ''), 'setOpen', () => set('openData'))
+      label(pageTitle, `setNav_${settingsPage}`)
+      body.innerHTML = ''
+      body.scrollTop = 0
+      ;(pages[settingsPage] || pages.general)()
     }
     try { updateState = (await api.updateState()) || updateState } catch {}
     render()
     host.appendChild(panel)
-    settingsRender = () => { if (panel.isConnected) render() }
+    // Ridisegnare solo le pagine semplici: quelle coi pannelli dentro (permessi, memoria, estensioni) si aggiornano da sé
+    settingsRender = () => { if (panel.isConnected && !['permissions', 'memory', 'extensions'].includes(settingsPage)) render() }
   }
   if (api.onSettingsOpen) api.onSettingsOpen(() => openSettings())
 
@@ -2070,21 +2119,21 @@
   // Il pannello delle estensioni: i server MCP (stato, strumenti, da dove vengono; accendere, spegnere, riconnettere)
   // e i plugin (accesi, spenti, errori). Le risposte le dà Claude Code: quello della conversazione in vista se è acceso,
   // altrimenti uno temporaneo (qualche secondo)
-  async function openExtensions() {
-    closeThemes()
-    closeFolderMenu()
+  // inside: dentro un'altra pagina (le impostazioni) invece che sopra la finestra
+  async function openExtensions(inside) {
+    if (!inside) { closeThemes(); closeFolderMenu() }
     const host = app.querySelector('[data-solid]') || app
     if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
     const panel = document.createElement('div')
-    panel.className = 'theme-picker settings-panel ext-panel'
+    panel.className = inside ? 'panel-embed settings-panel ext-panel' : 'theme-picker settings-panel ext-panel'
     panel.innerHTML = '<div class="theme-picker-box settings-box"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="settings-body"></div></div>'
     label(panel.querySelector('.theme-picker-head span'), 'extTitle')
     const close = panel.querySelector('.theme-picker-head button')
     label(close, 'themesClose')
     close.addEventListener('click', closeThemes)
-    panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    if (!inside) panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
     const body = panel.querySelector('.settings-body')
-    host.appendChild(panel)
+    ;(inside || host).appendChild(panel)
     const note = (key, vars) => { const n = document.createElement('div'); n.className = 'folder-note'; body.appendChild(label(n, key, vars)); return n }
     async function load() {
       body.innerHTML = ''
@@ -2585,19 +2634,19 @@
   // modifiche non salvate restano finché l'app è aperta (anche chiudendo il pannello)
   const memDrafts = new Map()
   let memCurrent = ''
-  async function openMemory() {
-    closeThemes()
-    closeFolderMenu()
+  // inside: dentro un'altra pagina (le impostazioni) invece che sopra la finestra
+  async function openMemory(inside) {
+    if (!inside) { closeThemes(); closeFolderMenu() }
     const host = app.querySelector('[data-solid]') || app
     if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
     const panel = document.createElement('div')
-    panel.className = 'theme-picker mem-panel'
+    panel.className = inside ? 'panel-embed mem-panel' : 'theme-picker mem-panel'
     panel.innerHTML = '<div class="theme-picker-box settings-box"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="perm-tabs"></div><div class="mem-body"></div></div>'
     label(panel.querySelector('.theme-picker-head span'), 'memTitle')
     const close = panel.querySelector('.theme-picker-head button')
     label(close, 'themesClose')
     close.addEventListener('click', closeThemes)
-    panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    if (!inside) panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
     const tabs = panel.querySelector('.perm-tabs')
     const body = panel.querySelector('.mem-body')
     const conv = active && active.id
@@ -2692,7 +2741,7 @@
       update()
       if (!previewing) area.focus()
     }
-    host.appendChild(panel)
+    ;(inside || host).appendChild(panel)
     await show(files.some((x) => x.file === memCurrent) ? memCurrent : ((files.find((x) => x.id === 'project') || files[0] || {}).file))
   }
 
@@ -2703,19 +2752,19 @@
   // "chiede sempre" (ask), "mai" (deny) e le cartelle in più. Una regola si aggiunge, si toglie o si sposta in un'altra
   // lista; le conversazioni ripartono con le regole nuove al prossimo messaggio
   let permScope = 'local'
-  async function openPermissions() {
-    closeThemes()
-    closeFolderMenu()
+  // inside: dentro un'altra pagina (le impostazioni) invece che sopra la finestra
+  async function openPermissions(inside) {
+    if (!inside) { closeThemes(); closeFolderMenu() }
     const host = app.querySelector('[data-solid]') || app
     if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
     const panel = document.createElement('div')
-    panel.className = 'theme-picker perm-panel'
+    panel.className = inside ? 'panel-embed perm-panel' : 'theme-picker perm-panel'
     panel.innerHTML = '<div class="theme-picker-box settings-box"><div class="theme-picker-head"><span></span><button class="btn small"></button></div><div class="perm-tabs"></div><div class="settings-body"></div></div>'
     label(panel.querySelector('.theme-picker-head span'), 'permTitle')
     const close = panel.querySelector('.theme-picker-head button')
     label(close, 'themesClose')
     close.addEventListener('click', closeThemes)
-    panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    if (!inside) panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
     const tabs = panel.querySelector('.perm-tabs')
     const body = panel.querySelector('.settings-body')
     const conv = active && active.id
@@ -2799,7 +2848,7 @@
     }
     await load()
     fill()
-    host.appendChild(panel)
+    ;(inside || host).appendChild(panel)
   }
 
   // ------------------------------------------------------------------ anteprima
@@ -4464,7 +4513,7 @@
     const fakeMemFiles = () => ({ cwd: 'C:/Users/luca/MapEditor', files: [['user', 'C:/Users/luca/.claude/CLAUDE.md'], ['project', 'C:/Users/luca/MapEditor/CLAUDE.md'], ['local', 'C:/Users/luca/MapEditor/CLAUDE.local.md'], ['parent', 'C:/Users/luca/CLAUDE.md']].filter(([id, f]) => id !== 'parent' || fakeMemory.has(f)).map(([id, file]) => ({ id, file, exists: fakeMemory.has(file), size: (fakeMemory.get(file) || '').length })) })
     const fakePermFiles = { user: 'C:/Users/luca/.claude/settings.json', project: 'C:/Users/luca/MapEditor/.claude/settings.json', local: 'C:/Users/luca/MapEditor/.claude/settings.local.json' }
     const fakeUpdate = { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/luca/Claudeleon', installed: true }
-    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '0.1.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claudeleon', shortcut: 'Ctrl+Alt+P', worktree: false }
+    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '1.0.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claudeleon', shortcut: 'Ctrl+Alt+P', worktree: false }
     const fakeSessions = [
       { id: 's0', title: 'Allegati e domande con le opzioni', lastModified: Date.now() - 600000, cwd: 'C:/Workspace/Progetti/Claudeleon', branch: 'main' },
       { id: 's1', title: 'Temi per Claudeleon', lastModified: Date.now() - 3600000, cwd: 'C:/Workspace/Progetti/Claudeleon', branch: 'main' },
