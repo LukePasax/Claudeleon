@@ -490,6 +490,24 @@ etichette `.attachment.review` nella striscia degli allegati e una `.review-bar`
 di una sessione dal primo messaggio toglie questi blocchi e quelli dei file allegati (`promptTitle` nel ponte).
 Nella riga della penna cartella, branch e modello si stringono (prima il modello) invece di andare a capo.
 
+## La skill dei temi e i temi dal vivo
+
+Claudeleon dà a ogni conversazione un plugin suo, `app/src/plugin/claudeleon/` (`PLUGIN_DIR` nel ponte, che nell'app
+installata punta ad `app.asar.unpacked`, perché `asarUnpack` comprende `src/plugin/**`): nelle opzioni di `query()`
+`plugins: [{ type: 'local', path }]`, la variabile `CLAUDELEON_THEMES_DIR` con la cartella `temi` dei dati e la stessa
+cartella in `additionalDirectories`. Il plugin ha una sola skill, `claudeleon-theme` (`SKILL.md`: quale tipo di tema
+scegliere, come scriverlo, dove; `reference/guide.md` è una copia di `docs/themes.md`, da ricopiare quando cambia,
+c'è una prova che lo controlla; `reference/variables.md`; tre esempi: `dusk.json` di soli colori, `harbor/` con
+`kit.adaptive`, `terminal/` con forma, CSS e un aggancio). Nell'init della sessione compare come
+`claudeleon:claudeleon-theme`, skill e comando.
+
+Il processo principale tiene d'occhio la cartella `temi` (`watchThemes`, `fs.watch` ricorsivo, 300 ms di attesa) e
+manda `themes:changed` con `themesSnapshot()`: i temi con codice con un `stamp` (l'ultima modifica di un loro file) e
+quelli di colori. La pagina (`api.onThemesChanged`) ricarica i temi con codice il cui stamp è cambiato
+(`Theming.load(…, true)`, che aggiunge `?v=` al `theme.css`), registra quelli di colori nuovi o cambiati (confronto su
+`__spec`), toglie quelli spariti (non quello in uso) e rimonta il tema in uso se è cambiato e l'editor non è aperto. Il
+protocollo `skins-theme://` risponde con `Cache-Control: no-store`.
+
 ## Prossimi passi possibili
 
 0. **Temi.**

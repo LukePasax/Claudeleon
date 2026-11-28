@@ -244,6 +244,7 @@ function makeConv(sessionId, cwd) {
   const b = c.bridge
   b.entrypoint = config.entrypoint || 'cli'
   b.claudePath = claudePath()
+  b.themesDir = userThemesDir()
   b.setModel(config.model || null)
   b.ultracode = !!config.ultracode
   b.setEffort(config.effort || null)
@@ -651,7 +652,7 @@ function registerIpc() {
     shortcut: TOGGLE_SHORTCUT.replace('Control', 'Ctrl'),
     theme: currentTheme().id,
     // Quelli del programma per id, quelli importati con codice con l'indirizzo da cui caricarli
-    themes: themes.filter((t) => !t.custom || t.code).map((t) => (t.code ? { id: t.id, base: `skins-theme://${t.id}/` } : t.id)),
+    themes: themes.filter((t) => !t.custom || t.code).map((t) => (t.code ? { id: t.id, base: `skins-theme://${t.id}/`, stamp: themeStamp(path.join(userThemesDir(), t.id)) } : t.id)),
     // I temi dell'editor: la pagina li costruisce dai colori
     userThemes: userThemes(userThemesDir()),
     workdir: bridge.workdir,
@@ -1283,6 +1284,38 @@ async function notify(title, body, c) {
   n.show()
 }
 
+// I temi cambiati sul disco (scritti da Claude con la skill dei temi, o a mano): la cartella si tiene d'occhio e la
+// finestra riceve l'elenco aggiornato, con un "timbro" per tema (l'ultima modifica dei suoi file) per ricaricare solo
+// quelli cambiati
+function themeStamp(dir) {
+  let max = 0
+  const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name); if (e.isDirectory()) walk(f); else max = Math.max(max, fs.statSync(f).mtimeMs) } }
+  try { walk(dir) } catch {}
+  return Math.round(max)
+}
+function themesSnapshot() {
+  const dir = userThemesDir()
+  return {
+    code: installedThemes(dir).map((t) => ({ id: t.id, base: `skins-theme://${t.id}/`, stamp: themeStamp(path.join(dir, t.id)) })),
+    colors: userThemes(dir),
+  }
+}
+let themesTimer = null
+function watchThemes() {
+  const dir = userThemesDir()
+  try { fs.mkdirSync(dir, { recursive: true }) } catch {}
+  try {
+    fs.watch(dir, { recursive: true }, () => {
+      clearTimeout(themesTimer)
+      themesTimer = setTimeout(() => {
+        themes = allThemes()
+        refreshTray()
+        send('themes:changed', themesSnapshot())
+      }, 300)
+    })
+  } catch (err) { logError('cartella dei temi non osservata', err.message) }
+}
+
 // I file dei temi importati con codice: solo dentro temi/<id>/
 function serveThemes() {
   protocol.handle('skins-theme', async (req) => {
@@ -1295,6 +1328,8 @@ function serveThemes() {
       const res = await net.fetch(require('url').pathToFileURL(file).href)
       const headers = new Headers(res.headers)
       headers.set('Access-Control-Allow-Origin', '*')
+      // Un tema che cambia (la skill dei temi) si rilegge sempre dal disco
+      headers.set('Cache-Control', 'no-store')
       return new Response(res.body, { status: res.status, headers })
     } catch {
       return new Response('', { status: 404 })
@@ -1342,6 +1377,7 @@ app.whenReady().then(() => {
   // config.json, ad esempio "claude-desktop"
   bridge.entrypoint = config.entrypoint || 'cli'
   bridge.claudePath = claudePath()
+  bridge.themesDir = userThemesDir()
   bridge.setModel(config.model || null)
   captureMode = !!capture
   loadContextMax(config.contextMax)
@@ -1356,6 +1392,7 @@ app.whenReady().then(() => {
   }
   activeConv = makeConv(null, null).id
   createWindow()
+  if (!capture) watchThemes()
   if (!capture) {
     try { fs.writeFileSync(path.join(app.getPath('userData'), 'icona.log'), '') } catch {}
     ensureStartMenuShortcut()

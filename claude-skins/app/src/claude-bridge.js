@@ -7,6 +7,9 @@ const path = require('path')
 const { EventEmitter } = require('events')
 const crypto = require('crypto')
 
+// Il plugin con le skill di Claudeleon. Nell'app installata sta fuori dall'archivio asar (asarUnpack), perché lo
+// legge Claude Code, che è un altro programma
+const PLUGIN_DIR = path.join(__dirname, 'plugin', 'claudeleon').replace(/app\.asar([\\/])/, 'app.asar.unpacked$1')
 const CLAUDE = path.join(os.homedir(), '.local', 'bin', process.platform === 'win32' ? 'claude.exe' : 'claude')
 
 // La personalità che si aggiunge al prompt di sistema viene dal tema (campo persona del suo theme.js); questa vale per
@@ -583,9 +586,15 @@ class ClaudeBridge extends EventEmitter {
           // Senza questa l'SDK segna la sessione come "programmatica" (sdk-ts) e gli elenchi delle sessioni di
           // Claude (il /resume del terminale, le app) la nascondono
           CLAUDE_CODE_ENTRYPOINT: this.entrypoint || 'cli',
+          // La cartella dei temi di Claudeleon, per la skill che li crea
+          ...(this.themesDir ? { CLAUDELEON_THEMES_DIR: this.themesDir } : {}),
         }),
         // Lo strumento con cui Claude dà un titolo alla conversazione, con lo stesso nome che ha nell'app desktop
         mcpServers: { [TITLE_SERVER]: await this.titleServer() },
+        // Le skill di Claudeleon (creare i temi), solo nelle sue conversazioni: un plugin locale, fuori dall'asar
+        ...(fs.existsSync(PLUGIN_DIR) ? { plugins: [{ type: 'local', path: PLUGIN_DIR }] } : {}),
+        // La cartella dei temi è fra quelle dove Claude può lavorare (coi soliti permessi), per la skill dei temi
+        ...(this.themesDir ? { additionalDirectories: [this.themesDir] } : {}),
         includePartialMessages: true,
         // Dopo ogni risposta, una previsione del prossimo messaggio della persona (Tab o un clic per usarla)
         promptSuggestions: true,
@@ -1175,7 +1184,7 @@ function savedContextMax() {
 }
 
 module.exports = {
-  ClaudeBridge, MODES, intent, DEFAULT_CLAUDE: CLAUDE, loadContextMax, savedContextMax,
+  ClaudeBridge, MODES, intent, DEFAULT_CLAUDE: CLAUDE, PLUGIN_DIR, loadContextMax, savedContextMax,
   // Per le prove (test/unit)
   _internals: { promptTitle, localUrls, transcriptMarkdown, applyTodo, settleTodo, withFiles, imagesOf, guessContextMax, Inbox },
 }

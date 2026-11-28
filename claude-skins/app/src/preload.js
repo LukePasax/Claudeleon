@@ -109,6 +109,7 @@ contextBridge.exposeInMainWorld('skins', {
   onReset: listen('chat:reset'),
   onTheme: listen('theme:apply'),
   onLanguage: listen('language:set'),
+  onThemesChanged: listen('themes:changed'),
   // Avvio sicuro
   ready: () => ipcRenderer.send('app:ready'),
   themeFailed: (id, message) => ipcRenderer.send('theme:failed', id, message),

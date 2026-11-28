@@ -152,6 +152,11 @@ Changes to permissions and memory apply from the next message.
 - **Export** saves any theme to a `.skin` file; **Import a theme** installs one. Themes made with the editor are
   only colors; a theme with a shape of its own contains code that runs in the window, so Claudeleon asks for
   confirmation before installing it: only install themes from people you trust.
+- **Ask Claude for a theme:** in a conversation, write for example "make me a theme like an old terminal" or "a
+  theme with my company's colors, light and dark". Claude knows how (Claudeleon gives it the `claudeleon-theme`
+  skill, also as the `/claudeleon:claudeleon-theme` command), writes the theme into the themes folder and it appears
+  in Themes right away; while it is the theme in use, every change Claude makes shows up live. To write themes by
+  hand see [themes.md](themes.md).
 
 ## Keyboard shortcuts
 

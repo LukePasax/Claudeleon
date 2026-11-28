@@ -1197,6 +1197,38 @@
     }
     host.appendChild(panel)
   }
+  // I temi cambiati sul disco (la skill dei temi di Claude li scrive nella cartella dell'app, o qualcuno a mano): quelli
+  // nuovi o cambiati si ricaricano, quelli spariti si tolgono; se è cambiato quello in uso la finestra lo rimonta, così
+  // si vede subito ogni ritocco. Il selettore dei temi, se è aperto, si ridisegna
+  const themeStamps = new Map()
+  if (api.onThemesChanged) api.onThemesChanged(async ({ code = [], colors = [] } = {}) => {
+    const cur = Theming.current.id
+    let curChanged = false
+    for (const e of code) {
+      if (Theming.get(e.id) && themeStamps.get(e.id) === e.stamp) continue
+      themeStamps.set(e.id, e.stamp)
+      await Theming.load([{ id: e.id, base: e.base }], true)
+      if (e.id === cur) curChanged = true
+    }
+    const kit = window.SkinsKits && window.SkinsKits.moderno
+    for (const spec of colors) {
+      const json = JSON.stringify(spec)
+      const old = Theming.get(spec.id)
+      if (!kit || (old && old.__spec === json)) continue
+      const th = kit.fromColors(spec)
+      th.__spec = json
+      Theming.register(th)
+      if (spec.id === cur) curChanged = true
+    }
+    const alive = new Set([...code.map((e) => e.id), ...colors.map((x) => x.id)])
+    for (const th of Theming.list()) {
+      const full = Theming.get(th.id)
+      if (full && (full.custom || Theming.installed(th.id)) && !alive.has(th.id) && th.id !== cur) Theming.unregister(th.id)
+    }
+    if (curChanged && !themeEditor) await mount(cur)
+    if (document.querySelector('.theme-picker .theme-cards')) openThemes()
+  })
+
   // Un tema da un file .skin: il processo principale lo controlla, chiede conferma e lo installa; qui si carica e si
   // mette in uso
   async function importTheme() {
@@ -4557,8 +4589,9 @@
     // I comandi della cache; l'elenco aggiornato arriva poi da onCommands
     api.commands().then((list) => { if (!commands.length) commands = list || [] }).catch(() => {})
     await Theming.load(info.themes || [])
+    for (const e of info.themes || []) if (e && e.stamp) themeStamps.set(e.id, e.stamp)
     // I temi dell'editor si costruiscono dai loro colori
-    for (const spec of info.userThemes || []) Theming.register(window.SkinsKits.moderno.fromColors(spec))
+    for (const spec of info.userThemes || []) { const th = window.SkinsKits.moderno.fromColors(spec); th.__spec = JSON.stringify(spec); Theming.register(th) }
     await mount(info.theme)
     if (part('input')) part('input').focus()
     // La pagina è partita: l'avvio sicuro non serve

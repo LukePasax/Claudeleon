@@ -188,6 +188,12 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   (un file JSON nella cartella `temi` dei dati dell'app, che resta con gli aggiornamenti); sulle schede dei tuoi temi
   ci sono "Modifica" ed "Elimina". I temi dell'editor hanno la struttura del kit moderno (come Essenziale): per
   forme diverse serve un tema scritto a mano (si passa poi come file `.skin`).
+- **Temi chiesti a Claude:** in una conversazione basta scrivere per esempio "fammi un tema come un vecchio
+  terminale" o "un tema coi colori della mia azienda, chiaro e scuro". Claudeleon dà a Claude una skill,
+  `claudeleon-theme` (anche come comando `/claudeleon:claudeleon-theme`), con la guida dei temi, tre esempi e la
+  cartella dove scriverli (`CLAUDELEON_THEMES_DIR`); Claude scrive il tema nella cartella `temi` dei dati dell'app e
+  il tema compare subito nel selettore. L'app tiene d'occhio quella cartella: un tema nuovo compare da solo, e quello
+  in uso si ricarica a ogni file salvato, così si vedono le modifiche di Claude man mano.
 - **Dettatura:** su Windows, accanto a "+" c'è un microfono: mette il cursore in fondo alla casella e accende la
   digitazione vocale di Windows (la stessa di Win+H), che scrive quello che dici; un altro clic (o Win+H) la ferma.
   La lingua è quella scelta in Windows (Impostazioni → Ora e lingua → Voce). Il riconoscimento vocale di Chromium

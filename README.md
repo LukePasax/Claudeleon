@@ -23,7 +23,8 @@ automatic updates.
 
 **Themes:** it ships with *Essential*, clean and neutral, light or dark like Windows. You can create themes with the
 built-in editor (colors, font, corners, with a live preview), export any theme to a `.skin` file and import themes
-others made — even ones with a shape all their own (themes with code ask for confirmation before installing).
+others made — even ones with a shape all their own (themes with code ask for confirmation before installing). Or
+just ask Claude in a conversation ("make me a theme like…"): Claudeleon teaches it how, and the theme appears live.
 
 **Language:** English by default, Italian in Settings → General → Language.
 
@@ -46,7 +47,8 @@ Documentation:
 Un'app a temi per lavorare con Claude Code: cambia pelle come un camaleonte, la conversazione resta quella.
 
 **Per installarla:** scarica `Claudeleon-Setup-<versione>.exe` dall'[ultima release](https://github.com/LukePasax/Claudeleon/releases/latest)
-e lancialo; poi si aggiorna da sola dalle release. Serve Claude Code installato, col login fatto. La lingua di
+e lancialo; poi si aggiorna da sola dalle release. Per un tema nuovo basta chiederlo a Claude in una conversazione
+("fammi un tema come…"): Claudeleon gli insegna come si fa e il tema compare subito. Serve Claude Code installato, col login fatto. La lingua di
 partenza è l'inglese: l'italiano si sceglie da Impostazioni → Generale → Lingua.
 
 Dal repo: doppio clic su `avvia.cmd` per aprirla senza installare, o su `crea-installer.cmd` per farsi l'installer

@@ -9,6 +9,9 @@ There are three ways to make a theme:
   "colors" theme based on the modern kit.
 - **The modern kit in a few lines** of `theme.js`, for a clean theme with your own colors (see below).
 - **A theme of your own:** a folder with `theme.js` (and `theme.css`, fonts, images…) with its own layout.
+- **Ask Claude:** in any Claudeleon conversation, "make me a theme like …". Claudeleon gives Claude a skill
+  (`claudeleon-theme`) with this guide and three examples, and the path of the themes folder; Claude writes the
+  theme there and it appears in Themes at once (see "Trying a theme").
 
 Every theme can be **exported** to a `.skin` file (Themes → Export) and **imported** elsewhere (Themes → Import a
 theme).
@@ -16,8 +19,9 @@ theme).
 ## Where themes live
 
 Built-in themes are folders in `claude-skins/app/src/renderer/themes/` (only `essenziale` ships with the app).
-Imported themes live in the app data folder (`%APPDATA%\Claudeleon\temi\<id>\`) and the window loads them from
-`skins-theme://<id>/`. The folder name is the theme id and must match the `id` in its `theme.js`.
+Imported themes live in the app data folder (`%APPDATA%\Claudeleon\temi\<id>\`, or `<id>.json` for the editor's
+colors-only themes) and the window loads them from `skins-theme://<id>/`. The app watches that folder: a theme
+added there shows up in Themes, and the theme in use reloads whenever one of its files changes. The folder name is the theme id and must match the `id` in its `theme.js`.
 
 To write a new theme: create its folder in `src/renderer/themes/`, try it (see "Trying a theme"), then export it from
 the theme picker and share the `.skin` file.
@@ -268,3 +272,6 @@ built-in theme's.
   built-in theme must be added to the `fakeApi` list in `renderer.js`.
 - **In the real window:** `electron . --cattura test.png giorno chat --tema <id>` (from `claude-skins/app`) saves a
   screenshot at the theme's size, or add e.g. `900x640` after `chat`.
+- **Live, in the installed app:** put the theme in the themes folder (`%APPDATA%\Claudeleon\temi\<id>\` with
+  `theme.json` and `theme.js`, or a single `<id>.json`). It appears in Themes within a second; choose it, and every
+  file you save there reloads in the window. This is how Claude works with the `claudeleon-theme` skill.

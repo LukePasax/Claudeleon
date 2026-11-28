@@ -1,0 +1,7 @@
+{
+  "id": "harbor",
+  "name": "Harbor",
+  "description": "Sea blues, light or dark like Windows",
+  "persona": "",
+  "window": { "width": 1100, "height": 760, "minWidth": 560, "minHeight": 440 }
+}

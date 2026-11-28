@@ -655,6 +655,8 @@
   // Da dove viene ogni tema: la cartella del programma (themes/<id>/) o, per quelli importati con codice,
   // skins-theme://<id>/ (la cartella temi nei dati dell'app). Lì stanno theme.js, theme.css e i suoi file
   const bases = new Map()
+  // Un tema ricaricato (fresh): i suoi file si chiedono di nuovo, senza la copia del browser
+  const versions = new Map()
   const baseOf = (theme) => bases.get(theme.id) || `themes/${theme.id}/`
   // entries: gli id dei temi del programma, o { id, base } per quelli importati. Ogni theme.js si registra in
   // window.SkinsThemes. fresh: ricaricare anche se c'è già (un tema importato di nuovo, al posto del vecchio)
@@ -663,7 +665,7 @@
     const list = entries.map((e) => (typeof e === 'string' ? { id: e, base: `themes/${e}/` } : e)).filter((e) => e && e.id)
     for (const e of list) {
       bases.set(e.id, e.base)
-      if (fresh) { registry.delete(e.id); window.SkinsThemes = window.SkinsThemes.filter((th) => th.id !== e.id) }
+      if (fresh) { registry.delete(e.id); window.SkinsThemes = window.SkinsThemes.filter((th) => th.id !== e.id); versions.set(e.id, Date.now()) }
     }
     await Promise.all(list.map((e) => loadScript(`${e.base}theme.js${fresh ? `?v=${Date.now()}` : ''}`)))
     // Nell'ordine dato (il predefinito per primo, poi per nome), non in quello in cui i file finiscono di caricarsi
@@ -679,7 +681,8 @@
     current = registry.get(id) || registry.values().next().value || { id: 'nessuno' }
     document.body.dataset.theme = current.id
     for (const old of document.querySelectorAll('link[data-theme-css]')) old.remove()
-    const sheets = [...(current.kits || []).map((k) => `kits/${k}.css`), ...(current.css ? [`${baseOf(current)}theme.css`] : [])]
+    const ver = versions.get(current.id)
+    const sheets = [...(current.kits || []).map((k) => `kits/${k}.css`), ...(current.css ? [`${baseOf(current)}theme.css${ver ? `?v=${ver}` : ''}`] : [])]
     return Promise.all(sheets.map((href) => new Promise((resolve) => {
       const link = document.createElement('link')
       link.rel = 'stylesheet'
