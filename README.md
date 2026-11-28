@@ -32,10 +32,12 @@ installer (`claude-skins\app\dist\Claudeleon-Setup-<version>.exe`). You need [No
 Releases are built by the "Release" GitHub Action (Actions → Release → Run workflow), after raising the version in
 `claude-skins/app/package.json`.
 
-Detailed documentation (in Italian):
-- [`claude-skins/app/LEGGIMI.md`](claude-skins/app/LEGGIMI.md): installation and use.
-- [`claude-skins/app/src/renderer/themes/LEGGIMI.md`](claude-skins/app/src/renderer/themes/LEGGIMI.md): how to write a theme.
-- [`claude-skins/CONTESTO-PER-CLAUDE.md`](claude-skins/CONTESTO-PER-CLAUDE.md): history, design choices, next steps.
+Documentation:
+- [User guide](docs/user-guide.md): install, updates, conversations, git, preview, settings, themes, shortcuts.
+- [Writing a theme](docs/themes.md): layout, drawings, hooks, colors, the modern kit, `.skin` files.
+- In Italian: [`LEGGIMI.md`](claude-skins/app/LEGGIMI.md) (use) and the
+  [theme guide](claude-skins/app/src/renderer/themes/LEGGIMI.md); [`CONTESTO-PER-CLAUDE.md`](claude-skins/CONTESTO-PER-CLAUDE.md)
+  has the history and design choices.
 
 ---
 
@@ -48,5 +50,6 @@ e lancialo; poi si aggiorna da sola dalle release. Serve Claude Code installato,
 partenza è l'inglese: l'italiano si sceglie da Impostazioni → Generale → Lingua.
 
 Dal repo: doppio clic su `avvia.cmd` per aprirla senza installare, o su `crea-installer.cmd` per farsi l'installer
-(`claude-skins\app\dist\Claudeleon-Setup-<versione>.exe`). Serve [Node.js](https://nodejs.org) LTS. La
-documentazione dettagliata è nei file `LEGGIMI.md` qui sopra.
+(`claude-skins\app\dist\Claudeleon-Setup-<versione>.exe`). Serve [Node.js](https://nodejs.org) LTS. La guida
+d'uso in italiano è [`LEGGIMI.md`](claude-skins/app/LEGGIMI.md), quella per scrivere temi è
+[`themes/LEGGIMI.md`](claude-skins/app/src/renderer/themes/LEGGIMI.md).
