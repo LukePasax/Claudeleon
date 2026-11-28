@@ -28,6 +28,7 @@
     cancelled: 'Richiesta annullata.',
     // Il selettore dei temi
     themes: 'Temi',
+    artifactsBtn: 'Artifact',
     themesTitle: 'Temi',
     themesCurrent: 'in uso',
     themesClose: 'Chiudi',
@@ -90,6 +91,10 @@
     tool_plan: 'Propone un piano',
     tool_mcp: 'Usa {x}',
     tool_other: 'Usa {x}',
+    tool_artifact: 'Pubblica {x}',
+    tool_artifactUpdate: 'Aggiorna {x}',
+    tool_artifactList: 'Guarda i tuoi artifact',
+    tool_artifactRead: 'Legge un artifact',
     // La cartella della conversazione
     folderPick: 'Scegli la cartella',
     folderTitle: 'Dove lavora Claude',
@@ -198,6 +203,7 @@
     setNav_permissions: 'Permessi',
     setNav_memory: 'Memoria',
     setNav_extensions: 'Estensioni',
+    setNav_artifacts: 'Artifact',
     setNav_updates: 'Aggiornamenti',
     setNav_about: 'Informazioni',
     setLanguage: 'Lingua',
@@ -316,6 +322,23 @@
     previewEmpty: 'Nessun server locale da mostrare. Quando Claude ne avvia uno (npm run dev e simili) il suo indirizzo compare qui; oppure scrivilo sopra.',
     previewGrip: 'Trascina per allargare o stringere l\'anteprima',
     previewShotFail: 'La foto dell\'anteprima non è riuscita.',
+    // Artifact di claude.ai
+    artOpen: 'Apri',
+    artCopy: 'Copia link',
+    artCopied: 'Copiato',
+    artPublished: 'Artifact pubblicato · claude.ai',
+    artUpdated: 'Artifact aggiornato · claude.ai',
+    artTip: 'Privato finché non lo condividi · {x}',
+    artConversation: 'Conversazione',
+    artVersions: '{n} versioni',
+    setArtifactsTitle: 'Artifact di claude.ai',
+    setArtifacts: 'Claude può pubblicare artifact',
+    setArtifactsNote: 'Pagine (spiegazioni, schemi, cruscotti, strumenti) su claude.ai, private finché non le condividi. Si aprono qui accanto alla conversazione; la prima volta il pannello chiede di accedere a claude.ai',
+    setArtifactsGallery: 'Tutti i tuoi artifact',
+    setArtifactsGalleryNote: 'La galleria su claude.ai, con quelli fatti anche altrove',
+    setArtifactsAll: 'Apri la galleria',
+    setArtifactsList: 'Pubblicati dalle conversazioni di questo computer',
+    setArtifactsNone: 'Nessun artifact nelle conversazioni salvate su questo computer. Chiedi a Claude di pubblicarne uno, per esempio «fammi una pagina che spiega questo progetto».',
     // Worktree
     wtTag: 'worktree',
     wtTagNew: 'worktree',
@@ -663,14 +686,23 @@
   async function load(entries, fresh) {
     window.SkinsThemes = window.SkinsThemes || []
     const list = entries.map((e) => (typeof e === 'string' ? { id: e, base: `themes/${e}/` } : e)).filter((e) => e && e.id)
+    // Ricaricando, la versione di prima resta da parte: se quella nuova non si carica (un file scritto a metà, un
+    // errore) torna lei, e la finestra non perde il tema
+    const before = new Map()
     for (const e of list) {
       bases.set(e.id, e.base)
-      if (fresh) { registry.delete(e.id); window.SkinsThemes = window.SkinsThemes.filter((th) => th.id !== e.id); versions.set(e.id, Date.now()) }
+      if (fresh) {
+        if (registry.has(e.id)) before.set(e.id, { th: registry.get(e.id), ver: versions.get(e.id) })
+        registry.delete(e.id)
+        window.SkinsThemes = window.SkinsThemes.filter((th) => th.id !== e.id)
+        versions.set(e.id, Date.now())
+      }
     }
     await Promise.all(list.map((e) => loadScript(`${e.base}theme.js${fresh ? `?v=${Date.now()}` : ''}`)))
     // Nell'ordine dato (il predefinito per primo, poi per nome), non in quello in cui i file finiscono di caricarsi
     const loaded = new Map(window.SkinsThemes.filter((th) => th && th.id).map((th) => [th.id, th]))
     for (const id of [...list.map((e) => e.id), ...loaded.keys()]) if (loaded.has(id) && !registry.has(id)) registry.set(id, loaded.get(id))
+    for (const [id, old] of before) if (!registry.has(id)) { registry.set(id, old.th); if (old.ver) versions.set(id, old.ver); else versions.delete(id) }
     return [...registry.values()].map((th) => ({ id: th.id, name: th.name || th.id }))
   }
 

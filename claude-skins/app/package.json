@@ -1,7 +1,7 @@
 {
   "name": "claudeleon",
   "productName": "Claudeleon",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Claude Code in una finestra a temi",
   "repository": "github:LukePasax/Claudeleon",
   "main": "src/main.js",

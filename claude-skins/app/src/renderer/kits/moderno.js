@@ -38,6 +38,7 @@
         <div class="sessions-list" data-part="sessions-list"></div>
       </div>
       <div class="side-foot">
+        <button class="link" data-action="artifacts" data-s="artifactsBtn"></button>
         <button class="link" data-action="themes" data-s="themes"></button>
         <button class="link" data-action="settings" data-s="settings"></button>
       </div>

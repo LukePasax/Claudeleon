@@ -1201,14 +1201,19 @@
   // nuovi o cambiati si ricaricano, quelli spariti si tolgono; se è cambiato quello in uso la finestra lo rimonta, così
   // si vede subito ogni ritocco. Il selettore dei temi, se è aperto, si ridisegna
   const themeStamps = new Map()
-  if (api.onThemesChanged) api.onThemesChanged(async ({ code = [], colors = [] } = {}) => {
+  // Uno alla volta: due salvataggi vicini non si accavallano
+  let themesQueue = Promise.resolve()
+  if (api.onThemesChanged) api.onThemesChanged((snap) => { themesQueue = themesQueue.then(() => themesChanged(snap || {})).catch((err) => { if (api.logError) api.logError(`temi cambiati: ${err && err.message}`) }) })
+  async function themesChanged({ code = [], colors = [] }) {
     const cur = Theming.current.id
     let curChanged = false
     for (const e of code) {
       if (Theming.get(e.id) && themeStamps.get(e.id) === e.stamp) continue
       themeStamps.set(e.id, e.stamp)
+      const old = Theming.get(e.id)
       await Theming.load([{ id: e.id, base: e.base }], true)
-      if (e.id === cur) curChanged = true
+      // Se la versione nuova non si è caricata (file a metà) resta quella di prima: niente da rimontare
+      if (e.id === cur && Theming.get(e.id) !== old) curChanged = true
     }
     const kit = window.SkinsKits && window.SkinsKits.moderno
     for (const spec of colors) {
@@ -1227,7 +1232,7 @@
     }
     if (curChanged && !themeEditor) await mount(cur)
     if (document.querySelector('.theme-picker .theme-cards')) openThemes()
-  })
+  }
 
   // Un tema da un file .skin: il processo principale lo controlla, chiede conferma e lo installa; qui si carica e si
   // mette in uso
@@ -2042,6 +2047,7 @@
     ['conversations', '<path d="M4 5h16v10H9l-5 4z"/>'],
     ['permissions', '<path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>'],
     ['memory', '<path d="M6 3h9l3 3v15H6z"/><path d="M9 9h6M9 13h6M9 17h4"/>'],
+    ['artifacts', '<rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 8.5h17M7 12.5h6M7 16h10"/>'],
     ['extensions', '<path d="M10 3h4v4h-4zM3 10h4v4H3zM17 10h4v4h-4zM10 17h4v4h-4z"/><path d="M12 7v10M7 12h10"/>'],
     ['updates', '<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/>'],
     ['about', '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>'],
@@ -2150,6 +2156,41 @@
       permissions() { if (api.permissions) openPermissions(body) },
       memory() { if (api.memoryFiles) openMemory(body) },
       extensions() { openExtensions(body) },
+      async artifacts() {
+        section('setArtifactsTitle')
+        toggle(row('setArtifacts', t('setArtifactsNote')), st.artifacts !== false, (v) => set('artifacts', v))
+        const all = row('setArtifactsGallery', t('setArtifactsGalleryNote'))
+        button(all, 'setArtifactsAll', () => api.openLink('https://claude.ai/code/artifacts'))
+        section('setArtifactsList')
+        const list = document.createElement('div')
+        list.className = 'art-list'
+        body.appendChild(list)
+        let items = []
+        try { items = (api.artifacts && (await api.artifacts())) || [] } catch {}
+        if (!list.isConnected) return
+        if (!items.length) { const n = document.createElement('div'); n.className = 'set-note art-none'; label(n, 'setArtifactsNone'); list.appendChild(n); return }
+        for (const a of items) {
+          const r = document.createElement('div')
+          r.className = 'art-row'
+          r.innerHTML = `<div class="art-icon">${ARTIFACT_ICON}</div><div class="art-text"><div class="art-title"></div><div class="art-sub"></div></div><div class="art-actions"></div>`
+          r.querySelector('.art-title').textContent = a.title || 'Artifact'
+          const folder = a.cwd ? String(a.cwd).split(/[\\/]/).filter(Boolean).pop() : ''
+          r.querySelector('.art-sub').textContent = [a.at ? formatWhen(a.at) : '', folder, a.versions > 1 ? t('artVersions', { n: a.versions }) : ''].filter(Boolean).join(' · ')
+          r.title = a.url
+          const acts = r.querySelector('.art-actions')
+          artifactActions(acts, a)
+          if (a.sessionId) {
+            const conv = document.createElement('button')
+            conv.className = 'btn small deny art-conv'
+            label(conv, 'artConversation')
+            conv.addEventListener('click', () => { closeThemes(); openSession(sessionsCache.find((x) => x.id === a.sessionId) || { id: a.sessionId, cwd: a.cwd }) })
+            acts.appendChild(conv)
+          }
+          // Apri: chiude le impostazioni, così il pannello si vede
+          acts.querySelector('.art-open').addEventListener('click', () => closeThemes())
+          list.appendChild(r)
+        }
+      },
       updates() {
         section('updTitle')
         const u = updateState || {}
@@ -2763,6 +2804,8 @@
     if (/^\/export\s*$/i.test(text) && api.exportSession) { input.value = ''; exportSession(active && (active.sessionId || (currentSession && currentSession.id)), convoDir || workdir || null, (part('chapter-title') && part('chapter-title').textContent) || ''); return }
     // /memory: il pannello della memoria (quello di Claude Code apre un editor da terminale)
     if (/^\/memory\s*$/i.test(text) && api.memoryFiles) { input.value = ''; openMemory(); return }
+    // /artifacts: gli artifact pubblicati da qui (quello del terminale è un elenco da tastiera)
+    if (/^\/artifacts\s*$/i.test(text) && api.artifacts) { input.value = ''; openSettings('artifacts'); return }
     if (notes.length) clearReviews()
     input.value = ''
     input.style.height = ''
@@ -3028,7 +3071,10 @@
   const LOCAL_URL = /\bhttps?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]):\d{2,5}(?:\/[^\s"'`<>()[\]{}\\]*)?/g
   const isLocal = (u) => /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?(\/|$)/i.test(u)
   const urlsIn = (text) => [...new Set((String(text || '').match(LOCAL_URL) || []).map((u) => u.replace('://0.0.0.0:', '://localhost:').replace(/[.,;:!?]+$/, '')))]
-  const hostPort = (u) => { try { const x = new URL(u); return x.host + (x.pathname !== '/' ? x.pathname : '') } catch { return u } }
+  const hostPort = (u) => { try { const x = new URL(u); if (x.protocol === 'file:') return decodeURIComponent(x.pathname.split('/').pop()); return x.host + (x.pathname !== '/' ? x.pathname : '') } catch { return u } }
+  // Gli artifact di claude.ai si aprono in un <webview> (claude.ai non si lascia incorniciare), con l'accesso a
+  // claude.ai che resta nella sua sessione; il resto (server locali, pagine HTML del computer) in un iframe
+  const isClaudeUrl = (u) => { try { const x = new URL(u); return x.protocol === 'https:' && (x.hostname === 'claude.ai' || x.hostname.endsWith('.claude.ai')) } catch { return false } }
   let preview = null
   let previewUrl = ''
   function addPreviewUrls(urls) {
@@ -3037,6 +3083,29 @@
     const list = (c.previewUrls || []).filter((u) => !urls.includes(u))
     c.previewUrls = [...urls.slice().reverse(), ...list].slice(0, 8)
     if (c === active) renderPreviewBtn()
+    // La pagina che si sta guardando è cambiata (Claude ha riscritto il file HTML): si ricarica
+    if (c === active && preview && preview.isConnected && !preview.hidden && urls.includes(previewUrl) && /^file:/i.test(previewUrl)) reloadPreview()
+  }
+  // Una pagina del computer (file://) non si apre come file: la finestra stessa è file://, e la pagina arriverebbe
+  // all'API dell'app e agli altri file. La serve il processo principale da skins-page://, un'origine sua che vede solo
+  // la cartella della pagina. Senza il processo principale (le prove nel browser) resta vuota
+  async function loadFrame(frame, url, force) {
+    if (!url) return
+    let src = url
+    if (/^file:/i.test(url)) {
+      src = api.previewPage ? await api.previewPage(url).catch(() => null) : null
+      if (previewUrl !== url) return
+      if (!src) { frame.src = 'about:blank'; return }
+    }
+    if (force || frame.dataset.url !== url) { frame.dataset.url = url; frame.src = src }
+  }
+  function reloadPreview() {
+    if (!preview || !previewUrl) return
+    const web = preview.querySelector('.pv-web')
+    if (isClaudeUrl(previewUrl) && web) { try { web.reload() } catch {} ; return }
+    const frame = preview.querySelector('.pv-frame')
+    frame.src = 'about:blank'
+    setTimeout(() => loadFrame(frame, previewUrl, true), 30)
   }
   function renderPreviewBtn() {
     if (quiet) return
@@ -3058,13 +3127,24 @@
       b.title = t('previewTip', { x: u })
     }
   }
-  function previewWidth(host) {
+  // La conversazione accanto resta larga almeno 520 pixel: il pannello prende lo spazio che resta tolte le altre parti
+  // del layout (la barra laterale), e si stringe lui quando si stringe la finestra
+  function previewMax(pane) {
+    const host = pane.parentElement
+    const main = app.querySelector('main')
+    let others = 0
+    for (const c of host.children) if (c !== pane && c !== main && c.offsetParent !== null && getComputedStyle(c).position !== 'absolute') others += c.offsetWidth
+    return Math.max(260, host.clientWidth - others - 520)
+  }
+  function previewWidth(pane) {
     let w = 0
     try { w = Number(localStorage.getItem('skins.previewWidth')) || 0 } catch {}
-    // La conversazione accanto resta larga almeno 520 pixel
-    const max = Math.max(320, host.clientWidth - 520)
-    return Math.min(max, Math.max(300, w || Math.round(host.clientWidth * 0.4)))
+    const max = previewMax(pane)
+    return Math.min(max, Math.max(260, w || Math.round(pane.parentElement.clientWidth * 0.4)))
   }
+  window.addEventListener('resize', () => {
+    if (preview && preview.isConnected && !preview.hidden && !preview.classList.contains('floating')) preview.style.width = `${previewWidth(preview)}px`
+  })
   function buildPreview() {
     const pane = document.createElement('div')
     pane.className = 'preview-pane'
@@ -3084,11 +3164,11 @@
     pane.querySelector('.pv-grip').title = t('previewGrip')
     addr.placeholder = t('previewAddress')
     label(pane.querySelector('.pv-empty'), 'previewEmpty')
-    pane.querySelector('.pv-reload').addEventListener('click', () => { if (previewUrl) { frame.src = 'about:blank'; setTimeout(() => { frame.src = previewUrl }, 30) } })
+    pane.querySelector('.pv-reload').addEventListener('click', reloadPreview)
     pane.querySelector('.pv-open').addEventListener('click', () => { if (previewUrl) api.openLink(previewUrl) })
     pane.querySelector('.pv-close').addEventListener('click', closePreview)
     pane.querySelector('.pv-shot').addEventListener('click', async () => {
-      const r = frame.getBoundingClientRect()
+      const r = pane.querySelector('.pv-body').getBoundingClientRect()
       const data = previewUrl && api.capturePreview ? await api.capturePreview({ x: r.left, y: r.top, width: r.width, height: r.height }).catch(() => null) : null
       if (data) await addImage(data, 'image/png', `anteprima ${hostPort(previewUrl)}.png`)
       else labelled('error', 'previewShotFail')
@@ -3100,7 +3180,7 @@
       let v = addr.value.trim()
       if (!v) return
       if (/^\d{2,5}$/.test(v)) v = `http://localhost:${v}`
-      else if (!/^https?:\/\//i.test(v)) v = `http://${v}`
+      else if (!/^(https?|file):\/\//i.test(v)) v = `http://${v}`
       navigatePreview(v)
     })
     // Il bordo sinistro si trascina per cambiare la larghezza (l'iframe non deve rubare il mouse intanto)
@@ -3110,7 +3190,8 @@
       const x0 = e.clientX
       const w0 = pane.offsetWidth
       pane.classList.add('dragging')
-      const move = (ev) => { pane.style.width = `${Math.min(host.clientWidth - 360, Math.max(280, w0 + x0 - ev.clientX))}px` }
+      const max = pane.classList.contains('floating') ? host.clientWidth - 360 : previewMax(pane)
+      const move = (ev) => { pane.style.width = `${Math.min(max, Math.max(260, w0 + x0 - ev.clientX))}px` }
       const up = () => {
         pane.classList.remove('dragging')
         document.removeEventListener('mousemove', move)
@@ -3120,7 +3201,7 @@
       document.addEventListener('mousemove', move)
       document.addEventListener('mouseup', up)
     })
-    pane.style.width = `${previewWidth(pane.parentElement)}px`
+    pane.style.width = `${previewWidth(pane)}px`
     return pane
   }
   function navigatePreview(url) {
@@ -3128,21 +3209,42 @@
     if (!preview) return
     preview.querySelector('.pv-addr').value = previewUrl
     const frame = preview.querySelector('.pv-frame')
-    frame.hidden = !previewUrl
+    const claude = isClaudeUrl(previewUrl)
+    let web = preview.querySelector('.pv-web')
+    frame.hidden = !previewUrl || claude
     preview.querySelector('.pv-empty').hidden = !!previewUrl
-    if (previewUrl && frame.src !== previewUrl) frame.src = previewUrl
+    if (claude) {
+      if (frame.src !== 'about:blank') { frame.src = 'about:blank'; delete frame.dataset.url }
+      if (!web) {
+        // Il processo principale accetta solo questa sessione e solo indirizzi di claude.ai
+        web = document.createElement('webview')
+        web.className = 'pv-web'
+        web.setAttribute('partition', 'persist:claudeai')
+        web.setAttribute('allowpopups', '')
+        web.setAttribute('src', previewUrl)
+        web.addEventListener('did-navigate', (e) => { if (preview && isClaudeUrl(e.url)) preview.querySelector('.pv-addr').value = e.url })
+        preview.querySelector('.pv-body').appendChild(web)
+      } else if (web.getAttribute('src') !== previewUrl) web.setAttribute('src', previewUrl)
+      web.hidden = false
+    } else {
+      // Resta, nascosto: tornando a un artifact non si ricarica da capo
+      if (web) web.hidden = true
+      loadFrame(frame, previewUrl)
+    }
     renderPreviewBtn()
   }
   function openPreview(url) {
     if (!preview || !preview.isConnected) preview = buildPreview()
     preview.hidden = false
+    if (!preview.classList.contains('floating')) preview.style.width = `${previewWidth(preview)}px`
     document.body.classList.add('has-preview')
     navigatePreview(url || previewUrl || ((active && active.previewUrls) || [])[0] || '')
     if (!previewUrl) preview.querySelector('.pv-addr').focus()
     hook('preview', previewUrl)
   }
   function closePreview() {
-    if (preview) { preview.hidden = true; preview.querySelector('.pv-frame').src = 'about:blank' }
+    // Il server locale si ferma (about:blank); la pagina di claude.ai resta com'era per quando si riapre
+    if (preview) { const f = preview.querySelector('.pv-frame'); preview.hidden = true; f.src = 'about:blank'; delete f.dataset.url }
     document.body.classList.remove('has-preview')
     renderPreviewBtn()
   }
@@ -3684,7 +3786,39 @@
     row.dataset.statusKey = error ? 'toolFail' : 'toolOk'
     row.dataset.status = t(row.dataset.statusKey)
   }
-  api.onToolDone(({ id, error, urls }) => { toolDone(id, error); addPreviewUrls(urls); hook('toolDone', { error: !!error }) })
+  api.onToolDone(({ id, error, urls, artifact }) => { toolDone(id, error); addPreviewUrls(urls); if (artifact) artifactCard(artifact); hook('toolDone', { error: !!error, artifact: artifact || null }) })
+
+  // Un artifact pubblicato (o aggiornato) da Claude su claude.ai, come nell'app desktop: una scheda col titolo e
+  // Apri (nel pannello accanto alla conversazione), Apri nel browser e Copia link
+  const ARTIFACT_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 8.5h17M7 12.5h6M7 16h10"/></svg>'
+  const isArtifactUrl = (u) => /^https:\/\/claude\.ai\/(code\/)?artifact\/[\w-]+/.test(String(u || ''))
+  function artifactActions(box, a) {
+    const open = document.createElement('button')
+    open.className = 'btn small art-open'
+    label(open, 'artOpen')
+    open.addEventListener('click', (e) => { e.stopPropagation(); openPreview(a.url) })
+    const ext = document.createElement('button')
+    ext.className = 'btn small deny art-ext'
+    ext.textContent = '↗'
+    ext.title = t('previewOpen')
+    ext.addEventListener('click', (e) => { e.stopPropagation(); api.openLink(a.url) })
+    const copy = document.createElement('button')
+    copy.className = 'btn small deny art-copy'
+    label(copy, 'artCopy')
+    copy.addEventListener('click', (e) => { e.stopPropagation(); copyText(a.url); label(copy, 'artCopied'); setTimeout(() => label(copy, 'artCopy'), 1500) })
+    box.append(open, ext, copy)
+  }
+  function artifactCard(a) {
+    if (!a || !isArtifactUrl(a.url)) return null
+    const item = add('artifact-card', `<div class="art-icon">${ARTIFACT_ICON}</div><div class="art-text"><div class="art-title"></div><div class="art-sub"></div></div><div class="art-actions"></div>`)
+    item.querySelector('.art-title').textContent = a.title || 'Artifact'
+    label(item.querySelector('.art-sub'), a.updated ? 'artUpdated' : 'artPublished')
+    item.title = t('artTip', { x: a.url })
+    item.dataset.url = a.url
+    artifactActions(item.querySelector('.art-actions'), a)
+    item.addEventListener('click', () => openPreview(a.url))
+    return item
+  }
 
   // La frase che riassume un gruppo di azioni (come nell'app desktop): le loro righe, con le differenze, vanno dentro
   // un gruppo chiuso sotto quella frase; un clic lo apre. Nel titolo, il conto delle righe cambiate
@@ -4044,6 +4178,41 @@
   }
   const fold = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
+  // Le conversazioni derivate da un'altra (s.parent) stanno subito sotto quella, rientrate, come nell'app desktop:
+  // la più recente prima; le derivate di una derivata ancora più a destra. Una famiglia sta nel gruppo della sua
+  // attività più recente. Una derivata resta da sola se quella di partenza non è nella lista (filtrata, archiviata,
+  // fissata mentre l'altra no). Dà [{ s, depth, time }] nell'ordine in cui si mostrano
+  function nestSessions(visible, rank) {
+    const byId = new Map(visible.map((s) => [s.id, s]))
+    const kids = new Map()
+    const isChild = (s) => s.parent && s.parent !== s.id && byId.has(s.parent) && rank(byId.get(s.parent)) === rank(s)
+    for (const s of visible) if (isChild(s)) { if (!kids.has(s.parent)) kids.set(s.parent, []); kids.get(s.parent).push(s) }
+    const newest = (a, b) => (b.lastModified || 0) - (a.lastModified || 0)
+    const famTime = new Map()
+    const time = (s, seen = new Set()) => {
+      if (famTime.has(s.id)) return famTime.get(s.id)
+      seen.add(s.id)
+      let t = s.lastModified || 0
+      for (const k of kids.get(s.id) || []) if (!seen.has(k.id)) t = Math.max(t, time(k, seen))
+      famTime.set(s.id, t)
+      return t
+    }
+    // Le radici: chi non è derivata di una visibile (o è in un giro, che non dovrebbe esserci)
+    const roots = visible.filter((s) => !isChild(s))
+    const placed = new Set()
+    const out = []
+    const walk = (s, depth) => {
+      if (placed.has(s.id)) return
+      placed.add(s.id)
+      out.push({ s, depth, time: time(s) })
+      for (const k of (kids.get(s.id) || []).slice().sort(newest)) walk(k, depth + 1)
+    }
+    const order = roots.map((s, i) => ({ s, i })).sort((a, b) => rank(a.s) - rank(b.s) || (rank(a.s) === 1 ? time(b.s) - time(a.s) : 0) || a.i - b.i)
+    for (const { s } of order) walk(s, 0)
+    for (const s of visible) if (!placed.has(s.id)) walk(s, 0)
+    return out
+  }
+
   function renderSessionList() {
     const list = part('sessions-list')
     if (!list) return
@@ -4058,8 +4227,8 @@
     if (!sessionsCache.length) { sessionNote(list, 'sessionsEmpty', { dir: workdir || 'cartella di lavoro' }); return }
     if (!visible.length) sessionNote(list, 'sessionsNoMatch', { q: sessionsQuery.trim() })
     let group = null
-    for (const s of visible) {
-      const g = s.archived ? 'groupArchived' : s.pinned ? 'groupPinned' : sessionGroup(s.lastModified)
+    for (const { s, depth, time } of nestSessions(visible, rank)) {
+      const g = depth ? group : s.archived ? 'groupArchived' : s.pinned ? 'groupPinned' : sessionGroup(time)
       if (g !== group) {
         group = g
         const h = document.createElement('div')
@@ -4067,6 +4236,7 @@
         list.appendChild(label(h, g))
       }
       const row = sessionRow(s)
+      if (depth) { row.classList.add('child'); row.style.setProperty('--depth', Math.min(depth, 3)) }
       // Trovata nei messaggi: un pezzo di quello che contiene le parole, con le parole evidenziate
       const hit = q && contentHits.get(s.id)
       if (hit) {
@@ -4285,6 +4455,7 @@
       else if (m.role === 'tool') {
         addTool(m.id, m.name, m.summary, m.change, m.intent)
         if (m.error !== null) toolDone(m.id, m.error)
+        if (m.artifact) artifactCard(m.artifact)
       }
     }
   }
@@ -4456,6 +4627,7 @@
     dictate: () => dictate(),
     preview: togglePreview,
     memory: () => openMemory(),
+    artifacts: () => openSettings('artifacts'),
     maximize: () => api.windowMode('max'),
     fullscreen: () => api.windowMode('full'),
     scene: () => { scene = scene === 'notte' ? 'giorno' : 'notte'; api.setScene(scene); paint(); hook('scene', scene) },
@@ -4465,7 +4637,7 @@
     const a = e.target.closest('a[data-href]')
     if (a) {
       e.preventDefault()
-      if (isLocal(a.dataset.href) && !e.ctrlKey && !e.metaKey && !e.shiftKey) openPreview(a.dataset.href)
+      if ((isLocal(a.dataset.href) || isArtifactUrl(a.dataset.href)) && !e.ctrlKey && !e.metaKey && !e.shiftKey) openPreview(a.dataset.href)
       else api.openLink(a.dataset.href)
       return
     }
@@ -4718,14 +4890,14 @@
     const day = 86400000
     // Un repo finto per il pannello di git
     const fakeGit = {
-      repo: true, root: 'C:/Users/luca/MapEditor', branch: 'fiumi', upstream: 'origin/fiumi', ahead: 1, behind: 0, detached: false, noCommits: false,
+      repo: true, root: 'C:/Users/me/MapEditor', branch: 'fiumi', upstream: 'origin/fiumi', ahead: 1, behind: 0, detached: false, noCommits: false,
       files: [
         { path: 'src/MapView.cpp', status: 'M', added: 2, removed: 1 },
         { path: 'src/Rivers.cpp', status: '?', added: 48, removed: 0 },
         { path: 'docs/vecchio.md', status: 'D', added: 0, removed: 12 },
       ],
-      remote: 'git@github.com:luca/MapEditor.git', web: 'https://github.com/luca/MapEditor', base: 'main', last: { hash: 'a1b2c3d', subject: 'Le strade sopra i sentieri' },
-      compare: 'https://github.com/luca/MapEditor/compare/main...fiumi?expand=1', gh: true,
+      remote: 'git@github.com:someone/MapEditor.git', web: 'https://github.com/someone/MapEditor', base: 'main', last: { hash: 'a1b2c3d', subject: 'Le strade sopra i sentieri' },
+      compare: 'https://github.com/someone/MapEditor/compare/main...fiumi?expand=1', gh: true,
     }
     if (demoEn()) {
       Object.assign(fakeGit, { branch: 'rivers', upstream: 'origin/rivers', root: 'C:/Projects/MapEditor', remote: 'git@github.com:example/MapEditor.git', web: 'https://github.com/example/MapEditor', compare: '' })
@@ -4740,17 +4912,17 @@
     const fakePerms = {
       user: { allow: ['WebSearch', 'Bash(git status)'], ask: [], deny: ['Bash(rm -rf:*)'], dirs: [] },
       project: { allow: ['Bash(npm run test:*)', 'Read(./docs/**)'], ask: ['Bash(git push:*)'], deny: [], dirs: [] },
-      local: { allow: ['Edit(src/**)'], ask: [], deny: [], dirs: ['C:/Users/luca/Documenti/Mappe'] },
+      local: { allow: ['Edit(src/**)'], ask: [], deny: [], dirs: ['C:/Users/me/Documenti/Mappe'] },
     }
     // La memoria finta: personale e del progetto, quella locale non c'è ancora
     const fakeMemory = new Map([
-      ['C:/Users/luca/.claude/CLAUDE.md', '# Le mie preferenze\n\n- Rispondi in italiano\n- Commenti nel codice in italiano\n- Prima di toccare più di tre file, chiedi\n'],
-      ['C:/Users/luca/MapEditor/CLAUDE.md', '# MapEditor\n\nEditor di mappe in C++17 con Qt 6.\n\n## Comandi\n\n- `cmake --build build` compila\n- `ctest --test-dir build` le prove\n\n## Regole\n\n- I fiumi si disegnano prima delle strade\n'],
+      ['C:/Users/me/.claude/CLAUDE.md', '# Le mie preferenze\n\n- Rispondi in italiano\n- Commenti nel codice in italiano\n- Prima di toccare più di tre file, chiedi\n'],
+      ['C:/Users/me/MapEditor/CLAUDE.md', '# MapEditor\n\nEditor di mappe in C++17 con Qt 6.\n\n## Comandi\n\n- `cmake --build build` compila\n- `ctest --test-dir build` le prove\n\n## Regole\n\n- I fiumi si disegnano prima delle strade\n'],
     ])
-    const fakeMemFiles = () => ({ cwd: 'C:/Users/luca/MapEditor', files: [['user', 'C:/Users/luca/.claude/CLAUDE.md'], ['project', 'C:/Users/luca/MapEditor/CLAUDE.md'], ['local', 'C:/Users/luca/MapEditor/CLAUDE.local.md'], ['parent', 'C:/Users/luca/CLAUDE.md']].filter(([id, f]) => id !== 'parent' || fakeMemory.has(f)).map(([id, file]) => ({ id, file, exists: fakeMemory.has(file), size: (fakeMemory.get(file) || '').length })) })
-    const fakePermFiles = { user: 'C:/Users/luca/.claude/settings.json', project: 'C:/Users/luca/MapEditor/.claude/settings.json', local: 'C:/Users/luca/MapEditor/.claude/settings.local.json' }
-    const fakeUpdate = demoEn() ? { state: 'uptodate', checkedAt: Date.now() } : { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/luca/Claudeleon', installed: true }
-    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '1.0.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claudeleon', shortcut: 'Ctrl+Alt+P', worktree: false, language: new URLSearchParams(location.search).get('lingua') || 'en' }
+    const fakeMemFiles = () => ({ cwd: 'C:/Users/me/MapEditor', files: [['user', 'C:/Users/me/.claude/CLAUDE.md'], ['project', 'C:/Users/me/MapEditor/CLAUDE.md'], ['local', 'C:/Users/me/MapEditor/CLAUDE.local.md'], ['parent', 'C:/Users/me/CLAUDE.md']].filter(([id, f]) => id !== 'parent' || fakeMemory.has(f)).map(([id, file]) => ({ id, file, exists: fakeMemory.has(file), size: (fakeMemory.get(file) || '').length })) })
+    const fakePermFiles = { user: 'C:/Users/me/.claude/settings.json', project: 'C:/Users/me/MapEditor/.claude/settings.json', local: 'C:/Users/me/MapEditor/.claude/settings.local.json' }
+    const fakeUpdate = demoEn() ? { state: 'uptodate', checkedAt: Date.now() } : { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/me/Claudeleon', installed: true }
+    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/me/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '1.0.0', installed: true, dataDir: 'C:/Users/me/AppData/Roaming/Claudeleon', shortcut: 'Ctrl+Alt+P', worktree: false, artifacts: true, language: new URLSearchParams(location.search).get('lingua') || 'en' }
     const fakeSessions = demoEn() ? [
       { id: 's0', title: 'Theme editor with live preview', lastModified: Date.now() - 600000, cwd: 'C:/Projects/Claudeleon', branch: 'main' },
       { id: 's1', title: 'Shortest path in RouteFinder', lastModified: Date.now() - 3600000, cwd: 'C:/Projects/MapEditor', branch: 'rivers' },
@@ -4761,10 +4933,13 @@
     ] : [
       { id: 's0', title: 'Allegati e domande con le opzioni', lastModified: Date.now() - 600000, cwd: 'C:/Workspace/Progetti/Claudeleon', branch: 'main' },
       { id: 's1', title: 'Temi per Claudeleon', lastModified: Date.now() - 3600000, cwd: 'C:/Workspace/Progetti/Claudeleon', branch: 'main' },
+      // Derivate da un'altra (una modifica a un messaggio già mandato): sotto quella di partenza
+      { id: 's7', title: 'Temi per Claudeleon (ripresa dal secondo messaggio)', parent: 's1', lastModified: Date.now() - 1800000, cwd: 'C:/Workspace/Progetti/Claudeleon', branch: 'main' },
+      { id: 's8', title: 'Backup delle note, con rclone', parent: 's5', lastModified: Date.now() - 2 * day, cwd: 'C:/Users/me/Documenti' },
       { id: 's2', title: 'Il calcolo dei sentieri in RouteFinder', lastModified: Date.now() - day, cwd: 'C:/Workspace/MapEditor' },
       { id: 's3', title: 'Mod desktop Signore degli Anelli', lastModified: Date.now() - 4 * day, cwd: 'C:/Workspace' },
-      { id: 's4', title: 'Profilo di Windows Terminal', lastModified: Date.now() - 9 * day, cwd: 'C:/Users/luca' },
-      { id: 's5', title: 'Backup delle note su Drive', lastModified: Date.now() - 45 * day, cwd: 'C:/Users/luca/Documenti' },
+      { id: 's4', title: 'Profilo di Windows Terminal', lastModified: Date.now() - 9 * day, cwd: 'C:/Users/me' },
+      { id: 's5', title: 'Backup delle note su Drive', lastModified: Date.now() - 45 * day, cwd: 'C:/Users/me/Documenti' },
       { id: 's6', title: 'Prova del vecchio rotolo', lastModified: Date.now() - 20 * day, cwd: 'C:/Workspace', archived: true },
     ]
     return {
@@ -4784,9 +4959,13 @@
       commands: async () => FAKE_COMMANDS,
       sessions: async () => fakeSessions.map((s) => Object.assign({}, s)),
       renameSession: async (id, title) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.title = title; return true },
+      artifacts: async () => [
+        { url: 'https://claude.ai/code/artifact/fiumi-1234', title: 'Come si disegnano i fiumi', at: Date.now() - 3600e3, sessionId: 's2', cwd: 'C:/Workspace/mappa', versions: 2 },
+        { url: 'https://claude.ai/code/artifact/note-5678', title: 'Backup delle note', at: Date.now() - 86400e3 * 3, sessionId: 's5', cwd: 'C:/Workspace/note', versions: 1 },
+      ],
       searchSessions: async (q) => { const f = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); return f(q).includes('guad') ? [{ id: 's2', count: 3, snippet: 'Poi i guadi: dove un sentiero attraversa un fiume, il costo del passo raddoppia…', role: 'assistant' }] : [] },
       pinSession: async (id, on) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.pinned = !!on; return true },
-      exportSession: async (id, cwd, title) => (id ? { ok: true, file: `C:/Users/luca/Documents/${title || 'Conversazione'}.md` } : { ok: false, error: 'nessuna sessione' }),
+      exportSession: async (id, cwd, title) => (id ? { ok: true, file: `C:/Users/me/Documents/${title || 'Conversazione'}.md` } : { ok: false, error: 'nessuna sessione' }),
       archiveSession: async (id, cwd, on) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.archived = !!on; return true },
       deleteSession: async (id) => { const k = fakeSessions.findIndex((x) => x.id === id); if (k >= 0 && confirm('Eliminare?')) { fakeSessions.splice(k, 1); return { deleted: true } } return { deleted: false } },
       // Una cronaca lunga (Backup delle note): 120 messaggi, per provare "Carica i messaggi precedenti"
@@ -4797,6 +4976,7 @@
         { role: 'tool', id: 'h1', name: 'Read', summary: 'src/MapView.cpp', change: null, error: false },
         { role: 'tool', id: 'h2', name: 'Edit', summary: 'src/MapView.cpp', change: FAKE_EDIT, error: false },
         { role: 'tool', id: 'h3', name: 'Bash', summary: 'cmake --build build', change: null, error: true },
+        { role: 'tool', id: 'h4', name: 'Artifact', summary: 'C:/Workspace/fiumi.html', intent: { verb: 'artifact', target: 'Come si disegnano i fiumi' }, change: null, error: false, artifact: { url: 'https://claude.ai/code/artifact/fiumi-1234', title: 'Come si disegnano i fiumi', updated: false } },
         { role: 'assistant', text: 'Fatto: i fiumi ora si disegnano **prima** delle strade. La compilazione però si è fermata su un errore di `MapLoader`.' },
         { role: 'user', text: '/usage' },
         { role: 'output', text: 'Sessione corrente\n  Token in ingresso   12.408\n  Costo stimato       0,21 $' },
@@ -4820,7 +5000,7 @@
       onModels: on('onModels'), onTodos: on('onTodos'), onContext: on('onContext'),
       onThinkingStart: on('onThinkingStart'), onSuggestion: on('onSuggestion'), onThinking: on('onThinking'), onThinkingEnd: on('onThinkingEnd'),
       openFile: async () => true,
-      permissions: async () => ({ cwd: 'C:/Users/luca/MapEditor', scopes: ['user', 'project', 'local'].map((id) => Object.assign({ id, file: fakePermFiles[id], exists: true, error: '' }, JSON.parse(JSON.stringify(fakePerms[id])))) }),
+      permissions: async () => ({ cwd: 'C:/Users/me/MapEditor', scopes: ['user', 'project', 'local'].map((id) => Object.assign({ id, file: fakePermFiles[id], exists: true, error: '' }, JSON.parse(JSON.stringify(fakePerms[id])))) }),
       changePermission: async (_c, scope, op) => {
         const sc = fakePerms[scope]
         const rule = String(op.rule || '').trim()
@@ -4836,12 +5016,12 @@
       openMemory: async () => true,
       dictate: async () => true,
       whatsNew: async () => (new URLSearchParams(location.search).get('novita') === 'si' ? { from: '1.0.0', to: '1.1.0', url: 'https://github.com/LukePasax/Claudeleon/releases/tag/v1.1.0', notes: "## What's Changed\n* Settings with categories, with permissions, memory and extensions inside by @LukePasax in https://github.com/LukePasax/Claudeleon/pull/3\n* English by default, Italian from the settings by @LukePasax in https://github.com/LukePasax/Claudeleon/pull/3\n* First-run welcome and what's new after an update\n\n**Full Changelog**: https://github.com/LukePasax/Claudeleon/compare/v1.0.0...v1.1.0" } : null),
-      claudeStatus: async () => { const q = new URLSearchParams(location.search); const found = q.get('claude') !== 'manca'; return { found, path: 'C:/Users/luca/.local/bin/claude.exe', version: found ? '2.1.330' : null, loggedIn: found && q.get('login') !== 'no', platform: 'win32' } },
+      claudeStatus: async () => { const q = new URLSearchParams(location.search); const found = q.get('claude') !== 'manca'; return { found, path: 'C:/Users/me/.local/bin/claude.exe', version: found ? '2.1.330' : null, loggedIn: found && q.get('login') !== 'no', platform: 'win32' } },
       retrySafeTheme: () => fireAll('onTheme', 'notturno', 0),
       dismissSafe() {},
       saveTheme: async (spec) => { const id = spec.id || String(spec.name || 'tema').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'tema'; return { ok: true, spec: Object.assign(window.SkinsKits.moderno.normalizeSpec(spec), { id }) } },
       deleteTheme: async () => true,
-      exportTheme: async (id) => ({ ok: true, file: `C:/Users/luca/Documents/${id}.skin` }),
+      exportTheme: async (id) => ({ ok: true, file: `C:/Users/me/Documents/${id}.skin` }),
       importTheme: async () => ({ ok: true, kind: 'colors', id: 'citta-di-sera', spec: { id: 'citta-di-sera', name: 'Città di sera', description: '', colors: { bg: '#fbf4ea', side: '#f1e6d6', surface: '#ffffff', ink: '#2b2118', inkSoft: '#7a6a58', accent: '#c2562b', onAccent: '#ffffff', line: '#e4d6c3', bubble: '#f6e1cf' }, font: 'serif', textSize: 15, radius: 6 } }),
       capturePreview: async () => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
       gitStatus: async () => JSON.parse(JSON.stringify(fakeGit)),
@@ -4851,7 +5031,7 @@
       gitCommit: async (_c, m, andPush) => { fakeGit.files = []; gitTotals(); fakeGit.last = { hash: 'e4f5a6b', subject: m }; fakeGit.ahead = andPush ? 0 : fakeGit.ahead + 1; return { ok: true } },
       gitPush: async () => { fakeGit.ahead = 0; fakeGit.upstream = `origin/${fakeGit.branch}`; return { ok: true } },
       gitPrInfo: async () => null,
-      gitPr: async () => ({ ok: true, url: 'https://github.com/luca/MapEditor/pull/7' }),
+      gitPr: async () => ({ ok: true, url: 'https://github.com/someone/MapEditor/pull/7' }),
       mergeWorktree: async () => { fakeGit.worktree.unmerged = 0; return { ok: true } },
       removeWorktree: async (_c, force) => (!force && (fakeGit.files.length || fakeGit.worktree.unmerged) ? { ok: false, needsForce: true, dirty: fakeGit.files.length > 0, unmerged: fakeGit.worktree.unmerged } : { ok: true, branchKept: '' }),
       revealFile: async () => false,
@@ -4882,7 +5062,7 @@
         // Una conversazione nuova riceve la sua sessione e compare negli annali
         // Con le copie separate accese, la prima domanda di una conversazione parte in un worktree
         if (conv && fakeSettings.worktree && !fakeSessions.some((x) => x.conv === conv)) {
-          const wt = { ok: true, name: 'aggiungi-fiumi-1a2b', branch: 'claude/aggiungi-fiumi-1a2b', path: 'C:/Users/luca/MapEditor/.claude/worktrees/aggiungi-fiumi-1a2b', main: 'C:/Users/luca/MapEditor', base: 'fiumi' }
+          const wt = { ok: true, name: 'aggiungi-fiumi-1a2b', branch: 'claude/aggiungi-fiumi-1a2b', path: 'C:/Users/me/MapEditor/.claude/worktrees/aggiungi-fiumi-1a2b', main: 'C:/Users/me/MapEditor', base: 'fiumi' }
           Object.assign(fakeGit, { branch: wt.branch, upstream: '', ahead: 0, root: wt.path, worktree: { main: wt.main, path: wt.path, name: wt.name, branch: wt.branch, base: 'fiumi', mainBranch: 'fiumi', unmerged: 2 } })
           fire('onWorktree', wt, 10)
         }

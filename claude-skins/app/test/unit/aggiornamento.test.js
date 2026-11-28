@@ -103,8 +103,8 @@ function fakeAutoUpdater(found) {
 const packagedApp = (d) => ({ isPackaged: true, getPath: () => d })
 
 test('release: le note in righe semplici, gli errori in breve', () => {
-  assert.deepEqual(noteLines('<h2>What\'s Changed</h2><ul><li>Temi in file <code>.skin</code> by @luca</li><li>Essenziale</li></ul><p><strong>Full Changelog</strong>: v1...v2</p>'),
-    ['Temi in file .skin by @luca', 'Essenziale'])
+  assert.deepEqual(noteLines('<h2>What\'s Changed</h2><ul><li>Temi in file <code>.skin</code> by @someone</li><li>Essenziale</li></ul><p><strong>Full Changelog</strong>: v1...v2</p>'),
+    ['Temi in file .skin by @someone', 'Essenziale'])
   assert.deepEqual(noteLines('## Novità\n- **Editor** dei temi\n- `/memory`\n'), ['Editor dei temi', '/memory'])
   assert.match(friendly(new Error('HttpError: 404 Not Found latest.yml')), /Nessuna release/)
   assert.match(friendly(new Error('net::ERR_INTERNET_DISCONNECTED')), /connessione/)

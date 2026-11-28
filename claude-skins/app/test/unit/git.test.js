@@ -34,11 +34,11 @@ test('git: la testata di git status', () => {
 })
 
 test('git: dal remoto al sito e alla pagina della pull request', () => {
-  assert.equal(webOf('git@github.com:luca/MapEditor.git'), 'https://github.com/luca/MapEditor')
-  assert.equal(webOf('https://token@github.com/luca/MapEditor.git'), 'https://github.com/luca/MapEditor')
+  assert.equal(webOf('git@github.com:someone/MapEditor.git'), 'https://github.com/someone/MapEditor')
+  assert.equal(webOf('https://token@github.com/someone/MapEditor.git'), 'https://github.com/someone/MapEditor')
   assert.equal(webOf('/una/cartella'), '')
-  assert.equal(compareUrl('https://github.com/luca/MapEditor', 'main', 'feature/fiumi'), 'https://github.com/luca/MapEditor/compare/main...feature/fiumi?expand=1')
-  assert.match(compareUrl('https://gitlab.com/luca/x', 'main', 'b'), /merge_requests\/new/)
+  assert.equal(compareUrl('https://github.com/someone/MapEditor', 'main', 'feature/fiumi'), 'https://github.com/someone/MapEditor/compare/main...feature/fiumi?expand=1')
+  assert.match(compareUrl('https://gitlab.com/someone/x', 'main', 'b'), /merge_requests\/new/)
   assert.equal(compareUrl('https://example.com/x', 'main', 'b'), '')
 })
 

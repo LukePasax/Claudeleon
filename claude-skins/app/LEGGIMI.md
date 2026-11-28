@@ -78,7 +78,8 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   (Essenziale 1100×760, mai oltre il 92% dello schermo; ogni tema ha la sua misura).
 - **Spostare e allargare:** si trascina dalla testata (la barra in alto); la
   maniglia a gradini in basso a destra allarga e allunga. Posizione e dimensione restano, e la dimensione è
-  ricordata per tema. Dal vassoio: "Riporta al centro" e "Dimensione iniziale".
+  ricordata per tema. Riparte com'era: ingrandita se lo era (lo schermo intero torna ingrandita), altrimenti dove
+  l'avevi lasciata; la prima volta al centro dello schermo. Dal vassoio: "Riporta al centro" e "Dimensione iniziale".
 - **Bordi e ingrandimento:** la finestra si ridimensiona da tutti i lati e gli angoli, come una finestra normale. Il
   pulsante accanto a "riduci a icona" (o il doppio clic sulla testata) la ingrandisce all'area di lavoro; F11 la porta a
   tutto schermo; di nuovo, si ripristina. Spostarla da ingrandita la riporta alla sua misura.
@@ -224,7 +225,17 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   per cambiare la larghezza (si ricorda). I link a localhost nelle risposte si aprono lì (con Ctrl nel browser);
   Ctrl+Maiusc+P apre e chiude il pannello. I server che vietano di farsi incorniciare lo permettono, solo per gli
   indirizzi locali. Quando la colonna della chat si stringe, i selettori della riga della penna restano con la sola
-  icona.
+  icona. Anche le pagine HTML che Claude scrive sul computer compaiono lì ("Anteprima · pagina.html") e si
+  ricaricano a ogni modifica. Una pagina così vede solo la sua cartella (e quelle sotto): non arriva agli altri file
+  né all'app.
+- **Artifact di claude.ai:** come nell'app desktop, Claude può pubblicare pagine su claude.ai (spiegazioni, schemi,
+  cruscotti, piccoli strumenti), private finché non le condividi: basta chiederglielo. Ogni pubblicazione ha una
+  scheda nella conversazione con "Apri" (nel pannello accanto alla conversazione), "↗" (nel browser) e "Copia
+  link"; anche i link agli artifact nelle risposte si aprono nel pannello. La prima volta il pannello chiede di
+  accedere a claude.ai, e l'accesso resta in Claudeleon (una sessione sua, `persist:claudeai`); se un modo di
+  accedere lì non va, c'è sempre il browser. Impostazioni → Artifact (o `/artifacts`) elenca quelli pubblicati dalle
+  conversazioni di questo computer, con la loro conversazione, apre la galleria di claude.ai con tutti, e ha
+  l'interruttore per spegnerli.
 - **Copia separata per ogni conversazione (worktree):** nel menu della cartella (o nelle impostazioni) si accende
   "Una copia separata per ogni conversazione". Da lì, nei repo git, il primo messaggio di una conversazione nuova crea
   una copia del repo in `.claude/worktrees/<nome>` (nome dalle prime parole del messaggio) su un branch suo,
@@ -300,7 +311,9 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   non contano; con più parole, le vuole tutte (anche in messaggi diversi).
 - **Elenco delle conversazioni:** le sessioni di Claude Code di tutte le cartelle, le più recenti prima, come nella barra
   laterale dell'app desktop (le sue comprese, coi loro titoli), raggruppate per giorno (oggi, ieri, ultimi 7 e 30
-  giorni, più vecchie); accanto all'ora c'è la cartella e il branch git. In cima un campo di ricerca filtra per
+  giorni, più vecchie); accanto all'ora c'è la cartella e il branch git. Le conversazioni partite da un'altra (la
+  modifica di un messaggio già mandato, un fork dell'app desktop o del terminale) stanno subito sotto quella,
+  rientrate; una famiglia sta nel gruppo della sua attività più recente. In cima un campo di ricerca filtra per
   titolo, cartella e branch. Ogni conversazione ha un menu ("⋯" passandoci sopra, o il tasto destro): **Rinomina**
   (sul posto, Invio salva), **Archivia** (resta sul disco e sparisce dall'elenco; le archiviate si vedono in fondo)
   ed **Elimina** (chiede conferma e cancella il transcript). Sono sempre

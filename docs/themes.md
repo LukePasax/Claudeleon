@@ -122,6 +122,7 @@ On any clickable element (also more than one per action):
 | `new` | New conversation |
 | `sessions`, `sessions-close` | Opens and closes the saved conversations overlay |
 | `settings` | Opens settings (also Ctrl+,) |
+| `artifacts` | Opens Settings → Artifacts: the claude.ai artifacts published from this computer (also `/artifacts`) |
 | `themes` | Opens the theme picker: a panel over the layout (inside the first `data-solid` element) with a card per theme |
 | `scene` | Night ↔ day. If the element is empty, the engine writes the name of the other scene |
 | `attach` | Picks files or images to attach (pasting and dragging always work) |
