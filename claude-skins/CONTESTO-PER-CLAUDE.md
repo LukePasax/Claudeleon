@@ -325,6 +325,13 @@ la configurazione c'era già: le versioni di prima della 1.1 non la ricordavano)
 le note dalla API di GitHub (`releases/tags/v<versione>`, repo da `package.json` `repository`) una volta sola. La
 pagina le mostra dopo il benvenuto. Versione finta: `?benvenuto=si`, `?claude=manca`, `?login=no`, `?novita=si`.
 
+## Immagini del README
+
+`docs/claudeleon-light.png` e `-dark.png`: la versione finta con `?tema=essenziale&lingua=en&demo=en` (dati finti in
+inglese: conversazioni, risposta, branch `rivers`), 1280×800 a scala 2, sfondo trasparente, con Playwright e
+`colorScheme` light/dark; si manda "Draw the rivers before the roads…" e si fotografa a risposta finita. Da rifare
+quando l'aspetto cambia molto.
+
 ## Impostazioni
 
 Pannello a categorie (`SETTINGS_PAGES`, `settingsPage` in localStorage); permessi, memoria ed estensioni sono gli

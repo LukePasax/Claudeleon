@@ -3,6 +3,11 @@
 A themeable desktop app for working with Claude Code: it changes its skin like a chameleon, the conversation stays
 the same. *(Italiano più sotto.)*
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/claudeleon-dark.png">
+  <img alt="Claudeleon with the Essential theme: the conversation list on the left, a reply from Claude with a diff, the input box with folder, branch and model" src="docs/claudeleon-light.png">
+</picture>
+
 **Install:** download `Claudeleon-Setup-<version>.exe` from the
 [latest release](https://github.com/LukePasax/Claudeleon/releases/latest) and run it; from then on it updates itself
 from the releases. You need [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and signed in.

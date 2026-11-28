@@ -4553,6 +4553,22 @@
   ]
 
   // Una risposta finta che usa tutto il markdown
+  // ?demo=en: i dati finti in inglese, per le immagini del README
+  // (una funzione: la versione finta nasce prima che questa parte del file sia letta)
+  function demoEn() { return new URLSearchParams(location.search).get('demo') === 'en' }
+  const FAKE_ANSWER_EN = [
+    'Rivers are now drawn **before the roads**, so they no longer cover them.',
+    '',
+    '- `DrawRivers()` in `MapView.cpp`, called right before `DrawRoads()`',
+    '- a **Rivers** switch in the *View* menu, on by default',
+    '',
+    '| File | Lines | Status |',
+    '|:-----|------:|:------:|',
+    '| `MapView.cpp` | +2 −1 | done |',
+    '| `RouteFinder.h` | +18 | to review |',
+    '',
+    'The test map now shows the river under the bridge. Want me to add fords on the trails too?',
+  ].join('\n')
   const FAKE_ANSWER = [
     'Ecco quanto mi chiedi: "{text}". La risposta arriva a pezzi, con **grassetto**, *corsivo*, ~~barrato~~ e `codice`.',
     '## Il piano',
@@ -4634,6 +4650,10 @@
       remote: 'git@github.com:luca/MapEditor.git', web: 'https://github.com/luca/MapEditor', base: 'main', last: { hash: 'a1b2c3d', subject: 'Le strade sopra i sentieri' },
       compare: 'https://github.com/luca/MapEditor/compare/main...fiumi?expand=1', gh: true,
     }
+    if (demoEn()) {
+      Object.assign(fakeGit, { branch: 'rivers', upstream: 'origin/rivers', root: 'C:/Projects/MapEditor', remote: 'git@github.com:example/MapEditor.git', web: 'https://github.com/example/MapEditor', compare: '' })
+      fakeGit.files[2].path = 'docs/old-notes.md'
+    }
     const gitTotals = () => { fakeGit.totals = fakeGit.files.reduce((t, f) => ({ files: t.files + 1, added: t.added + f.added, removed: t.removed + f.removed }), { files: 0, added: 0, removed: 0 }) }
     gitTotals()
     const fakeBranches = ['fiumi', 'main', 'sentieri']
@@ -4652,9 +4672,16 @@
     ])
     const fakeMemFiles = () => ({ cwd: 'C:/Users/luca/MapEditor', files: [['user', 'C:/Users/luca/.claude/CLAUDE.md'], ['project', 'C:/Users/luca/MapEditor/CLAUDE.md'], ['local', 'C:/Users/luca/MapEditor/CLAUDE.local.md'], ['parent', 'C:/Users/luca/CLAUDE.md']].filter(([id, f]) => id !== 'parent' || fakeMemory.has(f)).map(([id, file]) => ({ id, file, exists: fakeMemory.has(file), size: (fakeMemory.get(file) || '').length })) })
     const fakePermFiles = { user: 'C:/Users/luca/.claude/settings.json', project: 'C:/Users/luca/MapEditor/.claude/settings.json', local: 'C:/Users/luca/MapEditor/.claude/settings.local.json' }
-    const fakeUpdate = { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/luca/Claudeleon', installed: true }
+    const fakeUpdate = demoEn() ? { state: 'uptodate', checkedAt: Date.now() } : { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/luca/Claudeleon', installed: true }
     const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '1.0.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claudeleon', shortcut: 'Ctrl+Alt+P', worktree: false, language: new URLSearchParams(location.search).get('lingua') || 'en' }
-    const fakeSessions = [
+    const fakeSessions = demoEn() ? [
+      { id: 's0', title: 'Theme editor with live preview', lastModified: Date.now() - 600000, cwd: 'C:/Projects/Claudeleon', branch: 'main' },
+      { id: 's1', title: 'Shortest path in RouteFinder', lastModified: Date.now() - 3600000, cwd: 'C:/Projects/MapEditor', branch: 'rivers' },
+      { id: 's2', title: 'Fix the flaky export test', lastModified: Date.now() - day, cwd: 'C:/Projects/MapEditor' },
+      { id: 's3', title: 'Windows Terminal profile', lastModified: Date.now() - 4 * day, cwd: 'C:/Users/me' },
+      { id: 's4', title: 'Release notes for 1.1', lastModified: Date.now() - 9 * day, cwd: 'C:/Projects/Claudeleon', pinned: true },
+      { id: 's5', title: 'Backup script for notes', lastModified: Date.now() - 45 * day, cwd: 'C:/Users/me/Documents' },
+    ] : [
       { id: 's0', title: 'Allegati e domande con le opzioni', lastModified: Date.now() - 600000, cwd: 'C:/Workspace/Progetti/Claudeleon', branch: 'main' },
       { id: 's1', title: 'Temi per Claudeleon', lastModified: Date.now() - 3600000, cwd: 'C:/Workspace/Progetti/Claudeleon', branch: 'main' },
       { id: 's2', title: 'Il calcolo dei sentieri in RouteFinder', lastModified: Date.now() - day, cwd: 'C:/Workspace/MapEditor' },
@@ -4667,7 +4694,7 @@
       // ?tema=<id>&scena=giorno nell'indirizzo per guardare un tema
       info: async () => {
         const q = new URLSearchParams(location.search)
-        return { scene: q.get('scena') || 'notte', language: q.get('lingua') || 'en', welcomed: q.get('benvenuto') !== 'si', chapter: n, theme: q.get('tema') || 'essenziale', themes: ['essenziale'], userThemes: fakeUserThemes, workdir: 'C:/Workspace', workdirChosen: q.get('cartella') !== 'no', mode: q.get('modo') || 'auto' }
+        return { scene: q.get('scena') || 'notte', language: q.get('lingua') || 'en', welcomed: q.get('benvenuto') !== 'si', chapter: n, theme: q.get('tema') || 'essenziale', themes: ['essenziale'], userThemes: fakeUserThemes, workdir: demoEn() ? 'C:/Projects/MapEditor' : 'C:/Workspace', workdirChosen: q.get('cartella') !== 'no', mode: q.get('modo') || 'auto' }
       },
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
       setMode: (m) => fire('onMode', m, 0),
@@ -4782,8 +4809,8 @@
           fire('onWorktree', wt, 10)
         }
         if (conv && !fakeSessions.some((x) => x.conv === conv)) {
-          fakeSessions.unshift({ id: `fs-${conv}`, conv, title: (typeof msg === 'string' ? msg : msg.text.replace(/\s*<diff_comments>[\s\S]*$/, '') || 'Commenti sulle modifiche').slice(0, 40), lastModified: Date.now(), cwd: 'C:/Workspace' })
-          fire('onConvSession', { id: `fs-${conv}`, cwd: 'C:/Workspace' }, 30)
+          fakeSessions.unshift({ id: `fs-${conv}`, conv, title: (typeof msg === 'string' ? msg : msg.text.replace(/\s*<diff_comments>[\s\S]*$/, '') || 'Commenti sulle modifiche').slice(0, 40), lastModified: Date.now(), cwd: demoEn() ? 'C:/Projects/MapEditor' : 'C:/Workspace' })
+          fire('onConvSession', { id: `fs-${conv}`, cwd: demoEn() ? 'C:/Projects/MapEditor' : 'C:/Workspace' }, 30)
         }
         const text = typeof msg === 'string' ? msg : msg.text || '(allegati)'
         if (text.startsWith('/')) {
@@ -4795,20 +4822,20 @@
           return
         }
         fire('onThinkingStart', null, 60)
-        ;['Devo capire **dove** si disegnano le strade. ', 'Cerco DrawRoads nel codice, poi leggo MapView.cpp ', 'e aggiungo i fiumi prima delle strade.'].forEach((x, i) => fire('onThinking', x, 80 + i * 40))
+        ;(demoEn() ? ['I need to find **where** roads are drawn. ', 'Search for DrawRoads, then read MapView.cpp ', 'and draw rivers before the roads.'] : ['Devo capire **dove** si disegnano le strade. ', 'Cerco DrawRoads nel codice, poi leggo MapView.cpp ', 'e aggiungo i fiumi prima delle strade.']).forEach((x, i) => fire('onThinking', x, 80 + i * 40))
         fire('onThinkingEnd', null, 190)
         fire('onTool', { id: 't0', name: 'Grep', summary: 'DrawRoads', intent: { verb: 'grep', target: 'DrawRoads' } }, 200)
         fire('onToolDone', { id: 't0', error: false }, 260)
         fire('onTool', { id: 't1', name: 'Read', summary: 'src/MapView.cpp', intent: { verb: 'read', target: 'MapView.cpp' } }, 300)
         fire('onToolDone', { id: 't1', error: false }, 380)
-        fire('onToolSummary', { summary: 'Ha trovato dove si disegnano le strade', ids: ['t0', 't1'] }, 420)
+        fire('onToolSummary', { summary: demoEn() ? 'Found where the roads are drawn' : 'Ha trovato dove si disegnano le strade', ids: ['t0', 't1'] }, 420)
         fire('onTool', { id: 't2', name: 'Edit', summary: 'src/MapView.cpp', intent: { verb: 'edit', target: 'MapView.cpp' }, change: FAKE_EDIT }, 600)
         fire('onToolDone', { id: 't2', error: false }, 800)
-        const answer = FAKE_ANSWER.replace('{text}', text)
+        const answer = demoEn() ? FAKE_ANSWER_EN : FAKE_ANSWER.replace('{text}', text)
         ;[...answer].forEach((ch, i) => fire('onDelta', ch, 900 + i * 15))
         fire('onDone', { durationMs: 2400 }, 900 + answer.length * 15 + 100)
-        fire('onSuggestion', 'Aggiungi anche i guadi sui sentieri', 900 + answer.length * 15 + 150)
-        fire('onAsk', { id: 1, title: 'Claude vuole creare un file', description: '', detail: 'src/RouteFinder.h', change: FAKE_WRITE, canAlways: true }, 900 + answer.length * 15 + 200)
+        fire('onSuggestion', demoEn() ? 'Yes, add fords on the trails too' : 'Aggiungi anche i guadi sui sentieri', 900 + answer.length * 15 + 150)
+        if (!demoEn()) fire('onAsk', { id: 1, title: 'Claude vuole creare un file', description: '', detail: 'src/RouteFinder.h', change: FAKE_WRITE, canAlways: true }, 900 + answer.length * 15 + 200)
       },
       onDelta: on('onDelta'), onTool: on('onTool'), onToolDone: on('onToolDone'), onDone: on('onDone'), onError: on('onError'), onReset: on('onReset'), onTheme: on('onTheme'), onMode: on('onMode'), onToolSummary: on('onToolSummary'), onWindowState: on('onWindowState'), onWorkdir: on('onWorkdir'), onCommands: on('onCommands'), onCommandsError: on('onCommandsError'), onCommandOutput: on('onCommandOutput'), onCompacted: on('onCompacted'), onTitle: on('onTitle'), onStatus: on('onStatus'),
     }
