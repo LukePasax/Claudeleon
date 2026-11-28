@@ -17,7 +17,11 @@ const memory = require('./memory')
 const { plainSnippet } = require('./text')
 const { listThemes, DEFAULT_THEME, userThemes, userThemeInfo, saveUserTheme, deleteUserTheme, installedThemes, bundleFor, checkBundle, installBundle } = require('./themes')
 // I temi importati con codice si caricano da qui (skins-theme://<id>/theme.js), dalla cartella temi dei dati dell'app
-protocol.registerSchemesAsPrivileged([{ scheme: 'skins-theme', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }])
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'skins-theme', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
+  // Le pagine HTML del computer nell'anteprima (vedi servePages)
+  { scheme: 'skins-page', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
+])
 
 // La misura di partenza, simile a quella dell'app desktop, e la minima, per i temi che non dicono le loro
 // (campo window del theme.js). La finestra di partenza non supera mai il 92% dello schermo
@@ -989,8 +993,11 @@ function registerIpc() {
     const pinned = new Set(Array.isArray(config.pinned) ? config.pinned : [])
     return (await bridge.sessions()).map((s) => (pinned.has(s.id) ? Object.assign(s, { pinned: true }) : s))
   })
-  // La ricerca dentro le conversazioni (le parole nei messaggi, non solo nei titoli)
+  // L'anteprima di una pagina HTML del computer, da skins-page:// (vedi servePages)
+  ipcMain.handle('preview:page', (_e, fileUrl) => pageUrl(fileUrl))
+  // Gli artifact di claude.ai pubblicati dalle conversazioni di questo computer
   ipcMain.handle('artifacts:list', () => { try { return listArtifacts().slice(0, 300) } catch { return [] } })
+  // La ricerca dentro le conversazioni (le parole nei messaggi, non solo nei titoli)
   ipcMain.handle('sessions:search', (_e, q) => { try { return searchSessions(String(q || '')).slice(0, 200) } catch { return [] } })
   ipcMain.handle('session:pin', (_e, id, on) => {
     const list = (Array.isArray(config.pinned) ? config.pinned : []).filter((x) => x !== id)
@@ -1374,6 +1381,38 @@ function serveThemes() {
   })
 }
 
+// Le pagine HTML del computer nell'anteprima (quelle che Claude scrive): non come file://, che è l'origine della
+// finestra (una pagina arriverebbe all'API dell'app e a ogni file), ma da skins-page://<chiave>/<file>, un'origine
+// sua per cartella, che vede solo la cartella della pagina e quelle sotto (i suoi CSS, script e immagini)
+const pageRoots = new Map()
+function pageUrl(fileUrl) {
+  let file
+  try { file = require('url').fileURLToPath(String(fileUrl)) } catch { return null }
+  if (!/\.html?$/i.test(file) || !fs.existsSync(file)) return null
+  const dir = path.dirname(file)
+  const key = require('crypto').createHash('sha256').update(dir.toLowerCase()).digest('hex').slice(0, 24)
+  pageRoots.set(key, dir)
+  return `skins-page://${key}/${encodeURIComponent(path.basename(file))}`
+}
+function servePages() {
+  protocol.handle('skins-page', async (req) => {
+    try {
+      const u = new URL(req.url)
+      const dir = pageRoots.get(u.hostname)
+      if (!dir) return new Response('', { status: 404 })
+      const file = path.join(dir, ...decodeURIComponent(u.pathname).split('/').filter(Boolean))
+      const rel = path.relative(dir, file)
+      if (rel.startsWith('..') || path.isAbsolute(rel) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return new Response('', { status: 404 })
+      const res = await net.fetch(require('url').pathToFileURL(file).href)
+      const headers = new Headers(res.headers)
+      headers.set('Cache-Control', 'no-store')
+      return new Response(res.body, { status: res.status, headers })
+    } catch {
+      return new Response('', { status: 404 })
+    }
+  })
+}
+
 // Il pannello degli artifact: le pagine di claude.ai (e quelle per accedere) restano nel <webview>, il resto va nel
 // browser. Le finestre che claude.ai apre per l'accesso (Google, Apple) si aprono come finestre dell'app, nella stessa
 // sessione; l'identità del browser è quella di Chrome, senza Electron, altrimenti Google rifiuta l'accesso
@@ -1402,6 +1441,7 @@ process.on('uncaughtException', (err) => { logError('errore nel processo princip
 
 app.whenReady().then(() => {
   serveThemes()
+  servePages()
   setupClaudeSession()
   migrateOldData()
   loadConfig()

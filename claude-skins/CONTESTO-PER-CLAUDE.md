@@ -531,6 +531,25 @@ anthropic.com, claudeusercontent.com), il resto va nel browser, e le finestre ch
 finestre dell'app nella stessa sessione. L'identità del browser di quella sessione non dice Electron (Google
 rifiuterebbe l'accesso). Gli avvisi di nuovi commenti sugli artifact non arrivano nelle sessioni dell'SDK.
 
+## Finestra ricordata, conversazioni derivate, pagine del computer nell'anteprima
+
+- **Finestra:** `config.windowMode` ('normal' o 'max', lo schermo intero vale 'max') si salva in `setWinMode` e quando
+  spostarla da ingrandita la riporta a finestra (`rememberWinMode`); `createWindow` la riapre ingrandita sullo schermo
+  dove stava, con `restoreBounds` alla posizione e misura da finestra (`config.position`, `config.sizes`). Senza
+  posizione salvata (o su uno schermo che non c'è più) `defaultPosition` la centra.
+- **Derivate:** `src/forks.js` legge le prime righe dei `.jsonl` (a pezzi da 64 KB, al massimo 1 MB, fino alla prima
+  risposta di Claude; una volta sola per file): `forkedFrom.sessionId` (forkSession dell'SDK, fork dell'app desktop e
+  del terminale) o `requestSessionId` diverso dal proprio id (ripresa con `resume` + `forkSession`, come fa Claudeleon
+  modificando un messaggio: lì `forkedFrom` non c'è). `bridge.sessions()` aggiunge `parent`; `nestSessions` nella
+  pagina mette le derivate sotto (`.session-row.child`, `--depth`), con la famiglia nel gruppo della più recente.
+- **Pagine del computer:** mai `file://` nell'iframe dell'anteprima: la finestra è `file://` e la pagina arriverebbe a
+  `parent.skins` e a ogni file (Electron dà a `file://` privilegi in più). `preview:page` dà `skins-page://<chiave>/<file>`
+  (la chiave è l'hash della cartella, registrata in `pageRoots`), `servePages` serve solo dentro quella cartella. Una
+  prova nell'app vera (`test/ui/temi-dal-vivo.test.js`) controlla che non arrivi all'API, alla pagina e ai file sopra.
+- **Temi dal vivo:** `Theming.load(…, true)` tiene da parte la versione di prima e la rimette se la nuova non si
+  registra (un `theme.js` scritto a metà); `themesChanged` gira in coda (`themesQueue`) e rimonta solo se il tema è
+  cambiato davvero.
+
 ## Prossimi passi possibili
 
 0. **Temi.**

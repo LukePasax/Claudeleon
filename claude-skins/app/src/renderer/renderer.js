@@ -1201,14 +1201,19 @@
   // nuovi o cambiati si ricaricano, quelli spariti si tolgono; se è cambiato quello in uso la finestra lo rimonta, così
   // si vede subito ogni ritocco. Il selettore dei temi, se è aperto, si ridisegna
   const themeStamps = new Map()
-  if (api.onThemesChanged) api.onThemesChanged(async ({ code = [], colors = [] } = {}) => {
+  // Uno alla volta: due salvataggi vicini non si accavallano
+  let themesQueue = Promise.resolve()
+  if (api.onThemesChanged) api.onThemesChanged((snap) => { themesQueue = themesQueue.then(() => themesChanged(snap || {})).catch((err) => { if (api.logError) api.logError(`temi cambiati: ${err && err.message}`) }) })
+  async function themesChanged({ code = [], colors = [] }) {
     const cur = Theming.current.id
     let curChanged = false
     for (const e of code) {
       if (Theming.get(e.id) && themeStamps.get(e.id) === e.stamp) continue
       themeStamps.set(e.id, e.stamp)
+      const old = Theming.get(e.id)
       await Theming.load([{ id: e.id, base: e.base }], true)
-      if (e.id === cur) curChanged = true
+      // Se la versione nuova non si è caricata (file a metà) resta quella di prima: niente da rimontare
+      if (e.id === cur && Theming.get(e.id) !== old) curChanged = true
     }
     const kit = window.SkinsKits && window.SkinsKits.moderno
     for (const spec of colors) {
@@ -1227,7 +1232,7 @@
     }
     if (curChanged && !themeEditor) await mount(cur)
     if (document.querySelector('.theme-picker .theme-cards')) openThemes()
-  })
+  }
 
   // Un tema da un file .skin: il processo principale lo controlla, chiede conferma e lo installa; qui si carica e si
   // mette in uso
@@ -3081,13 +3086,26 @@
     // La pagina che si sta guardando è cambiata (Claude ha riscritto il file HTML): si ricarica
     if (c === active && preview && preview.isConnected && !preview.hidden && urls.includes(previewUrl) && /^file:/i.test(previewUrl)) reloadPreview()
   }
+  // Una pagina del computer (file://) non si apre come file: la finestra stessa è file://, e la pagina arriverebbe
+  // all'API dell'app e agli altri file. La serve il processo principale da skins-page://, un'origine sua che vede solo
+  // la cartella della pagina. Senza il processo principale (le prove nel browser) resta vuota
+  async function loadFrame(frame, url, force) {
+    if (!url) return
+    let src = url
+    if (/^file:/i.test(url)) {
+      src = api.previewPage ? await api.previewPage(url).catch(() => null) : null
+      if (previewUrl !== url) return
+      if (!src) { frame.src = 'about:blank'; return }
+    }
+    if (force || frame.dataset.url !== url) { frame.dataset.url = url; frame.src = src }
+  }
   function reloadPreview() {
     if (!preview || !previewUrl) return
     const web = preview.querySelector('.pv-web')
     if (isClaudeUrl(previewUrl) && web) { try { web.reload() } catch {} ; return }
     const frame = preview.querySelector('.pv-frame')
     frame.src = 'about:blank'
-    setTimeout(() => { frame.src = previewUrl }, 30)
+    setTimeout(() => loadFrame(frame, previewUrl, true), 30)
   }
   function renderPreviewBtn() {
     if (quiet) return
@@ -3196,7 +3214,7 @@
     frame.hidden = !previewUrl || claude
     preview.querySelector('.pv-empty').hidden = !!previewUrl
     if (claude) {
-      if (frame.src !== 'about:blank') frame.src = 'about:blank'
+      if (frame.src !== 'about:blank') { frame.src = 'about:blank'; delete frame.dataset.url }
       if (!web) {
         // Il processo principale accetta solo questa sessione e solo indirizzi di claude.ai
         web = document.createElement('webview')
@@ -3211,7 +3229,7 @@
     } else {
       // Resta, nascosto: tornando a un artifact non si ricarica da capo
       if (web) web.hidden = true
-      if (previewUrl && frame.src !== previewUrl) frame.src = previewUrl
+      loadFrame(frame, previewUrl)
     }
     renderPreviewBtn()
   }
@@ -3226,7 +3244,7 @@
   }
   function closePreview() {
     // Il server locale si ferma (about:blank); la pagina di claude.ai resta com'era per quando si riapre
-    if (preview) { preview.hidden = true; preview.querySelector('.pv-frame').src = 'about:blank' }
+    if (preview) { const f = preview.querySelector('.pv-frame'); preview.hidden = true; f.src = 'about:blank'; delete f.dataset.url }
     document.body.classList.remove('has-preview')
     renderPreviewBtn()
   }

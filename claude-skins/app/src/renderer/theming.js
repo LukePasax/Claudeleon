@@ -686,14 +686,23 @@
   async function load(entries, fresh) {
     window.SkinsThemes = window.SkinsThemes || []
     const list = entries.map((e) => (typeof e === 'string' ? { id: e, base: `themes/${e}/` } : e)).filter((e) => e && e.id)
+    // Ricaricando, la versione di prima resta da parte: se quella nuova non si carica (un file scritto a metà, un
+    // errore) torna lei, e la finestra non perde il tema
+    const before = new Map()
     for (const e of list) {
       bases.set(e.id, e.base)
-      if (fresh) { registry.delete(e.id); window.SkinsThemes = window.SkinsThemes.filter((th) => th.id !== e.id); versions.set(e.id, Date.now()) }
+      if (fresh) {
+        if (registry.has(e.id)) before.set(e.id, { th: registry.get(e.id), ver: versions.get(e.id) })
+        registry.delete(e.id)
+        window.SkinsThemes = window.SkinsThemes.filter((th) => th.id !== e.id)
+        versions.set(e.id, Date.now())
+      }
     }
     await Promise.all(list.map((e) => loadScript(`${e.base}theme.js${fresh ? `?v=${Date.now()}` : ''}`)))
     // Nell'ordine dato (il predefinito per primo, poi per nome), non in quello in cui i file finiscono di caricarsi
     const loaded = new Map(window.SkinsThemes.filter((th) => th && th.id).map((th) => [th.id, th]))
     for (const id of [...list.map((e) => e.id), ...loaded.keys()]) if (loaded.has(id) && !registry.has(id)) registry.set(id, loaded.get(id))
+    for (const [id, old] of before) if (!registry.has(id)) { registry.set(id, old.th); if (old.ver) versions.set(id, old.ver); else versions.delete(id) }
     return [...registry.values()].map((th) => ({ id: th.id, name: th.name || th.id }))
   }
 

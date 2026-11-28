@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld('skins', {
   pinSession: (id, on) => ipcRenderer.invoke('session:pin', id, on),
   searchSessions: (q) => ipcRenderer.invoke('sessions:search', q),
   artifacts: () => ipcRenderer.invoke('artifacts:list'),
+  previewPage: (fileUrl) => ipcRenderer.invoke('preview:page', fileUrl),
   exportSession: (id, cwd, title) => ipcRenderer.invoke('session:export', id, cwd, title),
   memoryFiles: (conv) => ipcRenderer.invoke('memory:list', conv),
   readMemory: (conv, file) => ipcRenderer.invoke('memory:read', conv, file),

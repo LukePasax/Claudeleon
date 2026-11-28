@@ -770,6 +770,8 @@ class ClaudeBridge extends EventEmitter {
       }
     } else if (msg.type === 'result') {
       live.turn = { open: false }
+      // Le azioni rimaste senza risultato (fermate a metà) non servono più
+      this.toolInputs.clear()
       if (msg.is_error || msg.subtype !== 'success') this.emit('error', msg.result || tr('Claude Code si è fermato ({x}).', { x: msg.subtype }))
       else {
         // Un comando che non ha fatto scrivere Claude né mandato un'uscita: il suo esito è nel risultato

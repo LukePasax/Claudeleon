@@ -34,7 +34,9 @@ Settings → Updates has **Check now** and the switch for automatic checks.
 ## The window
 
 - **Move and resize:** drag the top bar; resize from any edge or corner. The size is remembered per theme. Double-
-  click the top bar (or the maximize button) to fill the screen's work area; **F11** for full screen.
+  click the top bar (or the maximize button) to fill the screen's work area; **F11** for full screen. It reopens as
+  you left it: maximized if it was (full screen comes back maximized), otherwise where it was. The first time it
+  opens in the middle of the screen.
 - **Like a normal app:** it lives in the taskbar and "–" minimizes it there. It is not always on top unless you turn
   that on. **Ctrl+Alt+P** brings it to the front from any program (or minimizes it).
 - **Tray icon:** new conversation, theme, working folder, notifications, always on top, back to center, initial
@@ -50,6 +52,8 @@ Settings → Updates has **Check now** and the switch for automatic checks.
 - **The conversation list** on the left shows Claude Code sessions from all folders (including the desktop app's),
   grouped by day, with folder and git branch. The search box (Ctrl+K) filters by title, folder and branch, and from
   three letters on also by the **text of the messages**: matches show a snippet with the words highlighted.
+  Conversations that started from another one (editing a sent message, a fork in the desktop app or the terminal)
+  sit right under it, indented.
 - Each conversation has a menu (**⋯** or right-click): **Rename**, **Pin to top**, **Export to Markdown…**,
   **Archive** (hidden from the list, kept on disk) and **Delete** (removes the transcript, asks first). `/export`
   exports the current one.
@@ -130,7 +134,8 @@ dashboard of these numbers").
 - The first time, the panel asks you to sign in to claude.ai; the sign-in stays in Claudeleon. If a sign-in method
   does not work there, use **↗** and the browser.
 - While Claude writes an HTML page on your computer, **Preview · page.html** under the input box shows it in the same
-  panel, and it reloads every time Claude changes the file.
+  panel, and it reloads every time Claude changes the file. The page only sees its own folder (and those below it):
+  it cannot reach other files or the app.
 - **Artifacts** at the bottom of the sidebar (or Settings → Artifacts, or `/artifacts`) lists the artifacts published from the conversations on this computer,
   with their conversation, and opens the claude.ai gallery with all of them. The switch there turns artifacts off.
 
