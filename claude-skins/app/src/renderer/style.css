@@ -247,6 +247,8 @@ button { font-family: inherit; color: inherit; }
 .session-row .when { font-size: var(--small-size); color: var(--ink-soft); }
 .session-row.current { background: var(--code); }
 .session-row.current .title { color: var(--strong); }
+/* Una conversazione derivata da quella sopra: rientrata, con un filo che la lega */
+.session-row.child { margin-left: calc(var(--depth, 1) * 14px); border-left: var(--line) solid var(--edge-light); border-top-left-radius: 0; border-bottom-left-radius: 0; }
 
 /* I pulsanti */
 .btn {

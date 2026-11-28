@@ -302,6 +302,13 @@ function createWindow() {
   if (config.onTop === true) win.setAlwaysOnTop(true, 'floating')
   // Finché il mouse non è sopra una parte disegnata del tema, i clic attraversano la finestra (lo segnala la pagina)
   win.setIgnoreMouseEvents(true, { forward: true })
+  // Era ingrandita quando si è chiusa: riparte ingrandita sullo schermo dove stava (la misura da finestra resta per
+  // quando la si riporta a finestra). La prima volta, o con una posizione su uno schermo che non c'è più, al centro
+  if (config.windowMode === 'max' && !captureMode) {
+    restoreBounds = win.getBounds()
+    win.setBounds(screen.getDisplayMatching(restoreBounds).workArea)
+    winMode = 'max'
+  }
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'))
   // La pagina deve dire "pronta" entro 20 secondi; se si chiude da sola prima, si riparte col tema di partenza
   watchStart()
@@ -373,6 +380,15 @@ function setWinMode(mode) {
   }
   winMode = mode
   send('window:state', winMode)
+  rememberWinMode()
+}
+// Ingrandita o no si ricorda per il prossimo avvio (lo schermo intero torna come ingrandita: all'avvio coprirebbe
+// anche la barra di Windows). La misura e la posizione da finestra restano quelle di config.position e config.sizes
+function rememberWinMode() {
+  const m = winMode === 'normal' ? 'normal' : 'max'
+  if (config.windowMode === m) return
+  config.windowMode = m
+  saveConfig()
 }
 
 // Spostare ('move') o ridimensionare ('resize:<lati>', es. 'resize:se', 'resize:n'): dal clic sulla pagina si segue il
@@ -388,6 +404,7 @@ function startGesture(kind) {
     winMode = 'normal'
     win.setBounds({ x: Math.round(c.x - rb.width * ratio), y: Math.max(b.y, c.y - 20), width: rb.width, height: rb.height })
     send('window:state', winMode)
+    rememberWinMode()
   }
   if (kind !== 'move' && winMode !== 'normal') return
   const sides = kind.startsWith('resize') ? (kind.split(':')[1] || 'se') : ''

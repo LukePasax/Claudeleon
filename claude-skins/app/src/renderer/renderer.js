@@ -3109,13 +3109,24 @@
       b.title = t('previewTip', { x: u })
     }
   }
-  function previewWidth(host) {
+  // La conversazione accanto resta larga almeno 520 pixel: il pannello prende lo spazio che resta tolte le altre parti
+  // del layout (la barra laterale), e si stringe lui quando si stringe la finestra
+  function previewMax(pane) {
+    const host = pane.parentElement
+    const main = app.querySelector('main')
+    let others = 0
+    for (const c of host.children) if (c !== pane && c !== main && c.offsetParent !== null && getComputedStyle(c).position !== 'absolute') others += c.offsetWidth
+    return Math.max(260, host.clientWidth - others - 520)
+  }
+  function previewWidth(pane) {
     let w = 0
     try { w = Number(localStorage.getItem('skins.previewWidth')) || 0 } catch {}
-    // La conversazione accanto resta larga almeno 520 pixel
-    const max = Math.max(320, host.clientWidth - 520)
-    return Math.min(max, Math.max(300, w || Math.round(host.clientWidth * 0.4)))
+    const max = previewMax(pane)
+    return Math.min(max, Math.max(260, w || Math.round(pane.parentElement.clientWidth * 0.4)))
   }
+  window.addEventListener('resize', () => {
+    if (preview && preview.isConnected && !preview.hidden && !preview.classList.contains('floating')) preview.style.width = `${previewWidth(preview)}px`
+  })
   function buildPreview() {
     const pane = document.createElement('div')
     pane.className = 'preview-pane'
@@ -3161,7 +3172,8 @@
       const x0 = e.clientX
       const w0 = pane.offsetWidth
       pane.classList.add('dragging')
-      const move = (ev) => { pane.style.width = `${Math.min(host.clientWidth - 360, Math.max(280, w0 + x0 - ev.clientX))}px` }
+      const max = pane.classList.contains('floating') ? host.clientWidth - 360 : previewMax(pane)
+      const move = (ev) => { pane.style.width = `${Math.min(max, Math.max(260, w0 + x0 - ev.clientX))}px` }
       const up = () => {
         pane.classList.remove('dragging')
         document.removeEventListener('mousemove', move)
@@ -3171,7 +3183,7 @@
       document.addEventListener('mousemove', move)
       document.addEventListener('mouseup', up)
     })
-    pane.style.width = `${previewWidth(pane.parentElement)}px`
+    pane.style.width = `${previewWidth(pane)}px`
     return pane
   }
   function navigatePreview(url) {
@@ -3197,7 +3209,8 @@
       } else if (web.getAttribute('src') !== previewUrl) web.setAttribute('src', previewUrl)
       web.hidden = false
     } else {
-      if (web) web.remove()
+      // Resta, nascosto: tornando a un artifact non si ricarica da capo
+      if (web) web.hidden = true
       if (previewUrl && frame.src !== previewUrl) frame.src = previewUrl
     }
     renderPreviewBtn()
@@ -3205,13 +3218,15 @@
   function openPreview(url) {
     if (!preview || !preview.isConnected) preview = buildPreview()
     preview.hidden = false
+    if (!preview.classList.contains('floating')) preview.style.width = `${previewWidth(preview)}px`
     document.body.classList.add('has-preview')
     navigatePreview(url || previewUrl || ((active && active.previewUrls) || [])[0] || '')
     if (!previewUrl) preview.querySelector('.pv-addr').focus()
     hook('preview', previewUrl)
   }
   function closePreview() {
-    if (preview) { preview.hidden = true; preview.querySelector('.pv-frame').src = 'about:blank'; const web = preview.querySelector('.pv-web'); if (web) web.remove() }
+    // Il server locale si ferma (about:blank); la pagina di claude.ai resta com'era per quando si riapre
+    if (preview) { preview.hidden = true; preview.querySelector('.pv-frame').src = 'about:blank' }
     document.body.classList.remove('has-preview')
     renderPreviewBtn()
   }
@@ -3780,7 +3795,7 @@
     const item = add('artifact-card', `<div class="art-icon">${ARTIFACT_ICON}</div><div class="art-text"><div class="art-title"></div><div class="art-sub"></div></div><div class="art-actions"></div>`)
     item.querySelector('.art-title').textContent = a.title || 'Artifact'
     label(item.querySelector('.art-sub'), a.updated ? 'artUpdated' : 'artPublished')
-    item.title = a.url
+    item.title = t('artTip', { x: a.url })
     item.dataset.url = a.url
     artifactActions(item.querySelector('.art-actions'), a)
     item.addEventListener('click', () => openPreview(a.url))
@@ -4145,6 +4160,41 @@
   }
   const fold = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
+  // Le conversazioni derivate da un'altra (s.parent) stanno subito sotto quella, rientrate, come nell'app desktop:
+  // la più recente prima; le derivate di una derivata ancora più a destra. Una famiglia sta nel gruppo della sua
+  // attività più recente. Una derivata resta da sola se quella di partenza non è nella lista (filtrata, archiviata,
+  // fissata mentre l'altra no). Dà [{ s, depth, time }] nell'ordine in cui si mostrano
+  function nestSessions(visible, rank) {
+    const byId = new Map(visible.map((s) => [s.id, s]))
+    const kids = new Map()
+    const isChild = (s) => s.parent && s.parent !== s.id && byId.has(s.parent) && rank(byId.get(s.parent)) === rank(s)
+    for (const s of visible) if (isChild(s)) { if (!kids.has(s.parent)) kids.set(s.parent, []); kids.get(s.parent).push(s) }
+    const newest = (a, b) => (b.lastModified || 0) - (a.lastModified || 0)
+    const famTime = new Map()
+    const time = (s, seen = new Set()) => {
+      if (famTime.has(s.id)) return famTime.get(s.id)
+      seen.add(s.id)
+      let t = s.lastModified || 0
+      for (const k of kids.get(s.id) || []) if (!seen.has(k.id)) t = Math.max(t, time(k, seen))
+      famTime.set(s.id, t)
+      return t
+    }
+    // Le radici: chi non è derivata di una visibile (o è in un giro, che non dovrebbe esserci)
+    const roots = visible.filter((s) => !isChild(s))
+    const placed = new Set()
+    const out = []
+    const walk = (s, depth) => {
+      if (placed.has(s.id)) return
+      placed.add(s.id)
+      out.push({ s, depth, time: time(s) })
+      for (const k of (kids.get(s.id) || []).slice().sort(newest)) walk(k, depth + 1)
+    }
+    const order = roots.map((s, i) => ({ s, i })).sort((a, b) => rank(a.s) - rank(b.s) || (rank(a.s) === 1 ? time(b.s) - time(a.s) : 0) || a.i - b.i)
+    for (const { s } of order) walk(s, 0)
+    for (const s of visible) if (!placed.has(s.id)) walk(s, 0)
+    return out
+  }
+
   function renderSessionList() {
     const list = part('sessions-list')
     if (!list) return
@@ -4159,8 +4209,8 @@
     if (!sessionsCache.length) { sessionNote(list, 'sessionsEmpty', { dir: workdir || 'cartella di lavoro' }); return }
     if (!visible.length) sessionNote(list, 'sessionsNoMatch', { q: sessionsQuery.trim() })
     let group = null
-    for (const s of visible) {
-      const g = s.archived ? 'groupArchived' : s.pinned ? 'groupPinned' : sessionGroup(s.lastModified)
+    for (const { s, depth, time } of nestSessions(visible, rank)) {
+      const g = depth ? group : s.archived ? 'groupArchived' : s.pinned ? 'groupPinned' : sessionGroup(time)
       if (g !== group) {
         group = g
         const h = document.createElement('div')
@@ -4168,6 +4218,7 @@
         list.appendChild(label(h, g))
       }
       const row = sessionRow(s)
+      if (depth) { row.classList.add('child'); row.style.setProperty('--depth', Math.min(depth, 3)) }
       // Trovata nei messaggi: un pezzo di quello che contiene le parole, con le parole evidenziate
       const hit = q && contentHits.get(s.id)
       if (hit) {
@@ -4821,14 +4872,14 @@
     const day = 86400000
     // Un repo finto per il pannello di git
     const fakeGit = {
-      repo: true, root: 'C:/Users/luca/MapEditor', branch: 'fiumi', upstream: 'origin/fiumi', ahead: 1, behind: 0, detached: false, noCommits: false,
+      repo: true, root: 'C:/Users/me/MapEditor', branch: 'fiumi', upstream: 'origin/fiumi', ahead: 1, behind: 0, detached: false, noCommits: false,
       files: [
         { path: 'src/MapView.cpp', status: 'M', added: 2, removed: 1 },
         { path: 'src/Rivers.cpp', status: '?', added: 48, removed: 0 },
         { path: 'docs/vecchio.md', status: 'D', added: 0, removed: 12 },
       ],
-      remote: 'git@github.com:luca/MapEditor.git', web: 'https://github.com/luca/MapEditor', base: 'main', last: { hash: 'a1b2c3d', subject: 'Le strade sopra i sentieri' },
-      compare: 'https://github.com/luca/MapEditor/compare/main...fiumi?expand=1', gh: true,
+      remote: 'git@github.com:someone/MapEditor.git', web: 'https://github.com/someone/MapEditor', base: 'main', last: { hash: 'a1b2c3d', subject: 'Le strade sopra i sentieri' },
+      compare: 'https://github.com/someone/MapEditor/compare/main...fiumi?expand=1', gh: true,
     }
     if (demoEn()) {
       Object.assign(fakeGit, { branch: 'rivers', upstream: 'origin/rivers', root: 'C:/Projects/MapEditor', remote: 'git@github.com:example/MapEditor.git', web: 'https://github.com/example/MapEditor', compare: '' })
@@ -4843,17 +4894,17 @@
     const fakePerms = {
       user: { allow: ['WebSearch', 'Bash(git status)'], ask: [], deny: ['Bash(rm -rf:*)'], dirs: [] },
       project: { allow: ['Bash(npm run test:*)', 'Read(./docs/**)'], ask: ['Bash(git push:*)'], deny: [], dirs: [] },
-      local: { allow: ['Edit(src/**)'], ask: [], deny: [], dirs: ['C:/Users/luca/Documenti/Mappe'] },
+      local: { allow: ['Edit(src/**)'], ask: [], deny: [], dirs: ['C:/Users/me/Documenti/Mappe'] },
     }
     // La memoria finta: personale e del progetto, quella locale non c'è ancora
     const fakeMemory = new Map([
-      ['C:/Users/luca/.claude/CLAUDE.md', '# Le mie preferenze\n\n- Rispondi in italiano\n- Commenti nel codice in italiano\n- Prima di toccare più di tre file, chiedi\n'],
-      ['C:/Users/luca/MapEditor/CLAUDE.md', '# MapEditor\n\nEditor di mappe in C++17 con Qt 6.\n\n## Comandi\n\n- `cmake --build build` compila\n- `ctest --test-dir build` le prove\n\n## Regole\n\n- I fiumi si disegnano prima delle strade\n'],
+      ['C:/Users/me/.claude/CLAUDE.md', '# Le mie preferenze\n\n- Rispondi in italiano\n- Commenti nel codice in italiano\n- Prima di toccare più di tre file, chiedi\n'],
+      ['C:/Users/me/MapEditor/CLAUDE.md', '# MapEditor\n\nEditor di mappe in C++17 con Qt 6.\n\n## Comandi\n\n- `cmake --build build` compila\n- `ctest --test-dir build` le prove\n\n## Regole\n\n- I fiumi si disegnano prima delle strade\n'],
     ])
-    const fakeMemFiles = () => ({ cwd: 'C:/Users/luca/MapEditor', files: [['user', 'C:/Users/luca/.claude/CLAUDE.md'], ['project', 'C:/Users/luca/MapEditor/CLAUDE.md'], ['local', 'C:/Users/luca/MapEditor/CLAUDE.local.md'], ['parent', 'C:/Users/luca/CLAUDE.md']].filter(([id, f]) => id !== 'parent' || fakeMemory.has(f)).map(([id, file]) => ({ id, file, exists: fakeMemory.has(file), size: (fakeMemory.get(file) || '').length })) })
-    const fakePermFiles = { user: 'C:/Users/luca/.claude/settings.json', project: 'C:/Users/luca/MapEditor/.claude/settings.json', local: 'C:/Users/luca/MapEditor/.claude/settings.local.json' }
-    const fakeUpdate = demoEn() ? { state: 'uptodate', checkedAt: Date.now() } : { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/luca/Claudeleon', installed: true }
-    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '1.0.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claudeleon', shortcut: 'Ctrl+Alt+P', worktree: false, artifacts: true, language: new URLSearchParams(location.search).get('lingua') || 'en' }
+    const fakeMemFiles = () => ({ cwd: 'C:/Users/me/MapEditor', files: [['user', 'C:/Users/me/.claude/CLAUDE.md'], ['project', 'C:/Users/me/MapEditor/CLAUDE.md'], ['local', 'C:/Users/me/MapEditor/CLAUDE.local.md'], ['parent', 'C:/Users/me/CLAUDE.md']].filter(([id, f]) => id !== 'parent' || fakeMemory.has(f)).map(([id, file]) => ({ id, file, exists: fakeMemory.has(file), size: (fakeMemory.get(file) || '').length })) })
+    const fakePermFiles = { user: 'C:/Users/me/.claude/settings.json', project: 'C:/Users/me/MapEditor/.claude/settings.json', local: 'C:/Users/me/MapEditor/.claude/settings.local.json' }
+    const fakeUpdate = demoEn() ? { state: 'uptodate', checkedAt: Date.now() } : { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/me/Claudeleon', installed: true }
+    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/me/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '1.0.0', installed: true, dataDir: 'C:/Users/me/AppData/Roaming/Claudeleon', shortcut: 'Ctrl+Alt+P', worktree: false, artifacts: true, language: new URLSearchParams(location.search).get('lingua') || 'en' }
     const fakeSessions = demoEn() ? [
       { id: 's0', title: 'Theme editor with live preview', lastModified: Date.now() - 600000, cwd: 'C:/Projects/Claudeleon', branch: 'main' },
       { id: 's1', title: 'Shortest path in RouteFinder', lastModified: Date.now() - 3600000, cwd: 'C:/Projects/MapEditor', branch: 'rivers' },
@@ -4864,10 +4915,13 @@
     ] : [
       { id: 's0', title: 'Allegati e domande con le opzioni', lastModified: Date.now() - 600000, cwd: 'C:/Workspace/Progetti/Claudeleon', branch: 'main' },
       { id: 's1', title: 'Temi per Claudeleon', lastModified: Date.now() - 3600000, cwd: 'C:/Workspace/Progetti/Claudeleon', branch: 'main' },
+      // Derivate da un'altra (una modifica a un messaggio già mandato): sotto quella di partenza
+      { id: 's7', title: 'Temi per Claudeleon (ripresa dal secondo messaggio)', parent: 's1', lastModified: Date.now() - 1800000, cwd: 'C:/Workspace/Progetti/Claudeleon', branch: 'main' },
+      { id: 's8', title: 'Backup delle note, con rclone', parent: 's5', lastModified: Date.now() - 2 * day, cwd: 'C:/Users/me/Documenti' },
       { id: 's2', title: 'Il calcolo dei sentieri in RouteFinder', lastModified: Date.now() - day, cwd: 'C:/Workspace/MapEditor' },
       { id: 's3', title: 'Mod desktop Signore degli Anelli', lastModified: Date.now() - 4 * day, cwd: 'C:/Workspace' },
-      { id: 's4', title: 'Profilo di Windows Terminal', lastModified: Date.now() - 9 * day, cwd: 'C:/Users/luca' },
-      { id: 's5', title: 'Backup delle note su Drive', lastModified: Date.now() - 45 * day, cwd: 'C:/Users/luca/Documenti' },
+      { id: 's4', title: 'Profilo di Windows Terminal', lastModified: Date.now() - 9 * day, cwd: 'C:/Users/me' },
+      { id: 's5', title: 'Backup delle note su Drive', lastModified: Date.now() - 45 * day, cwd: 'C:/Users/me/Documenti' },
       { id: 's6', title: 'Prova del vecchio rotolo', lastModified: Date.now() - 20 * day, cwd: 'C:/Workspace', archived: true },
     ]
     return {
@@ -4893,7 +4947,7 @@
       ],
       searchSessions: async (q) => { const f = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); return f(q).includes('guad') ? [{ id: 's2', count: 3, snippet: 'Poi i guadi: dove un sentiero attraversa un fiume, il costo del passo raddoppia…', role: 'assistant' }] : [] },
       pinSession: async (id, on) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.pinned = !!on; return true },
-      exportSession: async (id, cwd, title) => (id ? { ok: true, file: `C:/Users/luca/Documents/${title || 'Conversazione'}.md` } : { ok: false, error: 'nessuna sessione' }),
+      exportSession: async (id, cwd, title) => (id ? { ok: true, file: `C:/Users/me/Documents/${title || 'Conversazione'}.md` } : { ok: false, error: 'nessuna sessione' }),
       archiveSession: async (id, cwd, on) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.archived = !!on; return true },
       deleteSession: async (id) => { const k = fakeSessions.findIndex((x) => x.id === id); if (k >= 0 && confirm('Eliminare?')) { fakeSessions.splice(k, 1); return { deleted: true } } return { deleted: false } },
       // Una cronaca lunga (Backup delle note): 120 messaggi, per provare "Carica i messaggi precedenti"
@@ -4928,7 +4982,7 @@
       onModels: on('onModels'), onTodos: on('onTodos'), onContext: on('onContext'),
       onThinkingStart: on('onThinkingStart'), onSuggestion: on('onSuggestion'), onThinking: on('onThinking'), onThinkingEnd: on('onThinkingEnd'),
       openFile: async () => true,
-      permissions: async () => ({ cwd: 'C:/Users/luca/MapEditor', scopes: ['user', 'project', 'local'].map((id) => Object.assign({ id, file: fakePermFiles[id], exists: true, error: '' }, JSON.parse(JSON.stringify(fakePerms[id])))) }),
+      permissions: async () => ({ cwd: 'C:/Users/me/MapEditor', scopes: ['user', 'project', 'local'].map((id) => Object.assign({ id, file: fakePermFiles[id], exists: true, error: '' }, JSON.parse(JSON.stringify(fakePerms[id])))) }),
       changePermission: async (_c, scope, op) => {
         const sc = fakePerms[scope]
         const rule = String(op.rule || '').trim()
@@ -4944,12 +4998,12 @@
       openMemory: async () => true,
       dictate: async () => true,
       whatsNew: async () => (new URLSearchParams(location.search).get('novita') === 'si' ? { from: '1.0.0', to: '1.1.0', url: 'https://github.com/LukePasax/Claudeleon/releases/tag/v1.1.0', notes: "## What's Changed\n* Settings with categories, with permissions, memory and extensions inside by @LukePasax in https://github.com/LukePasax/Claudeleon/pull/3\n* English by default, Italian from the settings by @LukePasax in https://github.com/LukePasax/Claudeleon/pull/3\n* First-run welcome and what's new after an update\n\n**Full Changelog**: https://github.com/LukePasax/Claudeleon/compare/v1.0.0...v1.1.0" } : null),
-      claudeStatus: async () => { const q = new URLSearchParams(location.search); const found = q.get('claude') !== 'manca'; return { found, path: 'C:/Users/luca/.local/bin/claude.exe', version: found ? '2.1.330' : null, loggedIn: found && q.get('login') !== 'no', platform: 'win32' } },
+      claudeStatus: async () => { const q = new URLSearchParams(location.search); const found = q.get('claude') !== 'manca'; return { found, path: 'C:/Users/me/.local/bin/claude.exe', version: found ? '2.1.330' : null, loggedIn: found && q.get('login') !== 'no', platform: 'win32' } },
       retrySafeTheme: () => fireAll('onTheme', 'notturno', 0),
       dismissSafe() {},
       saveTheme: async (spec) => { const id = spec.id || String(spec.name || 'tema').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'tema'; return { ok: true, spec: Object.assign(window.SkinsKits.moderno.normalizeSpec(spec), { id }) } },
       deleteTheme: async () => true,
-      exportTheme: async (id) => ({ ok: true, file: `C:/Users/luca/Documents/${id}.skin` }),
+      exportTheme: async (id) => ({ ok: true, file: `C:/Users/me/Documents/${id}.skin` }),
       importTheme: async () => ({ ok: true, kind: 'colors', id: 'citta-di-sera', spec: { id: 'citta-di-sera', name: 'Città di sera', description: '', colors: { bg: '#fbf4ea', side: '#f1e6d6', surface: '#ffffff', ink: '#2b2118', inkSoft: '#7a6a58', accent: '#c2562b', onAccent: '#ffffff', line: '#e4d6c3', bubble: '#f6e1cf' }, font: 'serif', textSize: 15, radius: 6 } }),
       capturePreview: async () => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
       gitStatus: async () => JSON.parse(JSON.stringify(fakeGit)),
@@ -4959,7 +5013,7 @@
       gitCommit: async (_c, m, andPush) => { fakeGit.files = []; gitTotals(); fakeGit.last = { hash: 'e4f5a6b', subject: m }; fakeGit.ahead = andPush ? 0 : fakeGit.ahead + 1; return { ok: true } },
       gitPush: async () => { fakeGit.ahead = 0; fakeGit.upstream = `origin/${fakeGit.branch}`; return { ok: true } },
       gitPrInfo: async () => null,
-      gitPr: async () => ({ ok: true, url: 'https://github.com/luca/MapEditor/pull/7' }),
+      gitPr: async () => ({ ok: true, url: 'https://github.com/someone/MapEditor/pull/7' }),
       mergeWorktree: async () => { fakeGit.worktree.unmerged = 0; return { ok: true } },
       removeWorktree: async (_c, force) => (!force && (fakeGit.files.length || fakeGit.worktree.unmerged) ? { ok: false, needsForce: true, dirty: fakeGit.files.length > 0, unmerged: fakeGit.worktree.unmerged } : { ok: true, branchKept: '' }),
       revealFile: async () => false,
@@ -4990,7 +5044,7 @@
         // Una conversazione nuova riceve la sua sessione e compare negli annali
         // Con le copie separate accese, la prima domanda di una conversazione parte in un worktree
         if (conv && fakeSettings.worktree && !fakeSessions.some((x) => x.conv === conv)) {
-          const wt = { ok: true, name: 'aggiungi-fiumi-1a2b', branch: 'claude/aggiungi-fiumi-1a2b', path: 'C:/Users/luca/MapEditor/.claude/worktrees/aggiungi-fiumi-1a2b', main: 'C:/Users/luca/MapEditor', base: 'fiumi' }
+          const wt = { ok: true, name: 'aggiungi-fiumi-1a2b', branch: 'claude/aggiungi-fiumi-1a2b', path: 'C:/Users/me/MapEditor/.claude/worktrees/aggiungi-fiumi-1a2b', main: 'C:/Users/me/MapEditor', base: 'fiumi' }
           Object.assign(fakeGit, { branch: wt.branch, upstream: '', ahead: 0, root: wt.path, worktree: { main: wt.main, path: wt.path, name: wt.name, branch: wt.branch, base: 'fiumi', mainBranch: 'fiumi', unmerged: 2 } })
           fire('onWorktree', wt, 10)
         }

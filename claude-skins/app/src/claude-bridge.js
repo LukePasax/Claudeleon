@@ -1031,7 +1031,11 @@ class ClaudeBridge extends EventEmitter {
   async sessions() {
     const { listSessions } = await loadSdk()
     const list = await listSessions({ limit: 300 })
+    // Da quale conversazione è partita (per mostrarla sotto quella, come nell'app desktop)
+    let parents = new Map()
+    try { parents = require('./forks').parents() } catch {}
     return list.map((s) => ({
+      parent: parents.get(s.sessionId) || null,
       id: s.sessionId,
       title: s.customTitle || s.summary || promptTitle(s.firstPrompt) || '(senza titolo)',
       lastModified: s.lastModified,

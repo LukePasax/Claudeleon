@@ -407,6 +407,24 @@ for (const tema of TEMI) {
     assert.deepEqual(errors, [])
   })
 
+  test(`${tema}: le conversazioni derivate stanno sotto quella di partenza`, async () => {
+    await open(tema)
+    await page.waitForSelector('.session-row.child')
+    const rows = await page.$$eval('.sessions-list > *', (r) => r.map((x) => [x.dataset.id || x.textContent, x.classList.contains('child')]))
+    const at = (id) => rows.findIndex(([x]) => x === id)
+    // Subito sotto, rientrata
+    assert.equal(at('s7'), at('s1') + 1)
+    assert.equal(rows[at('s7')][1], true)
+    // Una famiglia vecchia con una derivata recente sale nel gruppo della derivata
+    assert.equal(at('s8'), at('s5') + 1)
+    assert.equal(rows[at('s5') - 1][0], 'Ultimi 7 giorni')
+    // Cercando solo la derivata, sta da sola
+    await page.fill('.sessions-search, [data-part="sessions-search"]', 'rclone')
+    await page.waitForFunction(() => document.querySelectorAll('.session-row:not(.note)').length === 1)
+    assert.equal(await page.$eval('.session-row:not(.note)', (r) => [r.dataset.id, r.classList.contains('child')].join()), 's8,false')
+    assert.deepEqual(errors, [])
+  })
+
   test(`${tema}: la ricerca trova anche le parole nei messaggi`, async () => {
     await open(tema)
     await page.fill('.sessions-search, [data-part="sessions-search"]', 'guadi')
@@ -427,10 +445,11 @@ for (const tema of TEMI) {
     assert.equal(await page.inputValue('.pv-addr'), 'https://claude.ai/code/artifact/fiumi-1234')
     assert.equal(await page.$eval('.pv-web', (w) => w.getAttribute('partition')), 'persist:claudeai')
     assert.equal(await page.$eval('.pv-frame', (f) => f.hidden), true)
-    // Un indirizzo locale torna nell'iframe e il webview se ne va
+    // Un indirizzo locale torna nell'iframe; il webview resta, nascosto, per quando si torna all'artifact
     await page.fill('.pv-addr', '5173')
     await page.press('.pv-addr', 'Enter')
-    assert.equal(await page.$('.pv-web'), null)
+    assert.equal(await page.$eval('.pv-web', (w) => w.hidden), true)
+    assert.equal(await page.$eval('.pv-frame', (f) => f.hidden), false)
     await page.click('.pv-close')
     await page.fill('[data-part="input"]', '/artifacts')
     await page.keyboard.press('Enter')
