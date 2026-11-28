@@ -520,6 +520,7 @@
     // Gli annali: ricerca, gruppi, menu di ogni conversazione
     sessionsSearch: 'Cerca…',
     sessionsNoMatch: 'Nessuna conversazione con «{q}».',
+    sessionsHits: '{n} messaggi',
     sessionsArchived: 'Archiviate ({n})',
     sessionsHideArchived: 'Nascondi le archiviate',
     groupToday: 'Oggi',

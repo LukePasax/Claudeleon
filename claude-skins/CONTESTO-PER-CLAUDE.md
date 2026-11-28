@@ -325,6 +325,15 @@ la configurazione c'era già: le versioni di prima della 1.1 non la ricordavano)
 le note dalla API di GitHub (`releases/tags/v<versione>`, repo da `package.json` `repository`) una volta sola. La
 pagina le mostra dopo il benvenuto. Versione finta: `?benvenuto=si`, `?claude=manca`, `?login=no`, `?novita=si`.
 
+## Ricerca nelle conversazioni
+
+`src/search.js`: legge i `.jsonl` di `~/.claude/projects/*/` (o `CLAUDE_CONFIG_DIR`), solo le righe `user`/`assistant`
+non `isSidechain`/`isMeta`, il testo senza blocchi `<attached_files>`/`<diff_comments>` e senza messaggi di sistema;
+cache per id con data e misura del file (la prima lettura su una sessione enorme è ~0,6 s, poi ~1 ms; `warm()` 20 s
+dopo l'avvio). `search(q)`: tutte le parole (senza accenti, minuscole, almeno 2 lettere) nella conversazione; dà
+`{ id, count, snippet }`. IPC `sessions:search`; la pagina la chiama 250 ms dopo l'ultima lettera (da 3 lettere) e
+mostra `.session-snippet` con `<mark>`.
+
 ## Immagini del README
 
 `docs/claudeleon-light.png` e `-dark.png`: la versione finta con `?tema=essenziale&lingua=en&demo=en` (dati finti in

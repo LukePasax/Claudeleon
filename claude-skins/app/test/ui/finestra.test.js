@@ -407,6 +407,15 @@ for (const tema of TEMI) {
     assert.deepEqual(errors, [])
   })
 
+  test(`${tema}: la ricerca trova anche le parole nei messaggi`, async () => {
+    await open(tema)
+    await page.fill('.sessions-search, [data-part="sessions-search"]', 'guadi')
+    await page.waitForSelector('.session-row[data-id="s2"] .session-snippet mark')
+    assert.equal(await page.textContent('.session-row[data-id="s2"] .session-snippet mark'), 'guadi')
+    assert.equal(await page.$$eval('.session-row:not(.note)', (r) => r.length), 1)
+    assert.deepEqual(errors, [])
+  })
+
   test(`${tema}: impostazioni, estensioni, contesto, cambio di tema che tiene la conversazione`, async () => {
     await open(tema)
     await send('Ciao')

@@ -3967,8 +3967,26 @@
     input.dataset.sPlaceholder = 'sessionsSearch'
     input.placeholder = t('sessionsSearch')
     input.value = sessionsQuery
-    input.addEventListener('input', () => { sessionsQuery = input.value; renderSessionList() })
-    input.addEventListener('keydown', (e) => { if (e.key === 'Escape') { input.value = ''; sessionsQuery = ''; renderSessionList() } })
+    input.addEventListener('input', () => { sessionsQuery = input.value; renderSessionList(); searchContents() })
+    input.addEventListener('keydown', (e) => { if (e.key === 'Escape') { input.value = ''; sessionsQuery = ''; contentHits = new Map(); renderSessionList() } })
+  }
+  // La ricerca anche dentro i messaggi (dal processo principale), poco dopo l'ultima lettera: le conversazioni che
+  // contengono le parole compaiono con un pezzo del messaggio
+  let contentHits = new Map()
+  let contentTimer = null
+  let contentSeq = 0
+  function searchContents() {
+    clearTimeout(contentTimer)
+    const q = sessionsQuery.trim()
+    if (!api.searchSessions || fold(q).replace(/\s/g, '').length < 3) { if (contentHits.size) { contentHits = new Map(); renderSessionList() } return }
+    const seq = ++contentSeq
+    contentTimer = setTimeout(async () => {
+      let r = []
+      try { r = (await api.searchSessions(q)) || [] } catch {}
+      if (seq !== contentSeq) return
+      contentHits = new Map(r.map((x) => [x.id, x]))
+      renderSessionList()
+    }, 250)
   }
 
   // Oggi, ieri, ultimi 7 giorni, ultimi 30, più vecchie
@@ -3998,7 +4016,8 @@
     const list = part('sessions-list')
     if (!list) return
     const q = fold(sessionsQuery.trim())
-    const match = (s) => !q || fold(s.title).includes(q) || fold(s.cwd).includes(q) || fold(s.branch).includes(q)
+    const inMeta = (s) => fold(s.title).includes(q) || fold(s.cwd).includes(q) || fold(s.branch).includes(q)
+    const match = (s) => !q || inMeta(s) || contentHits.has(s.id)
     // Le fissate in cima, le archiviate tutte in fondo, ognuna sotto la sua testata
     const rank = (s) => (s.archived ? 2 : s.pinned ? 0 : 1)
     const visible = sessionsCache.filter((s) => (showArchived || !s.archived) && match(s)).sort((x, y) => rank(x) - rank(y))
@@ -4015,7 +4034,32 @@
         h.className = 'session-group'
         list.appendChild(label(h, g))
       }
-      list.appendChild(sessionRow(s))
+      const row = sessionRow(s)
+      // Trovata nei messaggi: un pezzo di quello che contiene le parole, con le parole evidenziate
+      const hit = q && contentHits.get(s.id)
+      if (hit) {
+        const sn = document.createElement('div')
+        sn.className = 'session-snippet'
+        const words = fold(sessionsQuery).split(/\s+/).filter((w) => w.length >= 2)
+        const text = hit.snippet
+        const folded = fold(text)
+        const marks = []
+        for (const w of words) { let i = folded.indexOf(w); while (i >= 0) { marks.push([i, i + w.length]); i = folded.indexOf(w, i + w.length) } }
+        marks.sort((a, b) => a[0] - b[0])
+        let at = 0
+        for (const [a, b] of marks) {
+          if (a < at) continue
+          sn.appendChild(document.createTextNode(text.slice(at, a)))
+          const m = document.createElement('mark')
+          m.textContent = text.slice(a, b)
+          sn.appendChild(m)
+          at = b
+        }
+        sn.appendChild(document.createTextNode(text.slice(at)))
+        if (hit.count > 1) { const c = document.createElement('span'); c.className = 'ss-count'; c.textContent = ` · ${t('sessionsHits', { n: hit.count })}`; sn.appendChild(c) }
+        row.querySelector('.when').after(sn)
+      }
+      list.appendChild(row)
     }
     if (archivedCount) {
       const more = document.createElement('button')
@@ -4707,6 +4751,7 @@
       commands: async () => FAKE_COMMANDS,
       sessions: async () => fakeSessions.map((s) => Object.assign({}, s)),
       renameSession: async (id, title) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.title = title; return true },
+      searchSessions: async (q) => { const f = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); return f(q).includes('guad') ? [{ id: 's2', count: 3, snippet: 'Poi i guadi: dove un sentiero attraversa un fiume, il costo del passo raddoppia…', role: 'assistant' }] : [] },
       pinSession: async (id, on) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.pinned = !!on; return true },
       exportSession: async (id, cwd, title) => (id ? { ok: true, file: `C:/Users/luca/Documents/${title || 'Conversazione'}.md` } : { ok: false, error: 'nessuna sessione' }),
       archiveSession: async (id, cwd, on) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.archived = !!on; return true },

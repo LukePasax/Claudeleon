@@ -810,3 +810,8 @@ body.busy .entry .edit-btn { display: none; }
 .news-box { width: min(620px, calc(100% - 40px)); display: flex; flex-direction: column; }
 .news-body { max-height: 52vh; overflow-y: auto; font-size: 14.5px; line-height: 1.55; user-select: text; }
 .news-body ul { padding-left: 20px; }
+
+/* Una conversazione trovata nei messaggi: un pezzo del testo, con le parole evidenziate */
+.session-snippet { font-size: 12px; line-height: 1.35; color: var(--ink-soft); margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; }
+.session-snippet mark { background: color-mix(in srgb, var(--gold) 28%, transparent); color: var(--ink); border-radius: 2px; padding: 0 1px; }
+.session-snippet .ss-count { opacity: 0.8; }

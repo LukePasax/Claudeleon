@@ -481,6 +481,7 @@
     contextEmpty: 'The context count arrives after the first reply of this conversation.',
     sessionsSearch: 'Search…',
     sessionsNoMatch: 'No conversation with “{q}”.',
+    sessionsHits: '{n} messages',
     sessionsArchived: 'Archived ({n})',
     sessionsHideArchived: 'Hide archived',
     groupToday: 'Today',

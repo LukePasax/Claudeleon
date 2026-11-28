@@ -52,6 +52,7 @@ contextBridge.exposeInMainWorld('skins', {
   dictate: process.platform === 'win32' ? () => ipcRenderer.invoke('dictate:start') : undefined,
   permissions: (conv) => ipcRenderer.invoke('perms:get', conv),
   pinSession: (id, on) => ipcRenderer.invoke('session:pin', id, on),
+  searchSessions: (q) => ipcRenderer.invoke('sessions:search', q),
   exportSession: (id, cwd, title) => ipcRenderer.invoke('session:export', id, cwd, title),
   memoryFiles: (conv) => ipcRenderer.invoke('memory:list', conv),
   readMemory: (conv, file) => ipcRenderer.invoke('memory:read', conv, file),

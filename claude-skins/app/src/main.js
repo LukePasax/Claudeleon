@@ -11,6 +11,7 @@ const { ReleaseUpdater } = require('./release-updater')
 const { listFiles, rankFiles } = require('./files')
 const gitOps = require('./git')
 const permissions = require('./permissions')
+const { search: searchSessions, warm: warmSearch } = require('./search')
 const memory = require('./memory')
 const { plainSnippet } = require('./text')
 const { listThemes, DEFAULT_THEME, userThemes, userThemeInfo, saveUserTheme, deleteUserTheme, installedThemes, bundleFor, checkBundle, installBundle } = require('./themes')
@@ -951,6 +952,8 @@ function registerIpc() {
     const pinned = new Set(Array.isArray(config.pinned) ? config.pinned : [])
     return (await bridge.sessions()).map((s) => (pinned.has(s.id) ? Object.assign(s, { pinned: true }) : s))
   })
+  // La ricerca dentro le conversazioni (le parole nei messaggi, non solo nei titoli)
+  ipcMain.handle('sessions:search', (_e, q) => { try { return searchSessions(String(q || '')).slice(0, 200) } catch { return [] } })
   ipcMain.handle('session:pin', (_e, id, on) => {
     const list = (Array.isArray(config.pinned) ? config.pinned : []).filter((x) => x !== id)
     if (on) list.unshift(String(id))
@@ -1359,6 +1362,8 @@ app.whenReady().then(() => {
     // Gli aggiornamenti: un controllo poco dopo l'avvio e poi ogni 6 ore (si spengono dalle impostazioni). Una novità
     // la dice anche una notifica, una volta sola per numero di novità
     makeUpdater()
+    // La ricerca nelle conversazioni legge i file in anticipo, così la prima è subito pronta
+    setTimeout(warmSearch, 20000)
     const autoCheck = () => { if (config.autoUpdate !== false && updater) updater.check() }
     setTimeout(autoCheck, 30000)
     setInterval(autoCheck, 6 * 3600 * 1000)

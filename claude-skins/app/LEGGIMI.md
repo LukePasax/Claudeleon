@@ -288,6 +288,10 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
     piano" (Claude procede, nel modo di prima) e "Continua a pianificare".
 
   Le domande compaiono nella conversazione con Permetti, Sempre e Nega, e con le differenze se riguardano un file.
+- **Ricerca nelle conversazioni:** il campo di ricerca dell'elenco guarda titoli, cartelle e branch e, da tre lettere,
+  anche il testo dei messaggi (le domande e le risposte, senza strumenti né promemoria): una conversazione trovata
+  così mostra un pezzo del messaggio con le parole evidenziate e quanti messaggi le contengono. Accenti e maiuscole
+  non contano; con più parole, le vuole tutte (anche in messaggi diversi).
 - **Elenco delle conversazioni:** le sessioni di Claude Code di tutte le cartelle, le più recenti prima, come nella barra
   laterale dell'app desktop (le sue comprese, coi loro titoli), raggruppate per giorno (oggi, ieri, ultimi 7 e 30
   giorni, più vecchie); accanto all'ora c'è la cartella e il branch git. In cima un campo di ricerca filtra per
