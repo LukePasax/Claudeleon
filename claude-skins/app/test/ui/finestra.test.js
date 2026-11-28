@@ -416,6 +416,36 @@ for (const tema of TEMI) {
     assert.deepEqual(errors, [])
   })
 
+  test(`${tema}: artifact, la scheda, il pannello di claude.ai e l'elenco con /artifacts`, async () => {
+    await open(tema)
+    await page.click('.session-row[data-id="s2"]')
+    await page.waitForSelector('.artifact-card')
+    assert.match(await page.textContent('.artifact-card .art-title'), /Come si disegnano i fiumi/)
+    assert.match(await page.textContent('.artifact-card .art-sub'), /pubblicato/)
+    await page.click('.artifact-card .art-open')
+    await page.waitForSelector('.preview-pane:not([hidden]) webview.pv-web')
+    assert.equal(await page.inputValue('.pv-addr'), 'https://claude.ai/code/artifact/fiumi-1234')
+    assert.equal(await page.$eval('.pv-web', (w) => w.getAttribute('partition')), 'persist:claudeai')
+    assert.equal(await page.$eval('.pv-frame', (f) => f.hidden), true)
+    // Un indirizzo locale torna nell'iframe e il webview se ne va
+    await page.fill('.pv-addr', '5173')
+    await page.press('.pv-addr', 'Enter')
+    assert.equal(await page.$('.pv-web'), null)
+    await page.click('.pv-close')
+    await page.fill('[data-part="input"]', '/artifacts')
+    await page.keyboard.press('Enter')
+    await page.waitForSelector('.art-row')
+    assert.equal(await page.$$eval('.art-row', (r) => r.length), 2)
+    assert.match(await page.textContent('.art-row'), /2 versioni/)
+    assert.equal(await page.inputValue('[data-part="input"]'), '')
+    // L'interruttore
+    await page.click('.set-row:has-text("Claude può pubblicare artifact") .set-switch')
+    await page.waitForSelector('.set-row:has-text("Claude può pubblicare artifact") .set-switch:not(.on)')
+    await page.click('.set-row:has-text("Claude può pubblicare artifact") .set-switch')
+    await page.click('.settings-panel .theme-picker-head button')
+    assert.deepEqual(errors, [])
+  })
+
   test(`${tema}: impostazioni, estensioni, contesto, cambio di tema che tiene la conversazione`, async () => {
     await open(tema)
     await send('Ciao')

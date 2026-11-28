@@ -17,7 +17,8 @@ The installer is not signed: if Windows says "Windows protected your PC", choose
 much of what the desktop app does: several conversations at once, the conversation list (search, pin, archive,
 export), attachments and `@` file mentions, slash commands, permission prompts and plan mode, visible reasoning,
 context and plan usage, changed-files summary with diffs and line comments for Claude, git (branches, commit, push,
-pull requests, a separate worktree per conversation), a live preview of local dev servers, background tasks, MCP
+pull requests, a separate worktree per conversation), a live preview of local dev servers, claude.ai artifacts (a card in the conversation, the page in a side panel,
+the list of those you published), background tasks, MCP
 servers and plugins, permission rules, memory (`CLAUDE.md`), notifications, dictation (Windows voice typing) and
 automatic updates.
 

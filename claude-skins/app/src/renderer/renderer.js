@@ -2042,6 +2042,7 @@
     ['conversations', '<path d="M4 5h16v10H9l-5 4z"/>'],
     ['permissions', '<path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>'],
     ['memory', '<path d="M6 3h9l3 3v15H6z"/><path d="M9 9h6M9 13h6M9 17h4"/>'],
+    ['artifacts', '<rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 8.5h17M7 12.5h6M7 16h10"/>'],
     ['extensions', '<path d="M10 3h4v4h-4zM3 10h4v4H3zM17 10h4v4h-4zM10 17h4v4h-4z"/><path d="M12 7v10M7 12h10"/>'],
     ['updates', '<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/>'],
     ['about', '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>'],
@@ -2150,6 +2151,41 @@
       permissions() { if (api.permissions) openPermissions(body) },
       memory() { if (api.memoryFiles) openMemory(body) },
       extensions() { openExtensions(body) },
+      async artifacts() {
+        section('setArtifactsTitle')
+        toggle(row('setArtifacts', t('setArtifactsNote')), st.artifacts !== false, (v) => set('artifacts', v))
+        const all = row('setArtifactsGallery', t('setArtifactsGalleryNote'))
+        button(all, 'setArtifactsAll', () => api.openLink('https://claude.ai/code/artifacts'))
+        section('setArtifactsList')
+        const list = document.createElement('div')
+        list.className = 'art-list'
+        body.appendChild(list)
+        let items = []
+        try { items = (api.artifacts && (await api.artifacts())) || [] } catch {}
+        if (!list.isConnected) return
+        if (!items.length) { const n = document.createElement('div'); n.className = 'set-note art-none'; label(n, 'setArtifactsNone'); list.appendChild(n); return }
+        for (const a of items) {
+          const r = document.createElement('div')
+          r.className = 'art-row'
+          r.innerHTML = `<div class="art-icon">${ARTIFACT_ICON}</div><div class="art-text"><div class="art-title"></div><div class="art-sub"></div></div><div class="art-actions"></div>`
+          r.querySelector('.art-title').textContent = a.title || 'Artifact'
+          const folder = a.cwd ? String(a.cwd).split(/[\\/]/).filter(Boolean).pop() : ''
+          r.querySelector('.art-sub').textContent = [a.at ? formatWhen(a.at) : '', folder, a.versions > 1 ? t('artVersions', { n: a.versions }) : ''].filter(Boolean).join(' · ')
+          r.title = a.url
+          const acts = r.querySelector('.art-actions')
+          artifactActions(acts, a)
+          if (a.sessionId) {
+            const conv = document.createElement('button')
+            conv.className = 'btn small deny art-conv'
+            label(conv, 'artConversation')
+            conv.addEventListener('click', () => { closeThemes(); openSession(sessionsCache.find((x) => x.id === a.sessionId) || { id: a.sessionId, cwd: a.cwd }) })
+            acts.appendChild(conv)
+          }
+          // Apri: chiude le impostazioni, così il pannello si vede
+          acts.querySelector('.art-open').addEventListener('click', () => closeThemes())
+          list.appendChild(r)
+        }
+      },
       updates() {
         section('updTitle')
         const u = updateState || {}
@@ -2763,6 +2799,8 @@
     if (/^\/export\s*$/i.test(text) && api.exportSession) { input.value = ''; exportSession(active && (active.sessionId || (currentSession && currentSession.id)), convoDir || workdir || null, (part('chapter-title') && part('chapter-title').textContent) || ''); return }
     // /memory: il pannello della memoria (quello di Claude Code apre un editor da terminale)
     if (/^\/memory\s*$/i.test(text) && api.memoryFiles) { input.value = ''; openMemory(); return }
+    // /artifacts: gli artifact pubblicati da qui (quello del terminale è un elenco da tastiera)
+    if (/^\/artifacts\s*$/i.test(text) && api.artifacts) { input.value = ''; openSettings('artifacts'); return }
     if (notes.length) clearReviews()
     input.value = ''
     input.style.height = ''
@@ -3028,7 +3066,10 @@
   const LOCAL_URL = /\bhttps?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]):\d{2,5}(?:\/[^\s"'`<>()[\]{}\\]*)?/g
   const isLocal = (u) => /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?(\/|$)/i.test(u)
   const urlsIn = (text) => [...new Set((String(text || '').match(LOCAL_URL) || []).map((u) => u.replace('://0.0.0.0:', '://localhost:').replace(/[.,;:!?]+$/, '')))]
-  const hostPort = (u) => { try { const x = new URL(u); return x.host + (x.pathname !== '/' ? x.pathname : '') } catch { return u } }
+  const hostPort = (u) => { try { const x = new URL(u); if (x.protocol === 'file:') return decodeURIComponent(x.pathname.split('/').pop()); return x.host + (x.pathname !== '/' ? x.pathname : '') } catch { return u } }
+  // Gli artifact di claude.ai si aprono in un <webview> (claude.ai non si lascia incorniciare), con l'accesso a
+  // claude.ai che resta nella sua sessione; il resto (server locali, pagine HTML del computer) in un iframe
+  const isClaudeUrl = (u) => { try { const x = new URL(u); return x.protocol === 'https:' && (x.hostname === 'claude.ai' || x.hostname.endsWith('.claude.ai')) } catch { return false } }
   let preview = null
   let previewUrl = ''
   function addPreviewUrls(urls) {
@@ -3037,6 +3078,16 @@
     const list = (c.previewUrls || []).filter((u) => !urls.includes(u))
     c.previewUrls = [...urls.slice().reverse(), ...list].slice(0, 8)
     if (c === active) renderPreviewBtn()
+    // La pagina che si sta guardando è cambiata (Claude ha riscritto il file HTML): si ricarica
+    if (c === active && preview && preview.isConnected && !preview.hidden && urls.includes(previewUrl) && /^file:/i.test(previewUrl)) reloadPreview()
+  }
+  function reloadPreview() {
+    if (!preview || !previewUrl) return
+    const web = preview.querySelector('.pv-web')
+    if (isClaudeUrl(previewUrl) && web) { try { web.reload() } catch {} ; return }
+    const frame = preview.querySelector('.pv-frame')
+    frame.src = 'about:blank'
+    setTimeout(() => { frame.src = previewUrl }, 30)
   }
   function renderPreviewBtn() {
     if (quiet) return
@@ -3084,11 +3135,11 @@
     pane.querySelector('.pv-grip').title = t('previewGrip')
     addr.placeholder = t('previewAddress')
     label(pane.querySelector('.pv-empty'), 'previewEmpty')
-    pane.querySelector('.pv-reload').addEventListener('click', () => { if (previewUrl) { frame.src = 'about:blank'; setTimeout(() => { frame.src = previewUrl }, 30) } })
+    pane.querySelector('.pv-reload').addEventListener('click', reloadPreview)
     pane.querySelector('.pv-open').addEventListener('click', () => { if (previewUrl) api.openLink(previewUrl) })
     pane.querySelector('.pv-close').addEventListener('click', closePreview)
     pane.querySelector('.pv-shot').addEventListener('click', async () => {
-      const r = frame.getBoundingClientRect()
+      const r = pane.querySelector('.pv-body').getBoundingClientRect()
       const data = previewUrl && api.capturePreview ? await api.capturePreview({ x: r.left, y: r.top, width: r.width, height: r.height }).catch(() => null) : null
       if (data) await addImage(data, 'image/png', `anteprima ${hostPort(previewUrl)}.png`)
       else labelled('error', 'previewShotFail')
@@ -3100,7 +3151,7 @@
       let v = addr.value.trim()
       if (!v) return
       if (/^\d{2,5}$/.test(v)) v = `http://localhost:${v}`
-      else if (!/^https?:\/\//i.test(v)) v = `http://${v}`
+      else if (!/^(https?|file):\/\//i.test(v)) v = `http://${v}`
       navigatePreview(v)
     })
     // Il bordo sinistro si trascina per cambiare la larghezza (l'iframe non deve rubare il mouse intanto)
@@ -3128,9 +3179,27 @@
     if (!preview) return
     preview.querySelector('.pv-addr').value = previewUrl
     const frame = preview.querySelector('.pv-frame')
-    frame.hidden = !previewUrl
+    const claude = isClaudeUrl(previewUrl)
+    let web = preview.querySelector('.pv-web')
+    frame.hidden = !previewUrl || claude
     preview.querySelector('.pv-empty').hidden = !!previewUrl
-    if (previewUrl && frame.src !== previewUrl) frame.src = previewUrl
+    if (claude) {
+      if (frame.src !== 'about:blank') frame.src = 'about:blank'
+      if (!web) {
+        // Il processo principale accetta solo questa sessione e solo indirizzi di claude.ai
+        web = document.createElement('webview')
+        web.className = 'pv-web'
+        web.setAttribute('partition', 'persist:claudeai')
+        web.setAttribute('allowpopups', '')
+        web.setAttribute('src', previewUrl)
+        web.addEventListener('did-navigate', (e) => { if (preview && isClaudeUrl(e.url)) preview.querySelector('.pv-addr').value = e.url })
+        preview.querySelector('.pv-body').appendChild(web)
+      } else if (web.getAttribute('src') !== previewUrl) web.setAttribute('src', previewUrl)
+      web.hidden = false
+    } else {
+      if (web) web.remove()
+      if (previewUrl && frame.src !== previewUrl) frame.src = previewUrl
+    }
     renderPreviewBtn()
   }
   function openPreview(url) {
@@ -3142,7 +3211,7 @@
     hook('preview', previewUrl)
   }
   function closePreview() {
-    if (preview) { preview.hidden = true; preview.querySelector('.pv-frame').src = 'about:blank' }
+    if (preview) { preview.hidden = true; preview.querySelector('.pv-frame').src = 'about:blank'; const web = preview.querySelector('.pv-web'); if (web) web.remove() }
     document.body.classList.remove('has-preview')
     renderPreviewBtn()
   }
@@ -3684,7 +3753,39 @@
     row.dataset.statusKey = error ? 'toolFail' : 'toolOk'
     row.dataset.status = t(row.dataset.statusKey)
   }
-  api.onToolDone(({ id, error, urls }) => { toolDone(id, error); addPreviewUrls(urls); hook('toolDone', { error: !!error }) })
+  api.onToolDone(({ id, error, urls, artifact }) => { toolDone(id, error); addPreviewUrls(urls); if (artifact) artifactCard(artifact); hook('toolDone', { error: !!error, artifact: artifact || null }) })
+
+  // Un artifact pubblicato (o aggiornato) da Claude su claude.ai, come nell'app desktop: una scheda col titolo e
+  // Apri (nel pannello accanto alla conversazione), Apri nel browser e Copia link
+  const ARTIFACT_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 8.5h17M7 12.5h6M7 16h10"/></svg>'
+  const isArtifactUrl = (u) => /^https:\/\/claude\.ai\/(code\/)?artifact\/[\w-]+/.test(String(u || ''))
+  function artifactActions(box, a) {
+    const open = document.createElement('button')
+    open.className = 'btn small art-open'
+    label(open, 'artOpen')
+    open.addEventListener('click', (e) => { e.stopPropagation(); openPreview(a.url) })
+    const ext = document.createElement('button')
+    ext.className = 'btn small deny art-ext'
+    ext.textContent = '↗'
+    ext.title = t('previewOpen')
+    ext.addEventListener('click', (e) => { e.stopPropagation(); api.openLink(a.url) })
+    const copy = document.createElement('button')
+    copy.className = 'btn small deny art-copy'
+    label(copy, 'artCopy')
+    copy.addEventListener('click', (e) => { e.stopPropagation(); copyText(a.url); label(copy, 'artCopied'); setTimeout(() => label(copy, 'artCopy'), 1500) })
+    box.append(open, ext, copy)
+  }
+  function artifactCard(a) {
+    if (!a || !isArtifactUrl(a.url)) return null
+    const item = add('artifact-card', `<div class="art-icon">${ARTIFACT_ICON}</div><div class="art-text"><div class="art-title"></div><div class="art-sub"></div></div><div class="art-actions"></div>`)
+    item.querySelector('.art-title').textContent = a.title || 'Artifact'
+    label(item.querySelector('.art-sub'), a.updated ? 'artUpdated' : 'artPublished')
+    item.title = a.url
+    item.dataset.url = a.url
+    artifactActions(item.querySelector('.art-actions'), a)
+    item.addEventListener('click', () => openPreview(a.url))
+    return item
+  }
 
   // La frase che riassume un gruppo di azioni (come nell'app desktop): le loro righe, con le differenze, vanno dentro
   // un gruppo chiuso sotto quella frase; un clic lo apre. Nel titolo, il conto delle righe cambiate
@@ -4285,6 +4386,7 @@
       else if (m.role === 'tool') {
         addTool(m.id, m.name, m.summary, m.change, m.intent)
         if (m.error !== null) toolDone(m.id, m.error)
+        if (m.artifact) artifactCard(m.artifact)
       }
     }
   }
@@ -4456,6 +4558,7 @@
     dictate: () => dictate(),
     preview: togglePreview,
     memory: () => openMemory(),
+    artifacts: () => openSettings('artifacts'),
     maximize: () => api.windowMode('max'),
     fullscreen: () => api.windowMode('full'),
     scene: () => { scene = scene === 'notte' ? 'giorno' : 'notte'; api.setScene(scene); paint(); hook('scene', scene) },
@@ -4465,7 +4568,7 @@
     const a = e.target.closest('a[data-href]')
     if (a) {
       e.preventDefault()
-      if (isLocal(a.dataset.href) && !e.ctrlKey && !e.metaKey && !e.shiftKey) openPreview(a.dataset.href)
+      if ((isLocal(a.dataset.href) || isArtifactUrl(a.dataset.href)) && !e.ctrlKey && !e.metaKey && !e.shiftKey) openPreview(a.dataset.href)
       else api.openLink(a.dataset.href)
       return
     }
@@ -4750,7 +4853,7 @@
     const fakeMemFiles = () => ({ cwd: 'C:/Users/luca/MapEditor', files: [['user', 'C:/Users/luca/.claude/CLAUDE.md'], ['project', 'C:/Users/luca/MapEditor/CLAUDE.md'], ['local', 'C:/Users/luca/MapEditor/CLAUDE.local.md'], ['parent', 'C:/Users/luca/CLAUDE.md']].filter(([id, f]) => id !== 'parent' || fakeMemory.has(f)).map(([id, file]) => ({ id, file, exists: fakeMemory.has(file), size: (fakeMemory.get(file) || '').length })) })
     const fakePermFiles = { user: 'C:/Users/luca/.claude/settings.json', project: 'C:/Users/luca/MapEditor/.claude/settings.json', local: 'C:/Users/luca/MapEditor/.claude/settings.local.json' }
     const fakeUpdate = demoEn() ? { state: 'uptodate', checkedAt: Date.now() } : { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/luca/Claudeleon', installed: true }
-    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '1.0.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claudeleon', shortcut: 'Ctrl+Alt+P', worktree: false, language: new URLSearchParams(location.search).get('lingua') || 'en' }
+    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '1.0.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claudeleon', shortcut: 'Ctrl+Alt+P', worktree: false, artifacts: true, language: new URLSearchParams(location.search).get('lingua') || 'en' }
     const fakeSessions = demoEn() ? [
       { id: 's0', title: 'Theme editor with live preview', lastModified: Date.now() - 600000, cwd: 'C:/Projects/Claudeleon', branch: 'main' },
       { id: 's1', title: 'Shortest path in RouteFinder', lastModified: Date.now() - 3600000, cwd: 'C:/Projects/MapEditor', branch: 'rivers' },
@@ -4784,6 +4887,10 @@
       commands: async () => FAKE_COMMANDS,
       sessions: async () => fakeSessions.map((s) => Object.assign({}, s)),
       renameSession: async (id, title) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.title = title; return true },
+      artifacts: async () => [
+        { url: 'https://claude.ai/code/artifact/fiumi-1234', title: 'Come si disegnano i fiumi', at: Date.now() - 3600e3, sessionId: 's2', cwd: 'C:/Workspace/mappa', versions: 2 },
+        { url: 'https://claude.ai/code/artifact/note-5678', title: 'Backup delle note', at: Date.now() - 86400e3 * 3, sessionId: 's5', cwd: 'C:/Workspace/note', versions: 1 },
+      ],
       searchSessions: async (q) => { const f = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); return f(q).includes('guad') ? [{ id: 's2', count: 3, snippet: 'Poi i guadi: dove un sentiero attraversa un fiume, il costo del passo raddoppia…', role: 'assistant' }] : [] },
       pinSession: async (id, on) => { const s = fakeSessions.find((x) => x.id === id); if (s) s.pinned = !!on; return true },
       exportSession: async (id, cwd, title) => (id ? { ok: true, file: `C:/Users/luca/Documents/${title || 'Conversazione'}.md` } : { ok: false, error: 'nessuna sessione' }),
@@ -4797,6 +4904,7 @@
         { role: 'tool', id: 'h1', name: 'Read', summary: 'src/MapView.cpp', change: null, error: false },
         { role: 'tool', id: 'h2', name: 'Edit', summary: 'src/MapView.cpp', change: FAKE_EDIT, error: false },
         { role: 'tool', id: 'h3', name: 'Bash', summary: 'cmake --build build', change: null, error: true },
+        { role: 'tool', id: 'h4', name: 'Artifact', summary: 'C:/Workspace/fiumi.html', intent: { verb: 'artifact', target: 'Come si disegnano i fiumi' }, change: null, error: false, artifact: { url: 'https://claude.ai/code/artifact/fiumi-1234', title: 'Come si disegnano i fiumi', updated: false } },
         { role: 'assistant', text: 'Fatto: i fiumi ora si disegnano **prima** delle strade. La compilazione però si è fermata su un errore di `MapLoader`.' },
         { role: 'user', text: '/usage' },
         { role: 'output', text: 'Sessione corrente\n  Token in ingresso   12.408\n  Costo stimato       0,21 $' },

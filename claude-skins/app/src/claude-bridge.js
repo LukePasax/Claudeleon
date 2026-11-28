@@ -6,6 +6,8 @@ const os = require('os')
 const path = require('path')
 const { EventEmitter } = require('events')
 const crypto = require('crypto')
+const { pathToFileURL } = require('url')
+const artifacts = require('./artifacts')
 
 // Il plugin con le skill di Claudeleon. Nell'app installata sta fuori dall'archivio asar (asarUnpack), perché lo
 // legge Claude Code, che è un altro programma
@@ -140,6 +142,14 @@ function intent(name, input) {
     case 'Skill': return { verb: 'skill', target: String(i.skill || i.command || i.name || '') }
     case 'Agent': case 'Task': return { verb: 'agent', target: '' }
     case 'ExitPlanMode': return { verb: 'plan', target: '' }
+    // Gli artifact di claude.ai: pubblica (o aggiorna) una pagina, li elenca, ne legge uno
+    case 'Artifact': {
+      const action = i.action || 'publish'
+      if (action === 'publish' && !i.asset) return { verb: i.url ? 'artifactUpdate' : 'artifact', target: String(i.title || base(i.file_path) || '') }
+      if (action === 'list') return { verb: 'artifactList', target: '' }
+      if (action === 'read') return { verb: 'artifactRead', target: '' }
+      return { verb: 'other', target: name }
+    }
     default: {
       // Gli strumenti dei server MCP si chiamano mcp__server__strumento
       const m = /^mcp__(.+?)__(.+)$/.exec(name || '')
@@ -208,6 +218,21 @@ function localUrls(text) {
     if (!out.includes(u)) out.push(u)
   }
   return out
+}
+// Le pagine HTML che Claude scrive o modifica si possono vedere nel pannello dell'anteprima (come file del computer)
+const HTML_TOOLS = new Set(['Write', 'Edit', 'MultiEdit'])
+function htmlFile(name, input) {
+  const f = input && (HTML_TOOLS.has(name) || name === 'Artifact') && typeof input.file_path === 'string' ? input.file_path : ''
+  return /\.html?$/i.test(f) && path.isAbsolute(f) ? f : ''
+}
+// Cosa aggiungere alla fine di un'azione riuscita: gli indirizzi per l'anteprima (server locali nell'uscita, la
+// pagina HTML toccata) e l'artifact pubblicato
+function toolExtras(name, input, text, result) {
+  const urls = localUrls(text)
+  const html = htmlFile(name, input)
+  if (html) urls.push(pathToFileURL(html).href)
+  const artifact = name === 'Artifact' ? artifacts.artifactOf(input, result, text) : null
+  return { urls, artifact }
 }
 // La coda del file d'uscita di un comando in background (dove un server scrive il suo indirizzo)
 function outputTail(file, max = 32768) {
@@ -318,6 +343,8 @@ class ClaudeBridge extends EventEmitter {
     // Le attività della conversazione in corso
     this.todos = []
     this.todoCreated = new Map()
+    // Nome e ingresso degli strumenti in corso che servono anche alla fine (artifact, pagine HTML)
+    this.toolInputs = new Map()
     this.questions = new Map()
     this.query = null
     this.pending = new Map()
@@ -603,6 +630,8 @@ class ClaudeBridge extends EventEmitter {
         forkSession: fork ? true : undefined,
         // I salvataggi dei file prima di ogni modifica: servono a riportarli indietro modificando un messaggio
         enableFileCheckpointing: true,
+        // Gli artifact di claude.ai si possono spegnere dalle impostazioni
+        ...(this.artifacts === false ? { disallowedTools: artifacts.ARTIFACT_TOOLS } : {}),
         canUseTool: (toolName, input, options) => this.ask(toolName, input, options),
       },
     })
@@ -709,7 +738,10 @@ class ClaudeBridge extends EventEmitter {
         }
         if (block.type === 'tool_use' && TODO_TOOLS.has(block.name)) {
           if (applyTodo(this.todos, this.todoCreated, block.name, block.id, block.input)) this.emit('todos', this.todos)
-        } else if (block.type === 'tool_use') this.emit('tool', { id: block.id, name: block.name, summary: summary(block.input), intent: intent(block.name, block.input), change: this.change(block.name, block.input) })
+        } else if (block.type === 'tool_use') {
+          if (block.name === 'Artifact' || htmlFile(block.name, block.input)) this.toolInputs.set(block.id, { name: block.name, input: block.input })
+          this.emit('tool', { id: block.id, name: block.name, summary: summary(block.input), intent: intent(block.name, block.input), change: this.change(block.name, block.input) })
+        }
         else if (block.type === 'text' && !turn.sawDelta && block.text) {
           this.emit('delta', (turn.wroteText ? '\n\n' : '') + block.text)
           turn.wroteText = true
@@ -729,7 +761,12 @@ class ClaudeBridge extends EventEmitter {
           continue
         }
         const text = typeof block.content === 'string' ? block.content : (Array.isArray(block.content) ? block.content.map((c) => c.text || '').join('\n') : '')
-        this.emit('toolDone', { id: block.tool_use_id, error: !!block.is_error, urls: block.is_error ? [] : localUrls(text) })
+        const known = this.toolInputs.get(block.tool_use_id)
+        this.toolInputs.delete(block.tool_use_id)
+        // Il risultato strutturato vale per lo strumento solo se il messaggio ha un risultato solo
+        const single = msg.message.content.filter((b) => b && b.type === 'tool_result').length === 1
+        const extra = block.is_error ? { urls: [], artifact: null } : toolExtras(known ? known.name : '', known ? known.input : null, text, single ? msg.tool_use_result : null)
+        this.emit('toolDone', Object.assign({ id: block.tool_use_id, error: !!block.is_error, urls: extra.urls }, extra.artifact ? { artifact: extra.artifact } : {}))
       }
     } else if (msg.type === 'result') {
       live.turn = { open: false }
@@ -1124,6 +1161,7 @@ class ClaudeBridge extends EventEmitter {
           if (b.type !== 'tool_use') continue
           if (TODO_TOOLS.has(b.name)) { applyTodo(todos, created, b.name, b.id, b.input); continue }
           const item = { role: 'tool', id: b.id, name: b.name, summary: summary(b.input), intent: intent(b.name, b.input), change: this.change(b.name, b.input, true), error: null }
+          if (b.name === 'Artifact') item.input = b.input
           tools.set(b.id, item)
           items.push(item)
         }
@@ -1137,6 +1175,12 @@ class ClaudeBridge extends EventEmitter {
         } else if (b.type === 'tool_result') {
           const t = tools.get(b.tool_use_id)
           if (t) t.error = !!b.is_error
+          // Un artifact pubblicato: la sua scheda anche nelle conversazioni riaperte
+          if (t && t.input) {
+            const a = !b.is_error && artifacts.artifactOf(t.input, m.tool_use_result || m.toolUseResult, artifacts.resultText(b.content))
+            if (a) t.artifact = a
+            delete t.input
+          }
         }
       }
       const text = plainText(m.message).trim()
@@ -1160,6 +1204,7 @@ class ClaudeBridge extends EventEmitter {
     }
     // La cronaca riaperta continua con le sue attività
     this.resetTodos(todos)
+    for (const t of tools.values()) delete t.input
     // Il contesto, stimato dai token dell'ultima risposta salvata (il conto vero arriva dopo la prima risposta)
     for (let k = messages.length - 1; k >= 0; k--) {
       const m = messages[k]
@@ -1186,5 +1231,5 @@ function savedContextMax() {
 module.exports = {
   ClaudeBridge, MODES, intent, DEFAULT_CLAUDE: CLAUDE, PLUGIN_DIR, loadContextMax, savedContextMax,
   // Per le prove (test/unit)
-  _internals: { promptTitle, localUrls, transcriptMarkdown, applyTodo, settleTodo, withFiles, imagesOf, guessContextMax, Inbox },
+  _internals: { promptTitle, localUrls, toolExtras, transcriptMarkdown, applyTodo, settleTodo, withFiles, imagesOf, guessContextMax, Inbox },
 }

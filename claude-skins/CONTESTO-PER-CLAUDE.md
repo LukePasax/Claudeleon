@@ -508,6 +508,29 @@ quelli di colori. La pagina (`api.onThemesChanged`) ricarica i temi con codice i
 `__spec`), toglie quelli spariti (non quello in uso) e rimonta il tema in uso se è cambiato e l'editor non è aperto. Il
 protocollo `skins-theme://` risponde con `Cache-Control: no-store`.
 
+## Artifact di claude.ai
+
+Lo strumento `Artifact` è di Claude Code (con un account claude.ai che li ha): Claudeleon non pubblica niente da sé,
+riconosce le pubblicazioni e le mostra. `src/artifacts.js`: `artifactOf(input, result, text)` dice se un'azione è una
+pubblicazione riuscita (azione publish, non `asset`; l'indirizzo `claude.ai/(code/)artifact/<id>` dal risultato
+strutturato o dal testo; il titolo dal risultato, dall'ingresso, dal `<title>` della pagina o dal nome del file) e
+`list()` ricava l'elenco dai `.jsonl` delle sessioni (come la ricerca, con la cache per data e misura; uno per
+indirizzo, l'ultima pubblicazione, con `versions`). Il ponte tiene nome e ingresso degli strumenti che servono alla
+fine (`toolInputs`: Artifact e le scritture di `.html`) e `toolExtras` aggiunge a `toolDone` l'`artifact` e gli
+indirizzi `file://` delle pagine HTML toccate (per l'anteprima, che si ricarica se le sta mostrando); `history` mette
+`artifact` sulle voci riaperte. Le parole delle azioni: `tool_artifact`, `tool_artifactUpdate`, `tool_artifactList`,
+`tool_artifactRead`. Con l'interruttore spento (`config.artifacts === false`) il ponte passa
+`disallowedTools: ['Artifact', 'ArtifactComments', 'ArtifactData']` e le conversazioni ripartono come per i permessi.
+
+Nella pagina: `artifactCard` (scheda `.item.artifact-card`), la pagina delle impostazioni `artifacts` (anche
+`/artifacts` e l'azione `data-action="artifacts"`). claude.ai non si lascia incorniciare, quindi il pannello
+dell'anteprima usa un `<webview class="pv-web" partition="persist:claudeai">` per gli indirizzi di claude.ai e l'iframe
+per il resto. La finestra ha `webviewTag: true`; `will-attach-webview` accetta solo quella sessione e indirizzi
+claude.ai, senza preload né Node; dentro il webview restano claude.ai e le pagine per accedere (Google, Apple,
+anthropic.com, claudeusercontent.com), il resto va nel browser, e le finestre che claude.ai apre per l'accesso sono
+finestre dell'app nella stessa sessione. L'identità del browser di quella sessione non dice Electron (Google
+rifiuterebbe l'accesso). Gli avvisi di nuovi commenti sugli artifact non arrivano nelle sessioni dell'SDK.
+
 ## Prossimi passi possibili
 
 0. **Temi.**

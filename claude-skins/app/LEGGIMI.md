@@ -224,7 +224,16 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   per cambiare la larghezza (si ricorda). I link a localhost nelle risposte si aprono lì (con Ctrl nel browser);
   Ctrl+Maiusc+P apre e chiude il pannello. I server che vietano di farsi incorniciare lo permettono, solo per gli
   indirizzi locali. Quando la colonna della chat si stringe, i selettori della riga della penna restano con la sola
-  icona.
+  icona. Anche le pagine HTML che Claude scrive sul computer compaiono lì ("Anteprima · pagina.html") e si
+  ricaricano a ogni modifica.
+- **Artifact di claude.ai:** come nell'app desktop, Claude può pubblicare pagine su claude.ai (spiegazioni, schemi,
+  cruscotti, piccoli strumenti), private finché non le condividi: basta chiederglielo. Ogni pubblicazione ha una
+  scheda nella conversazione con "Apri" (nel pannello accanto alla conversazione), "↗" (nel browser) e "Copia
+  link"; anche i link agli artifact nelle risposte si aprono nel pannello. La prima volta il pannello chiede di
+  accedere a claude.ai, e l'accesso resta in Claudeleon (una sessione sua, `persist:claudeai`); se un modo di
+  accedere lì non va, c'è sempre il browser. Impostazioni → Artifact (o `/artifacts`) elenca quelli pubblicati dalle
+  conversazioni di questo computer, con la loro conversazione, apre la galleria di claude.ai con tutti, e ha
+  l'interruttore per spegnerli.
 - **Copia separata per ogni conversazione (worktree):** nel menu della cartella (o nelle impostazioni) si accende
   "Una copia separata per ogni conversazione". Da lì, nei repo git, il primo messaggio di una conversazione nuova crea
   una copia del repo in `.claude/worktrees/<nome>` (nome dalle prime parole del messaggio) su un branch suo,

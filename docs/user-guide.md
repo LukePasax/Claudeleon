@@ -118,6 +118,22 @@ open in browser, and **Snapshot for Claude**, which attaches an image of what th
 Drag the left edge to resize. Links to localhost in replies open there (Ctrl+click opens the browser). Ctrl+Shift+P
 toggles the panel.
 
+## Artifacts
+
+Claude can publish **artifacts**: pages on claude.ai (explainers, diagrams, dashboards, small tools) that stay private
+until you share them, as in the Claude desktop app. Ask for one ("make me a page that explains this project", "a
+dashboard of these numbers").
+
+- A **card** in the conversation shows each published or updated artifact: **Open** shows it in the panel next to
+  the conversation, **↗** in the browser, **Copy link** copies its address. Links to artifacts in replies open in the
+  panel too (Ctrl+click opens the browser).
+- The first time, the panel asks you to sign in to claude.ai; the sign-in stays in Claudeleon. If a sign-in method
+  does not work there, use **↗** and the browser.
+- While Claude writes an HTML page on your computer, **Preview · page.html** under the input box shows it in the same
+  panel, and it reloads every time Claude changes the file.
+- **Settings → Artifacts** (or `/artifacts`) lists the artifacts published from the conversations on this computer,
+  with their conversation, and opens the claude.ai gallery with all of them. The switch there turns artifacts off.
+
 ## Settings
 
 **Settings** (bottom of the sidebar, Ctrl+, or the tray) has categories on the left:
@@ -135,6 +151,7 @@ toggles the panel.
 - **Memory:** the `CLAUDE.md` files Claude reads in every conversation: personal (`~/.claude/CLAUDE.md`), the
   project's (`CLAUDE.md`), just yours in the project (`CLAUDE.local.md`) and those of the folders above. An editor with
   a Markdown preview; Ctrl+S saves.
+- **Artifacts:** the artifacts published from this computer, the claude.ai gallery, on/off.
 - **Extensions:** MCP servers (status, where they come from, tools; on/off, reconnect) and plugins (on/off for all
   conversations). New ones are added from Claude Code (`/mcp`, `/plugin`, `claude mcp add`).
 - **Updates:** status, release notes, **Check now**, automatic checks.

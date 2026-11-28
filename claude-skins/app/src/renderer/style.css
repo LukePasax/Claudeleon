@@ -694,6 +694,27 @@ body.busy .entry .edit-btn { display: none; }
 .pv-body { position: relative; flex: 1; min-height: 0; background: #fff; }
 .pv-frame { display: block; width: 100%; height: 100%; border: none; background: #fff; }
 .pv-frame[hidden] { display: none; }
+.pv-web { display: flex; position: absolute; inset: 0; width: 100%; height: 100%; border: none; background: #fff; }
+.pv-web[hidden] { display: none; }
+.preview-pane.dragging .pv-web { pointer-events: none; }
+
+/* Gli artifact di claude.ai: la scheda nella conversazione e le righe nelle impostazioni */
+.item.artifact-card, .art-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin: 6px 0;
+  border: var(--line) solid var(--edge-light); border-radius: var(--radius);
+  background: var(--surface); color: var(--ink);
+}
+.item.artifact-card { cursor: pointer; max-width: 560px; }
+.item.artifact-card:hover { border-color: var(--gold); }
+.art-icon { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 8px; color: var(--gold); background: var(--code); }
+.art-text { flex: 1; min-width: 0; }
+.art-title { font-weight: 600; color: var(--strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.art-sub { font-size: var(--small-size); color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.art-actions { flex: none; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.art-list { display: flex; flex-direction: column; }
+.art-row { margin: 4px 0; flex-wrap: wrap; }
+.art-row .art-text { min-width: 200px; }
+.art-none { padding: 6px 0; }
 .pv-empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; font-size: var(--small-size); line-height: 1.5; color: var(--ink-soft); background: var(--menu-bg, var(--bg)); }
 .pv-empty[hidden] { display: none; }
 /* Stretti al massimo, cartella, modello e branch tengono almeno la loro icona */
