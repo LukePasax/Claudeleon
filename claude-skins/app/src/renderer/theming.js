@@ -42,6 +42,7 @@
     themesImportDesc: 'Da un file .skin: un tema passato da qualcun altro',
     themesExported: 'Tema esportato in {x}',
     themesFail: 'Non riuscito: {x}',
+    themesNotRegistered: 'il file del tema non registra «{x}»',
     // L'editor dei temi
     teTitleNew: 'Nuovo tema',
     teTitleEdit: 'Modifica il tema',
@@ -592,8 +593,22 @@
     },
   }
 
+  // La lingua della finestra: inglese (lang/en.js, quella di partenza) o italiano (le scritte qui sopra). Una scritta
+  // che manca in inglese viene dall'italiano
+  const IT = { strings: STRINGS, months: MONTHS, days: ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'] }
+  let language = 'en'
+  const pack = () => (language === 'it' ? IT : (window.SkinsLang && window.SkinsLang.en) || IT)
+  function setLanguage(l) {
+    language = l === 'it' ? 'it' : 'en'
+    document.documentElement.lang = language
+  }
+  // Il nome e la descrizione di un tema nella lingua della finestra (names / descriptions, se il tema li dà)
+  const nameOf = (th) => (th && th.names && th.names[language]) || (th && th.name) || (th && th.id) || ''
+  const descriptionOf = (th) => (th && th.descriptions && th.descriptions[language]) || (th && th.description) || ''
+
   function plainDate(d) {
-    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
+    const p = pack()
+    return language === 'it' ? `${d.getDate()} ${p.months[d.getMonth()]} ${d.getFullYear()}` : `${p.months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
   }
 
   const registry = new Map()
@@ -683,7 +698,10 @@
   }
 
   function t(key, vars) {
-    const s = (current.strings && current.strings[key]) ?? STRINGS[key] ?? key
+    // Le scritte del tema: per lingua ({ en: {...}, it: {...} }) o le stesse per tutte
+    const ts = current.strings || {}
+    const own = ts.en || ts.it ? ts[language] || {} : ts
+    const s = own[key] ?? pack().strings[key] ?? STRINGS[key] ?? key
     return vars ? s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m)) : s
   }
 
@@ -817,8 +835,10 @@
     installed: (id) => String(bases.get(id) || '').startsWith('skins-theme:'),
     preview,
     // I temi caricati, per il selettore: id, nome, descrizione
-    list: () => [...registry.values()].filter((th) => !String(th.id).startsWith('__')).map((th) => ({ id: th.id, name: th.name || th.id, description: th.description || '' })),
+    list: () => [...registry.values()].filter((th) => !String(th.id).startsWith('__')).map((th) => ({ id: th.id, name: nameOf(th), description: descriptionOf(th) })),
     load, use, applyScene, t, chapterDate, plainDate, art, icon, trayIcon, appIcon, hook, asset, artScale, MONTHS,
+    setLanguage, nameOf, months: () => pack().months, days: () => pack().days,
+    get language() { return language },
     get current() { return current },
     palette: (name) => paletteOf(current, name),
   }

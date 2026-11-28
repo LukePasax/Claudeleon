@@ -5,6 +5,8 @@ const fs = require('fs')
 const path = require('path')
 const { ClaudeBridge, DEFAULT_CLAUDE, loadContextMax, savedContextMax } = require('./claude-bridge')
 const { Updater } = require('./updater')
+const i18n = require('./i18n')
+const { tr } = i18n
 const { ReleaseUpdater } = require('./release-updater')
 const { listFiles, rankFiles } = require('./files')
 const gitOps = require('./git')
@@ -190,7 +192,7 @@ function setTheme(id) {
   if (!themes.some((t) => t.id === id)) return
   config.theme = id
   saveConfig()
-  for (const b of allBridges()) b.persona = currentTheme().persona
+  for (const b of allBridges()) b.persona = i18n.pick(currentTheme().persona)
   // La finestra prende la misura del nuovo tema, attorno allo stesso centro e dentro lo schermo (se è ingrandita
   // resta ingrandita: cambia la misura a cui tornerà)
   if (winMode !== 'normal') {
@@ -233,7 +235,7 @@ function makeConv(sessionId, cwd) {
       if (activeConv === c.id) { config.sessionId = id; config.sessionCwd = c.cwd; saveConfig() }
       if (fresh) send('conv:session', { id, cwd: c.cwd }, c.id)
     },
-  }, config.workdir, currentTheme().persona, config.permissionMode)
+  }, config.workdir, i18n.pick(currentTheme().persona), config.permissionMode)
   const b = c.bridge
   b.entrypoint = config.entrypoint || 'cli'
   b.claudePath = config.claudePath || null
@@ -449,17 +451,17 @@ function toggleVisible() {
 
 function trayMenu() {
   return Menu.buildFromTemplate([
-    { label: win && shown() ? 'Riduci a icona' : 'Mostra', click: () => { if (shown()) win.minimize(); else bringBack(); refreshTray() } },
-    { label: 'Nuova conversazione', click: () => send('chat:reset') },
-    { label: 'Tema', submenu: themes.map((t) => ({ label: t.name, type: 'radio', checked: t.id === currentTheme().id, click: () => setTheme(t.id) })) },
-    { label: 'Cartella di lavoro…', click: chooseWorkdir },
-    { label: 'Notifiche', type: 'checkbox', checked: config.notify !== false, click: (item) => { config.notify = item.checked; saveConfig() } },
-    { label: 'Sempre in primo piano', type: 'checkbox', checked: config.onTop === true, click: (item) => setOnTop(item.checked) },
-    { label: 'Riporta al centro', click: centerWindow },
-    { label: 'Dimensione iniziale', click: resetWindowSize },
-    { label: 'Impostazioni…', click: () => { bringBack(); send('settings:open') } },
+    { label: win && shown() ? tr('Riduci a icona') : tr('Mostra'), click: () => { if (shown()) win.minimize(); else bringBack(); refreshTray() } },
+    { label: tr('Nuova conversazione'), click: () => send('chat:reset') },
+    { label: tr('Tema'), submenu: themes.map((t) => ({ label: i18n.pick(t.names) || t.name, type: 'radio', checked: t.id === currentTheme().id, click: () => setTheme(t.id) })) },
+    { label: tr('Cartella di lavoro…'), click: chooseWorkdir },
+    { label: tr('Notifiche'), type: 'checkbox', checked: config.notify !== false, click: (item) => { config.notify = item.checked; saveConfig() } },
+    { label: tr('Sempre in primo piano'), type: 'checkbox', checked: config.onTop === true, click: (item) => setOnTop(item.checked) },
+    { label: tr('Riporta al centro'), click: centerWindow },
+    { label: tr('Dimensione iniziale'), click: resetWindowSize },
+    { label: tr('Impostazioni…'), click: () => { bringBack(); send('settings:open') } },
     { type: 'separator' },
-    { label: 'Esci', click: () => app.quit() },
+    { label: tr('Esci'), click: () => app.quit() },
   ])
 }
 
@@ -515,6 +517,7 @@ async function settingsState() {
     shortcut: TOGGLE_SHORTCUT.replace('Control', 'Ctrl'),
     autoUpdate: config.autoUpdate !== false,
     worktree: config.worktree === true,
+    language: i18n.language(),
     updateSource: updateSource(),
     updateSources: updateSources(),
   }
@@ -525,6 +528,15 @@ async function applySetting(key, value) {
   else if (key === 'notify') { config.notify = !!value; saveConfig() }
   else if (key === 'autoUpdate') { config.autoUpdate = !!value; saveConfig() }
   else if (key === 'worktree') { config.worktree = !!value; saveConfig() }
+  else if (key === 'language') {
+    // La lingua: per il processo principale (vassoio, finestre di dialogo, messaggi), per la finestra e per la
+    // personalità che il tema dà a Claude (dal prossimo messaggio)
+    config.language = value === 'it' ? 'it' : 'en'
+    saveConfig()
+    i18n.setLanguage(config.language)
+    for (const b of [bridge, ...allBridges()]) b.persona = i18n.pick(currentTheme().persona)
+    send('language:set', config.language)
+  }
   else if (key === 'updateSource' && updateSources().includes(value)) {
     config.updateSource = value
     saveConfig()
@@ -542,7 +554,7 @@ async function applySetting(key, value) {
     for (const b of [bridge, ...allBridges()]) b.claudePath = config.claudePath
     bridge.loadCommands()
   } else if (key === 'chooseClaude') {
-    const r = await dialog.showOpenDialog(win, { title: 'Dov\'è Claude Code', defaultPath: path.dirname(claudePath()), properties: ['openFile'], filters: process.platform === 'win32' ? [{ name: 'Claude Code', extensions: ['exe', 'cmd'] }] : [] })
+    const r = await dialog.showOpenDialog(win, { title: tr('Dov\'è Claude Code'), defaultPath: path.dirname(claudePath()), properties: ['openFile'], filters: process.platform === 'win32' ? [{ name: 'Claude Code', extensions: ['exe', 'cmd'] }] : [] })
     if (!r.canceled && r.filePaths[0]) return applySetting('claudePath', r.filePaths[0])
   } else if (key === 'workdir') await chooseWorkdir()
   else if (key === 'center') centerWindow()
@@ -554,7 +566,7 @@ async function applySetting(key, value) {
 
 // La cartella in cui nascono le conversazioni nuove (quelle riprese restano nella loro)
 async function chooseWorkdir() {
-  const r = await dialog.showOpenDialog(win, { title: 'Cartella di lavoro di Claude', defaultPath: config.workdir || app.getPath('home'), properties: ['openDirectory'] })
+  const r = await dialog.showOpenDialog(win, { title: tr('Cartella di lavoro di Claude'), defaultPath: config.workdir || app.getPath('home'), properties: ['openDirectory'] })
   if (r.canceled || !r.filePaths[0]) return null
   return setWorkdir(r.filePaths[0])
 }
@@ -611,6 +623,7 @@ function registerIpc() {
     workdirChosen: !!config.workdir,
     sessionCwd: config.sessionId ? (config.sessionCwd || bridge.workdir) : null,
     mode: config.permissionMode || bridge.mode,
+    language: i18n.language(),
   }))
   ipcMain.on('theme:set', (_e, id) => setTheme(String(id)))
   // L'avvio sicuro: la pagina è partita; un tema non si è montato; l'avviso letto o "Riprova"; gli errori della pagina
@@ -648,10 +661,10 @@ function registerIpc() {
   ipcMain.handle('theme:export', async (_e, id) => {
     try {
       const b = bundleFor(String(id || ''), userThemesDir())
-      if (!b) return { ok: false, error: 'Tema sconosciuto' }
+      if (!b) return { ok: false, error: tr('Tema sconosciuto') }
       const name = (b.kind === 'colors' ? b.spec.name : b.manifest.name) || String(id)
       const safe = name.replace(/[<>:"/\\|?*\x00-\x1f]+/g, ' ').trim().slice(0, 60) || 'tema'
-      const r = await dialog.showSaveDialog(win, { title: 'Esporta il tema', defaultPath: path.join(app.getPath('documents'), `${safe}.skin`), filters: [{ name: 'Tema di Claudeleon', extensions: ['skin'] }] })
+      const r = await dialog.showSaveDialog(win, { title: tr('Esporta il tema'), defaultPath: path.join(app.getPath('documents'), `${safe}.skin`), filters: [{ name: tr('Tema di Claudeleon'), extensions: ['skin'] }] })
       if (r.canceled || !r.filePath) return { ok: false, canceled: true }
       fs.writeFileSync(r.filePath, JSON.stringify(b))
       return { ok: true, file: r.filePath }
@@ -663,25 +676,25 @@ function registerIpc() {
   // c'è già chiede se sostituirlo. Restituisce come caricarlo nella pagina
   ipcMain.handle('theme:import', async () => {
     try {
-      const pick = await dialog.showOpenDialog(win, { title: 'Importa un tema', properties: ['openFile'], filters: [{ name: 'Tema di Claudeleon', extensions: ['skin', 'json'] }] })
+      const pick = await dialog.showOpenDialog(win, { title: tr('Importa un tema'), properties: ['openFile'], filters: [{ name: tr('Tema di Claudeleon'), extensions: ['skin', 'json'] }] })
       if (pick.canceled || !pick.filePaths[0]) return { ok: false, canceled: true }
       const file = pick.filePaths[0]
-      if (fs.statSync(file).size > 40 * 1024 * 1024) return { ok: false, error: 'Il file è troppo grande' }
+      if (fs.statSync(file).size > 40 * 1024 * 1024) return { ok: false, error: tr('Il file è troppo grande') }
       let b
-      try { b = JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return { ok: false, error: 'Il file non è un tema di Claudeleon' } }
+      try { b = JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return { ok: false, error: tr('Il file non è un tema di Claudeleon') } }
       const c = checkBundle(b)
       if (!c.ok) return c
       if (c.kind === 'code') {
         const ok = await dialog.showMessageBox(win, {
-          type: 'warning', buttons: ['Installa', 'Annulla'], defaultId: 1, cancelId: 1, noLink: true,
-          title: 'Installare il tema?', message: `Installare il tema «${c.name}»?`,
-          detail: 'Questo tema contiene codice che girerà nella finestra di Claudeleon (può leggere le conversazioni e mandare messaggi a Claude). Installalo solo se viene da qualcuno di cui ti fidi.',
+          type: 'warning', buttons: [tr('Installa'), tr('Annulla')], defaultId: 1, cancelId: 1, noLink: true,
+          title: tr('Installare il tema?'), message: tr('Installare il tema «{x}»?', { x: c.name }),
+          detail: tr('Questo tema contiene codice che girerà nella finestra di Claudeleon (può leggere le conversazioni e mandare messaggi a Claude). Installalo solo se viene da qualcuno di cui ti fidi.'),
         })
         if (ok.response !== 0) return { ok: false, canceled: true }
       }
       let r = installBundle(userThemesDir(), b, false)
       if (!r.ok && r.exists) {
-        const again = await dialog.showMessageBox(win, { type: 'question', buttons: ['Sostituisci', 'Annulla'], defaultId: 0, cancelId: 1, noLink: true, title: 'Tema già installato', message: `Il tema «${r.name}» c'è già. Sostituirlo con quello del file?` })
+        const again = await dialog.showMessageBox(win, { type: 'question', buttons: [tr('Sostituisci'), tr('Annulla')], defaultId: 0, cancelId: 1, noLink: true, title: tr('Tema già installato'), message: tr('Il tema «{x}» c\'è già. Sostituirlo con quello del file?', { x: r.name }) })
         if (again.response !== 0) return { ok: false, canceled: true }
         r = installBundle(userThemesDir(), b, true)
       }
@@ -788,14 +801,14 @@ function registerIpc() {
           c.worktree = r
           c.bridge.workdir = r.path
           send('conv:worktree', r, c.id)
-        } else if (r.error !== 'Non è un repo git') send('conv:worktree', { ok: false, error: r.error }, c.id)
+        } else if (r.error !== tr('Non è un repo git')) send('conv:worktree', { ok: false, error: r.error }, c.id)
       }).catch(() => {})
     }
     ;(c.ready || Promise.resolve()).then(() => c.bridge.send(payload))
   })
   // Il pulsante "allega": file e immagini dal disco
   ipcMain.handle('files:choose', async () => {
-    const r = await dialog.showOpenDialog(win, { title: 'Allega file o immagini', defaultPath: (convOf(activeConv) && convOf(activeConv).cwd) || bridge.workdir, properties: ['openFile', 'multiSelections'] })
+    const r = await dialog.showOpenDialog(win, { title: tr('Allega file o immagini'), defaultPath: (convOf(activeConv) && convOf(activeConv).cwd) || bridge.workdir, properties: ['openFile', 'multiSelections'] })
     return r.canceled ? [] : r.filePaths
   })
   // Un'immagine dal disco, per mandarla a Claude come immagine e non come percorso
@@ -895,8 +908,8 @@ function registerIpc() {
   ipcMain.handle('session:export', async (_e, id, cwd, title) => {
     try {
       const md = await bridge.exportMarkdown(String(id), cwd || null, String(title || ''))
-      const name = (String(title || 'Conversazione').replace(/[<>:"/\\|?*\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Conversazione') + '.md'
-      const r = await dialog.showSaveDialog(win, { title: 'Esporta la conversazione', defaultPath: path.join(app.getPath('documents'), name), filters: [{ name: 'Markdown', extensions: ['md'] }] })
+      const name = (String(title || tr('Conversazione')).replace(/[<>:"/\\|?*\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || tr('Conversazione')) + '.md'
+      const r = await dialog.showSaveDialog(win, { title: tr('Esporta la conversazione'), defaultPath: path.join(app.getPath('documents'), name), filters: [{ name: 'Markdown', extensions: ['md'] }] })
       if (r.canceled || !r.filePath) return { ok: false, canceled: true }
       fs.writeFileSync(r.filePath, md)
       return { ok: true, file: r.filePath }
@@ -913,10 +926,10 @@ function registerIpc() {
   ipcMain.handle('session:archive', async (_e, id, cwd, on) => { await bridge.archive(id, cwd, !!on); return true })
   ipcMain.handle('session:delete', async (_e, id, cwd, title) => {
     const r = await dialog.showMessageBox(win, {
-      type: 'warning', buttons: ['Elimina', 'Annulla'], defaultId: 1, cancelId: 1, noLink: true,
-      title: 'Eliminare la conversazione?',
-      message: `Eliminare «${String(title || '').slice(0, 80)}»?`,
-      detail: 'Il transcript di Claude Code viene cancellato dal disco e non si può recuperare, nemmeno dall\'app desktop. Per toglierla solo dall\'elenco c\'è "Archivia".',
+      type: 'warning', buttons: [tr('Elimina'), tr('Annulla')], defaultId: 1, cancelId: 1, noLink: true,
+      title: tr('Eliminare la conversazione?'),
+      message: tr('Eliminare «{x}»?', { x: String(title || '').slice(0, 80) }),
+      detail: tr('Il transcript di Claude Code viene cancellato dal disco e non si può recuperare, nemmeno dall\'app desktop. Per toglierla solo dall\'elenco c\'è "Archivia".'),
     })
     if (r.response !== 0) return { deleted: false }
     const wasCurrent = config.sessionId === id
@@ -981,12 +994,12 @@ function wireConv(c) {
     send('claude:done', r, c.id)
     const text = plainSnippet(c.replyText)
     c.replyText = ''
-    notify('Claude ha finito', text || 'La risposta è pronta.', c)
+    notify(tr('Claude ha finito'), text || tr('La risposta è pronta.'), c)
   })
   b.on('error', (m) => {
     send('claude:error', m, c.id)
     c.replyText = ''
-    notify('Claude si è fermato', plainSnippet(String(m || '')), c)
+    notify(tr('Claude si è fermato'), plainSnippet(String(m || '')), c)
   })
   // Una domanda di permesso: se la finestra è ridotta a icona lampeggia nella barra, come le altre app, e arriva
   // una notifica
@@ -994,9 +1007,9 @@ function wireConv(c) {
     if (!win.isVisible()) win.show()
     if (win.isMinimized() || !win.isFocused()) win.flashFrame(true)
     send('perm:ask', q, c.id)
-    if (q.kind === 'plan') notify('Claude propone un piano', 'Da approvare per continuare.', c)
-    else if (q.kind === 'question') notify('Claude ti fa una domanda', (q.questions[0] && q.questions[0].question) || '', c)
-    else notify('Claude chiede il permesso', [q.title, q.detail].filter(Boolean).join(' · '), c)
+    if (q.kind === 'plan') notify(tr('Claude propone un piano'), tr('Da approvare per continuare.'), c)
+    else if (q.kind === 'question') notify(tr('Claude ti fa una domanda'), (q.questions[0] && q.questions[0].question) || '', c)
+    else notify(tr('Claude chiede il permesso'), [q.title, q.detail].filter(Boolean).join(' · '), c)
   })
   fwd('askClosed', 'perm:closed')
   fwd('todos', 'claude:todos')
@@ -1149,8 +1162,8 @@ function makeUpdater() {
     const key = s.version || s.count
     if (s.state === 'available' && key !== updateNotified && config.notify !== false && Notification.isSupported()) {
       updateNotified = key
-      const body = s.version ? `È uscita la versione ${s.version}${s.commits && s.commits[0] ? `: ${s.commits[0]}` : ''}` : s.commits && s.commits[0] ? `${s.count} novità, fra cui: ${s.commits[0]}` : `${s.count} novità`
-      const n = new Notification({ title: 'Claudeleon: aggiornamento disponibile', body, icon: trayImage || undefined })
+      const body = s.version ? tr('È uscita la versione {v}', { v: s.version }) + (s.commits && s.commits[0] ? `: ${s.commits[0]}` : '') : s.commits && s.commits[0] ? tr('{n} novità, fra cui: {x}', { n: s.count, x: s.commits[0] }) : tr('{n} novità', { n: s.count })
+      const n = new Notification({ title: tr('Claudeleon: aggiornamento disponibile'), body, icon: trayImage || undefined })
       n.on('click', () => { bringBack(); send('settings:open') })
       n.show()
     }
@@ -1238,6 +1251,7 @@ app.whenReady().then(() => {
   serveThemes()
   migrateOldData()
   loadConfig()
+  i18n.setLanguage(config.language || 'en')
   const capture = captureArgs()
   if (capture) {
     // Le prove non toccano la configurazione vera
@@ -1259,7 +1273,7 @@ app.whenReady().then(() => {
   bridge = new ClaudeBridge({
     getSession: () => config.sessionId,
     setSession: (id, cwd) => { config.sessionId = id; config.sessionCwd = cwd || null; saveConfig() },
-  }, config.workdir, currentTheme().persona, config.permissionMode)
+  }, config.workdir, i18n.pick(currentTheme().persona), config.permissionMode)
   // Come si presentano le sessioni a Claude Code (cli: visibili nel /resume e nelle altre app). Si può cambiare in
   // config.json, ad esempio "claude-desktop"
   bridge.entrypoint = config.entrypoint || 'cli'

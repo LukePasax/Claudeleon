@@ -259,6 +259,13 @@ col modo dei permessi, `body[data-theme]` col tema. Un aggancio che va in errore
 - Un carattere nuovo va nella cartella del tema e si dichiara con `@font-face` nel `theme.css`, con un percorso
   relativo. Sono ammessi solo file locali.
 
+## Lingue
+
+L'app è in inglese o in italiano. Le `strings` di un tema possono essere per lingua (`strings: { en: {...}, it:
+{...} }`) o le stesse per tutte; quelle che il tema non dà vengono dal motore nella lingua scelta. Anche nome e
+descrizione possono avere la versione per lingua (`names: { it: '...' }`, `descriptions: { it: '...' }`) e la
+`persona` può essere `{ en: '...', it: '...' }`.
+
 ## Passare un tema ad altri: il file `.skin`
 
 "Esporta" (sulla scheda del tema, nel selettore) salva un JSON `{ format: 'claude-skins-theme', version: 1, kind, … }`:

@@ -15,7 +15,8 @@
   // Gli errori della pagina finiscono in errori.log (cartella dei dati), per capire cosa non va
   window.addEventListener('error', (e) => { if (api.logError) api.logError(`${e.message} (${(e.filename || '').split('/').pop()}:${e.lineno})${e.error && e.error.stack ? `\n${e.error.stack}` : ''}`) })
   window.addEventListener('unhandledrejection', (e) => { if (api.logError) api.logError(`promessa: ${(e.reason && e.reason.stack) || e.reason}`) })
-  const MONTHS = Theming.MONTHS
+  // I mesi nella lingua della finestra
+  const month = (i) => Theming.months()[i]
   const part = (name) => app.querySelector(`[data-part="${name}"]`)
   const all = (sel) => app.querySelectorAll(sel)
 
@@ -629,8 +630,9 @@
     const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
     const today = new Date()
     if (d.toDateString() === today.toDateString()) return t('usageAt', { when: hm })
-    const days = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab']
-    return t('usageAt', { when: `${days[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}, ${hm}` })
+    const day = Theming.days()[d.getDay()]
+    const mon = month(d.getMonth()).slice(0, 3)
+    return t('usageAt', { when: Theming.language === 'it' ? `${day} ${d.getDate()} ${mon}, ${hm}` : `${day} ${mon} ${d.getDate()}, ${hm}` })
   }
   function usageSection(menu) {
     const head = document.createElement('div')
@@ -1203,7 +1205,7 @@
     if (r.kind === 'code') await Theming.load([{ id: r.id, base: r.base }], true)
     else Theming.register(window.SkinsKits.moderno.fromColors(r.spec))
     closeThemes()
-    if (!Theming.get(r.id)) { labelled('error', 'themesFail', { x: `il file del tema non registra «${r.id}»` }); return }
+    if (!Theming.get(r.id)) { labelled('error', 'themesFail', { x: t('themesNotRegistered', { x: r.id }) }); return }
     api.setTheme(r.id)
   }
 
@@ -1864,6 +1866,15 @@
     } else if (r && r.error) labelled('error', 'wtFailed', { err: r.error })
   })
   if (api.settings) api.settings().then((st) => { worktreeOn = !!(st && st.worktree); renderFolder() }).catch(() => {})
+  // La lingua cambiata dalle impostazioni: tutto si ridisegna nella nuova (le voci già scritte nella conversazione
+  // restano come sono); le impostazioni, se erano aperte, si riaprono sulla stessa pagina
+  if (api.onLanguage) api.onLanguage(async (l) => {
+    const settingsOpen = !!document.querySelector('.theme-picker.settings-panel')
+    Theming.setLanguage(l)
+    await mount(Theming.current.id)
+    if (sessionsPinned()) refreshSessions()
+    if (settingsOpen) openSettings()
+  })
 
   // ------------------------------------------------------------------ impostazioni
 
@@ -1940,7 +1951,7 @@
       general() {
         section('setLook')
         if (api.setSetting) select(row('setLanguage', t('setLanguageNote')), [['en', 'English'], ['it', 'Italiano']], st.language || 'en', (v) => set('language', v))
-        const th = row('setTheme', Theming.current.name)
+        const th = row('setTheme', Theming.nameOf(Theming.current))
         button(th, 'setChange', () => { closeThemes(); openThemes() })
         if (api.saveTheme) button(th, 'themesNew', () => { closeThemes(); openThemeEditor(null) })
         if (api.importTheme) button(th, 'setImport', () => importTheme())
@@ -2989,13 +3000,15 @@
   // una barra nei pannelli) e partono con il prossimo messaggio, in un blocco <diff_comments> in fondo al testo che
   // Claude legge (file, riga, lato, codice, commento) e che qui torna una lista. Valgono per la conversazione in vista
   let reviewSeq = 0
-  const REVIEW_INTRO = 'Commenti sulle righe delle modifiche: per ognuno il file, la riga (side "+" aggiunta, "-" tolta, " " invariata), il codice di quella riga e il commento.'
+  const reviewIntro = () => (Theming.language === 'it'
+    ? 'Commenti sulle righe delle modifiche: per ognuno il file, la riga (side "+" aggiunta, "-" tolta, " " invariata), il codice di quella riga e il commento.'
+    : 'Comments on the lines of the changes: for each one the file, the line (side "+" added, "-" removed, " " unchanged), the code of that line and the comment.')
   const attr = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
   const unattr = (x) => String(x).replace(/&quot;/g, '"').replace(/&amp;/g, '&')
   function reviewBlock(list) {
     if (!list.length) return ''
     const items = list.map((r) => `<comment file="${attr(r.file)}" line="${attr(r.line)}" side="${attr(r.side)}">\n<code>${r.code}</code>\n${r.text}\n</comment>`)
-    return `\n\n<diff_comments>\n${REVIEW_INTRO}\n${items.join('\n')}\n</diff_comments>`
+    return `\n\n<diff_comments>\n${reviewIntro()}\n${items.join('\n')}\n</diff_comments>`
   }
   function parseReviews(block) {
     const out = []
@@ -3777,7 +3790,7 @@
 
   function formatWhen(ms) {
     const d = new Date(ms)
-    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    return `${Theming.plainDate(d)}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   }
 
   // Il pannello delle cronache: in sovrimpressione (si apre col pulsante, hidden altrimenti) o fisso nel layout, con
@@ -3852,7 +3865,9 @@
     const d = new Date(ms)
     const g = sessionGroup(ms)
     if (g === 'groupToday' || g === 'groupYesterday') return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-    return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}${d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : ''}`
+    const mon = month(d.getMonth()).slice(0, 3)
+    const year = d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : ''
+    return Theming.language === 'it' ? `${d.getDate()} ${mon}${year}` : `${mon} ${d.getDate()}${year}`
   }
   const fold = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
@@ -4356,6 +4371,7 @@
 
   api.info().then(async (info) => {
     scene = info.scene === 'giorno' ? 'giorno' : 'notte'
+    Theming.setLanguage(info.language || 'en')
     workdir = info.workdir || ''
     chapter = info.chapter || 1
     mode = info.mode || 'auto'
@@ -4513,7 +4529,7 @@
     const fakeMemFiles = () => ({ cwd: 'C:/Users/luca/MapEditor', files: [['user', 'C:/Users/luca/.claude/CLAUDE.md'], ['project', 'C:/Users/luca/MapEditor/CLAUDE.md'], ['local', 'C:/Users/luca/MapEditor/CLAUDE.local.md'], ['parent', 'C:/Users/luca/CLAUDE.md']].filter(([id, f]) => id !== 'parent' || fakeMemory.has(f)).map(([id, file]) => ({ id, file, exists: fakeMemory.has(file), size: (fakeMemory.get(file) || '').length })) })
     const fakePermFiles = { user: 'C:/Users/luca/.claude/settings.json', project: 'C:/Users/luca/MapEditor/.claude/settings.json', local: 'C:/Users/luca/MapEditor/.claude/settings.local.json' }
     const fakeUpdate = { state: 'available', count: 3, behind: 3, local: 0, commits: ['Pannello dei server MCP e dei plugin', 'Riepilogo dei file modificati nella conversazione', 'Pannello delle impostazioni'], branch: 'main', dirty: false, repo: 'C:/Users/luca/Claudeleon', installed: true }
-    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '1.0.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claudeleon', shortcut: 'Ctrl+Alt+P', worktree: false }
+    const fakeSettings = { onTop: false, notify: true, openAtLogin: false, workdir: 'C:/Workspace', mode: 'auto', entrypoint: 'cli', claudePath: 'C:/Users/luca/.local/bin/claude.exe', claudeDefault: true, claudeFound: true, claudeVersion: '2.1.330', version: '1.0.0', installed: true, dataDir: 'C:/Users/luca/AppData/Roaming/Claudeleon', shortcut: 'Ctrl+Alt+P', worktree: false, language: new URLSearchParams(location.search).get('lingua') || 'en' }
     const fakeSessions = [
       { id: 's0', title: 'Allegati e domande con le opzioni', lastModified: Date.now() - 600000, cwd: 'C:/Workspace/Progetti/Claudeleon', branch: 'main' },
       { id: 's1', title: 'Temi per Claudeleon', lastModified: Date.now() - 3600000, cwd: 'C:/Workspace/Progetti/Claudeleon', branch: 'main' },
@@ -4527,7 +4543,7 @@
       // ?tema=<id>&scena=giorno nell'indirizzo per guardare un tema
       info: async () => {
         const q = new URLSearchParams(location.search)
-        return { scene: q.get('scena') || 'notte', chapter: n, theme: q.get('tema') || 'essenziale', themes: ['essenziale'], userThemes: fakeUserThemes, workdir: 'C:/Workspace', workdirChosen: q.get('cartella') !== 'no', mode: q.get('modo') || 'auto' }
+        return { scene: q.get('scena') || 'notte', language: q.get('lingua') || 'en', chapter: n, theme: q.get('tema') || 'essenziale', themes: ['essenziale'], userThemes: fakeUserThemes, workdir: 'C:/Workspace', workdirChosen: q.get('cartella') !== 'no', mode: q.get('modo') || 'auto' }
       },
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
       setMode: (m) => fire('onMode', m, 0),
@@ -4621,9 +4637,9 @@
       onUpdate: on('onUpdate'),
       stopTask: async () => true,
       backgroundNow: async () => true,
-      onTasks: on('onTasks'), onWorktree: on('onWorktree'), onSafeState: on('onSafeState'),
+      onTasks: on('onTasks'), onWorktree: on('onWorktree'), onSafeState: on('onSafeState'), onLanguage: on('onLanguage'),
       settings: async () => fakeSettings,
-      setSetting: async (k, v) => { if (k in fakeSettings) fakeSettings[k] = v; return fakeSettings },
+      setSetting: async (k, v) => { if (k in fakeSettings) fakeSettings[k] = v; if (k === 'language') fireAll('onLanguage', v, 0); return fakeSettings },
       suggestFiles: async (q) => ['src/', 'src/MapView.cpp', 'src/MapView.h', 'src/MapLoader.cpp', 'src/RouteFinder.h', 'docs/', 'docs/specifiche.pdf', 'README.md', 'CMakeLists.txt'].filter((f) => f.toLowerCase().includes(q.toLowerCase())).slice(0, 15),
       edit(uuid, msg, restore, conv) {
         if (restore) fireAll('onRewound', { ok: true, files: ['src/MapView.cpp'], insertions: 2, deletions: 1 }, 50, conv)

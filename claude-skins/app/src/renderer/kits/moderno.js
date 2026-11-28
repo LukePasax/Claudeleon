@@ -14,33 +14,16 @@
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${pal.inkSoft}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`
   }
 
+  // Le scritte proprie del kit, per lingua (le altre sono quelle del motore)
   const strings = {
-    title: 'Claudeleon',
-    chapter: 'Nuova conversazione',
-    newChapter: 'Nuova conversazione',
-    placeholder: 'Scrivi a Claude…',
-    hint: 'Invio per inviare · Maiusc+Invio per andare a capo · / per i comandi',
-    busyHint: 'Claude sta lavorando…',
-    send: 'Invia',
-    stop: 'Ferma',
-    stopped: 'Interrotto.',
-    you: 'Tu',
-    claude: 'Claude',
-    took: '{s} s',
-    toolOk: '✓',
-    toolFail: '✕',
-    sessions: 'Conversazioni',
-    sessionsTitle: 'Recenti',
-    sessionsLoading: 'Carico le conversazioni…',
-    sessionsEmpty: 'Nessuna conversazione salvata su questo computer.',
-    copying: 'Carico la conversazione…',
-    continueHere: 'Da qui la conversazione continua.',
-    themes: 'Temi',
-    themesTitle: 'Temi',
-    modesLabel: '',
-    hideTip: 'Riduci a icona',
-    quitTip: 'Chiudi',
-    gripTip: 'Ridimensiona',
+    en: {
+      chapter: 'New conversation', sessions: 'Conversations', sessionsTitle: 'Recent',
+      sessionsEmpty: 'No conversations saved on this computer.', toolOk: '✓', toolFail: '✕', modesLabel: '', gripTip: 'Resize',
+    },
+    it: {
+      chapter: 'Nuova conversazione', sessions: 'Conversazioni', sessionsTitle: 'Recenti',
+      sessionsEmpty: 'Nessuna conversazione salvata su questo computer.', toolOk: '✓', toolFail: '✕', modesLabel: '', gripTip: 'Ridimensiona',
+    },
   }
 
   const layout = `
@@ -171,10 +154,11 @@
       id,
       name,
       description,
-      persona: [
-        'Rispondi in modo chiaro e diretto, senza giri di parole.',
-        'Usa markdown (titoli, elenchi, tabelle, blocchi di codice) quando aiuta la lettura.',
-      ].join(' '),
+      // Per lingua: il processo principale prende quella della finestra
+      persona: {
+        en: 'Answer clearly and directly, without beating around the bush. Use markdown (headings, lists, tables, code blocks) when it helps reading.',
+        it: 'Rispondi in modo chiaro e diretto, senza giri di parole. Usa markdown (titoli, elenchi, tabelle, blocchi di codice) quando aiuta la lettura.',
+      },
       window: { width: 1100, height: 760, minWidth: 560, minHeight: 440 },
       kits: ['moderno'],
       strings,
@@ -255,12 +239,14 @@
 
   // Un tema con due aspetti, chiaro (scena giorno) e scuro (scena notte), che segue l'impostazione di Windows:
   // light e dark sono descrizioni come quelle dell'editor
-  function adaptive({ id, name, description, light, dark }) {
+  function adaptive({ id, name, description, names, descriptions, light, dark }) {
     const l = fromColors(Object.assign({}, light, { id, name, description }))
     const d = fromColors(Object.assign({}, dark, { id, name, description }))
     const theme = kit({ id, name, description, look: d.scenes.notte })
     theme.scenes = { notte: d.scenes.notte, giorno: l.scenes.notte }
     theme.followSystem = true
+    if (names) theme.names = names
+    if (descriptions) theme.descriptions = descriptions
     theme.looks = { notte: d.custom, giorno: l.custom }
     return theme
   }

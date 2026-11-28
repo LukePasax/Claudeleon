@@ -23,9 +23,10 @@ before(async () => {
 after(async () => { if (app) await app.close() })
 
 // Una pagina pulita col tema dato
-async function open(tema) {
+// Le prove leggono le scritte italiane; quella della lingua apre anche in inglese
+async function open(tema, lingua = 'it') {
   errors = []
-  const url = require('url').pathToFileURL(INDEX).href + `?tema=${tema}&scena=giorno&veloce=1`
+  const url = require('url').pathToFileURL(INDEX).href + `?tema=${tema}&scena=giorno&veloce=1&lingua=${lingua}`
   await page.goto(url)
   await page.waitForSelector('[data-part="input"]')
   await page.waitForTimeout(150)
@@ -373,6 +374,21 @@ for (const tema of TEMI) {
     await page.click('[data-action="themes"]')
     await page.click('.theme-import')
     await page.waitForFunction(() => Theming.current.id === 'citta-di-sera')
+    assert.deepEqual(errors, [])
+  })
+
+  test(`${tema}: in inglese di partenza, e il cambio di lingua dalle impostazioni`, async () => {
+    await open(tema, 'en')
+    assert.equal(await page.getAttribute('[data-part="input"]', 'placeholder'), 'Write to Claude…')
+    assert.equal(await page.textContent('[data-action="send"]'), 'Send')
+    await page.keyboard.press('Control+,')
+    await page.waitForSelector('.set-nav-item[data-page="general"]:has-text("General")')
+    await page.click('.set-nav-item[data-page="general"]')
+    await page.selectOption('.settings-panel .set-row:has-text("Language") select', 'it')
+    // Tutto si ridisegna in italiano, e le impostazioni restano aperte
+    await page.waitForFunction(() => document.querySelector('[data-part="input"]').placeholder === 'Scrivi a Claude…')
+    await page.waitForSelector('.set-nav-item[data-page="general"]:has-text("Generale")')
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'it')
     assert.deepEqual(errors, [])
   })
 

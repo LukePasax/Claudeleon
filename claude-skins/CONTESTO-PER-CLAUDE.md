@@ -299,6 +299,27 @@ alfanumerico del cwd diventa -) e carica il ponte con `query()` sostituita da un
 fallisce deve spegnere le conversazioni accese (`after`), altrimenti il processo non finisce. `listFiles`/`rankFiles`
 stanno in `src/files.js`, `plainSnippet` in `src/text.js`.
 
+## Lingue
+
+Inglese di partenza (`config.language`, `en` | `it`). Finestra: le scritte italiane sono `STRINGS` in theming.js, le
+inglesi `renderer/lang/en.js` (caricato prima di theming.js; stesso elenco di chiavi, una che manca ripiega
+sull'italiano); `Theming.setLanguage`, `months()`/`days()`, `plainDate` col formato della lingua, `nameOf(theme)`
+(campi `names`/`descriptions` per lingua). Le scritte di un tema possono essere per lingua (`strings: { en, it }`,
+come il kit moderno) o uguali per tutte (come Casa Baggins). Processo principale: `src/i18n.js` con `tr('frase
+italiana {x}', { x })` e il dizionario `EN` con la frase italiana come chiave, usato da main.js, git.js,
+permissions.js, memory.js, themes.js, updater.js, release-updater.js e claude-bridge.js (anche i messaggi a Claude);
+`pick()` per i campi per lingua dei temi (`persona` del kit è `{ en, it }`). `language:set` alla pagina, che
+rimonta il tema e riapre le impostazioni. Prove: `test/unit/lingue.test.js` (ogni `tr()` ha la traduzione, le
+scritte della finestra ci sono tutte e due con gli stessi segnaposto); le altre prove si mettono in italiano
+(`setLanguage('it')`, `?lingua=it`), una della finestra prova l'inglese e il cambio. Il tema di partenza si chiama
+"Essential" ("Essenziale" in italiano).
+
+## Impostazioni
+
+Pannello a categorie (`SETTINGS_PAGES`, `settingsPage` in localStorage); permessi, memoria ed estensioni sono gli
+stessi pannelli aperti con `openPermissions(body)` ecc. (parametro `inside`: dentro un altro contenitore, classe
+`.panel-embed`, senza titolo né cornice). Le scorciatoie sono una tabella (`KEYS`).
+
 ## Release su GitHub
 
 `.github/workflows/release.yml`: a mano (Run workflow) o con un tag `v<versione>`; prove della logica su

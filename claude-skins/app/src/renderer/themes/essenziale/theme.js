@@ -5,8 +5,10 @@
 
   const theme = kit.adaptive({
     id: 'essenziale',
-    name: 'Essenziale',
-    description: 'Pulito e neutro: chiaro o scuro come Windows.',
+    name: 'Essential',
+    description: 'Clean and neutral: light or dark like Windows.',
+    names: { it: 'Essenziale' },
+    descriptions: { it: 'Pulito e neutro: chiaro o scuro come Windows.' },
     light: {
       colors: { bg: '#fafafa', side: '#f1f2f4', surface: '#ffffff', ink: '#1f2328', inkSoft: '#69707a', accent: '#3b6fd8', onAccent: '#ffffff', line: '#e1e4e8', bubble: '#eaf0fb' },
       font: 'sistema', textSize: 15, radius: 8,

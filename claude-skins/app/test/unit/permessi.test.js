@@ -2,6 +2,8 @@
 // senza toccare il resto dei file
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
+// Queste prove controllano i messaggi in italiano
+require('../../src/i18n').setLanguage('it')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')

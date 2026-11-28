@@ -161,6 +161,13 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   stato, da quanto, quanti strumenti ha usato, l'ultimo e il riassunto finale, con "Ferma" e "Uscita" (il file con
   l'uscita). Mentre Claude lavora, "Manda in background" (o Ctrl+B) sposta in background il comando o il sotto-agente
   in corso, come nel terminale, e Claude va avanti. Con attività in corso la conversazione non si spegne da sola.
+- **Lingua:** l'inglese è la lingua di partenza; Impostazioni → Generale → Lingua passa all'italiano (e viceversa)
+  sul posto: finestra, menu del vassoio, finestre di dialogo, notifiche, messaggi d'errore e la "personalità" che il
+  tema dà a Claude. Le voci già scritte nella conversazione restano come sono; Claude risponde nella lingua in cui
+  gli scrivi.
+- **Impostazioni:** un pannello con le categorie a sinistra (Generale, Claude, Conversazioni, Permessi, Memoria,
+  Estensioni, Aggiornamenti, Informazioni); permessi, memoria ed estensioni si vedono lì dentro. L'ultima categoria
+  aperta si ricorda.
 - **Avvio sicuro:** se un tema impedisce all'app di partire, la finestra torna al tema di partenza (Essenziale) e
   un avviso spiega cosa è successo, con "Riprova «tema»", "Errori" (apre `errori.log`) e "Va bene". Succede quando un
   tema dà errore mentre si monta o non ha la conversazione e la casella, quando la pagina non finisce di partire

@@ -3,6 +3,7 @@
 // in tre file, come per Claude Code: le impostazioni dell'utente (tutti i progetti), quelle del progetto condivise
 // col repo (.claude/settings.json) e quelle solo locali (.claude/settings.local.json). Si leggono e si scrivono qui
 // toccando solo il campo permissions, il resto del file resta com'è
+const { tr } = require('./i18n')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
@@ -26,7 +27,7 @@ function readJson(file) {
   const text = fs.readFileSync(file, 'utf8')
   if (!text.trim()) return { data: {}, exists: true }
   const data = JSON.parse(text)
-  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('il file non contiene un oggetto JSON')
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error(tr('il file non contiene un oggetto JSON'))
   return { data, exists: true }
 }
 
@@ -61,13 +62,13 @@ function validRule(r) {
 // op: { kind: 'add' | 'remove' | 'move', list, rule, to }. list e to sono allow, ask, deny o dirs (le cartelle)
 function change(cwd, scope, op) {
   const f = files(cwd)[scope]
-  if (!f) return { ok: false, error: 'Posto sconosciuto' }
-  if (!op || !LISTS.includes(op.list) || (op.kind === 'move' && (!LISTS.includes(op.to) || op.to === 'dirs' || op.list === 'dirs'))) return { ok: false, error: 'Richiesta non valida' }
+  if (!f) return { ok: false, error: tr('Posto sconosciuto') }
+  if (!op || !LISTS.includes(op.list) || (op.kind === 'move' && (!LISTS.includes(op.to) || op.to === 'dirs' || op.list === 'dirs'))) return { ok: false, error: tr('Richiesta non valida') }
   const rule = String(op.rule || '').trim()
-  if (op.kind === 'add' && op.list !== 'dirs' && !validRule(rule)) return { ok: false, error: `«${rule}» non sembra una regola: per esempio Bash(npm run test:*) o Read(./docs/**)` }
-  if (op.kind === 'add' && op.list === 'dirs' && (!rule || /[\r\n]/.test(rule))) return { ok: false, error: 'Serve il percorso di una cartella' }
+  if (op.kind === 'add' && op.list !== 'dirs' && !validRule(rule)) return { ok: false, error: tr('«{x}» non sembra una regola: per esempio Bash(npm run test:*) o Read(./docs/**)', { x: rule }) }
+  if (op.kind === 'add' && op.list === 'dirs' && (!rule || /[\r\n]/.test(rule))) return { ok: false, error: tr('Serve il percorso di una cartella') }
   let doc
-  try { doc = readJson(f).data } catch (err) { return { ok: false, error: `${path.basename(f)} non si legge (${err.message}): sistemalo a mano prima` } }
+  try { doc = readJson(f).data } catch (err) { return { ok: false, error: tr('{x} non si legge ({y}): sistemalo a mano prima', { x: path.basename(f), y: err.message }) } }
   const perms = doc.permissions && typeof doc.permissions === 'object' ? doc.permissions : {}
   const key = (l) => (l === 'dirs' ? 'additionalDirectories' : l)
   const list = (l) => strings(perms[key(l)])
@@ -80,10 +81,10 @@ function change(cwd, scope, op) {
   } else if (op.kind === 'remove') {
     set(op.list, list(op.list).filter((x) => x !== rule))
   } else if (op.kind === 'move') {
-    if (!list(op.list).includes(rule)) return { ok: false, error: 'La regola non c\'è più' }
+    if (!list(op.list).includes(rule)) return { ok: false, error: tr('La regola non c\'è più') }
     set(op.list, list(op.list).filter((x) => x !== rule))
     if (!list(op.to).includes(rule)) set(op.to, [...list(op.to), rule])
-  } else return { ok: false, error: 'Richiesta non valida' }
+  } else return { ok: false, error: tr('Richiesta non valida') }
   if (Object.keys(perms).length) doc.permissions = perms
   else delete doc.permissions
   try {

@@ -4,6 +4,7 @@
 // e pulsante fissato restano). Stessa forma di updater.js per la finestra: state, check(), update(), evento 'state'.
 // Lo stato: { state: idle | checking | uptodate | available | updating | error | unavailable, version, notes,
 // commits (le righe delle note), step (download, install), percent, source: 'github' }
+const { tr } = require('./i18n')
 const fs = require('fs')
 const path = require('path')
 const { EventEmitter } = require('events')
@@ -62,7 +63,7 @@ class ReleaseUpdater extends EventEmitter {
   }
 
   async check() {
-    if (!this.app.isPackaged) { this.set({ state: 'unavailable', error: 'Gli aggiornamenti dalle release valgono per l\'app installata.' }); return this.state }
+    if (!this.app.isPackaged) { this.set({ state: 'unavailable', error: tr('Gli aggiornamenti dalle release valgono per l\'app installata.') }); return this.state }
     if (this.state.state === 'updating') return this.state
     try { await this.au.checkForUpdates() } catch (err) { this.set({ state: 'error', error: friendly(err), checkedAt: Date.now() }) }
     return this.state
@@ -79,11 +80,11 @@ class ReleaseUpdater extends EventEmitter {
 // Gli errori più comuni detti in breve
 function friendly(err) {
   const m = String((err && err.message) || err || '')
-  if (/ENOTFOUND|ECONNREFUSED|ETIMEDOUT|net::ERR_/i.test(m)) return 'Nessuna connessione con GitHub.'
-  if (/404|latest\.yml|Cannot find/i.test(m)) return 'Nessuna release trovata su GitHub (il repo è pubblico? c\'è almeno una release?).'
-  if (/app-update\.yml/i.test(m)) return 'Questa installazione non sa dove cercare gli aggiornamenti: reinstalla dall\'ultima release.'
-  if (/sha512|checksum/i.test(m)) return 'Il file scaricato non corrisponde: riprova più tardi.'
-  return m.split('\n')[0].slice(0, 200) || 'Errore sconosciuto'
+  if (/ENOTFOUND|ECONNREFUSED|ETIMEDOUT|net::ERR_/i.test(m)) return tr('Nessuna connessione con GitHub.')
+  if (/404|latest\.yml|Cannot find/i.test(m)) return tr('Nessuna release trovata su GitHub (il repo è pubblico? c\'è almeno una release?).')
+  if (/app-update\.yml/i.test(m)) return tr('Questa installazione non sa dove cercare gli aggiornamenti: reinstalla dall\'ultima release.')
+  if (/sha512|checksum/i.test(m)) return tr('Il file scaricato non corrisponde: riprova più tardi.')
+  return m.split('\n')[0].slice(0, 200) || tr('Errore sconosciuto')
 }
 
 module.exports = { ReleaseUpdater, noteLines, friendly }
