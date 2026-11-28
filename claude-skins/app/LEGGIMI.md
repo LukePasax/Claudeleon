@@ -189,6 +189,12 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   (un file JSON nella cartella `temi` dei dati dell'app, che resta con gli aggiornamenti); sulle schede dei tuoi temi
   ci sono "Modifica" ed "Elimina". I temi dell'editor hanno la struttura del kit moderno (come Essenziale): per
   forme diverse serve un tema scritto a mano (si passa poi come file `.skin`).
+- **Temi che si aggiornano da sé:** nel selettore, "Si aggiorna da sé" vuol dire che il tema usa la struttura di
+  Claudeleon (i temi dell'editor, Essenziale, quasi tutti quelli fatti da Claude): i pulsanti nuovi arrivano con gli
+  aggiornamenti. Un tema con una **forma sua** (un libro, un terminale, Casa Baggins) dice per quale versione di
+  Claudeleon è fatto; se gli manca un pulsante più nuovo, Claudeleon lo aggiunge accanto agli altri suoi pulsanti e la
+  scheda lo dice, con **Aggiorna con Claude**: apre una conversazione con la richiesta già scritta per farlo mettere
+  al posto giusto, nello stile del tema.
 - **Temi chiesti a Claude:** in una conversazione basta scrivere per esempio "fammi un tema come un vecchio
   terminale" o "un tema coi colori della mia azienda, chiaro e scuro". Claudeleon dà a Claude una skill,
   `claudeleon-theme` (anche come comando `/claudeleon:claudeleon-theme`), con la guida dei temi, tre esempi e la

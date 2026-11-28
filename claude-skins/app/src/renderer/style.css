@@ -763,6 +763,10 @@ body.busy .entry .edit-btn { display: none; }
 .theme-card.theme-new { align-items: center; justify-content: center; text-align: center; border-style: dashed; min-height: 150px; }
 .tn-plus { font-size: 34px; line-height: 1; color: var(--gold); }
 .theme-actions { display: flex; gap: 6px; margin-top: 2px; }
+.theme-kind { font-size: var(--small-size); color: var(--ink-soft); }
+.theme-kind.auto::before { content: '↻ '; color: var(--gold); }
+.theme-kind.own::before { content: '◆ '; color: var(--ink-soft); }
+.theme-missing { font-size: var(--small-size); color: var(--gold); }
 .theme-actions .btn.sure { color: var(--minus); }
 .theme-editor {
   position: fixed; top: 18px; right: 18px; bottom: 18px; z-index: 90; width: 300px; display: flex; flex-direction: column;

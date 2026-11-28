@@ -174,6 +174,11 @@ Changes to permissions and memory apply from the next message.
 - **Export** saves any theme to a `.skin` file; **Import a theme** installs one. Themes made with the editor are
   only colors; a theme with a shape of its own contains code that runs in the window, so Claudeleon asks for
   confirmation before installing it: only install themes from people you trust.
+- **Themes that update by themselves:** a card says **Updates by itself** when the theme uses Claudeleon's own
+  structure (all the editor's themes, Essential, most themes Claude makes): new buttons arrive with updates. A theme
+  with **its own shape** (like a book or a terminal) shows which Claudeleon version it was made for; when it lacks a
+  newer button, Claudeleon adds it next to the theme's other buttons and the card says so, with **Update with
+  Claude**: it opens a conversation asking Claude to put it in the right place, in the theme's style.
 - **Ask Claude for a theme:** in a conversation, write for example "make me a theme like an old terminal" or "a
   theme with my company's colors, light and dark". Claude knows how (Claudeleon gives it the `claudeleon-theme`
   skill, also as the `/claudeleon:claudeleon-theme` command), writes the theme into the themes folder and it appears

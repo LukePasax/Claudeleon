@@ -407,6 +407,40 @@ for (const tema of TEMI) {
     assert.deepEqual(errors, [])
   })
 
+  test(`${tema}: un tema con una forma sua riceve da Claudeleon i pulsanti che non ha`, async () => {
+    await open(tema)
+    await page.evaluate(() => {
+      Theming.register({
+        id: 'forma-sua', name: 'Forma sua', description: 'Un layout scritto a mano, prima degli artifact', engine: '1.1.0',
+        layout: '<div data-solid class="fs"><main><div data-part="log"></div><textarea data-part="input"></textarea><nav><button class="pulsantino" data-action="themes">Temi</button><button class="pulsantino" data-action="settings">Impostazioni</button></nav></main></div>',
+        scenes: { notte: { palette: {}, vars: {} }, giorno: { palette: {}, vars: {} } },
+      })
+      window.anteprima.tema('forma-sua')
+    })
+    await page.waitForSelector('[data-action="artifacts"][data-added]')
+    // Prima del pulsante dei temi, con la sua classe e una scritta
+    assert.deepEqual(await page.$eval('[data-action="artifacts"]', (b) => [b.className, b.textContent, b.nextElementSibling.dataset.action]), ['pulsantino', 'Artifact', 'themes'])
+    await page.click('[data-action="artifacts"]')
+    await page.waitForSelector('.set-nav-item.on[data-page="artifacts"]')
+    await page.click('.settings-panel .theme-picker-head button')
+    // Nel selettore: cosa si aggiorna da sé e cosa no
+    await page.click('[data-action="themes"]')
+    await page.waitForSelector('.theme-card .theme-kind')
+    const cards = await page.$$eval('.theme-card', (cs) => Object.fromEntries(cs.map((c) => [c.querySelector('.theme-name').textContent, [(c.querySelector('.theme-kind') || {}).textContent || '', (c.querySelector('.theme-missing') || {}).textContent || '']])))
+    assert.deepEqual(cards['Essenziale'], ['Si aggiorna da sé', ''])
+    assert.deepEqual(cards['Forma sua'], ['Forma sua · fatto per Claudeleon 1.1.0', 'Aggiunti da Claudeleon: Artifact'])
+    await page.click('.theme-picker-head button')
+    // Un tema che il pulsante ce l'ha già: niente copia
+    await page.evaluate(() => {
+      Theming.register({ id: 'forma-nuova', name: 'Forma nuova', layout: '<div data-solid><main><div data-part="log"></div><textarea data-part="input"></textarea><button data-action="artifacts">A</button><button data-action="settings">I</button></main></div>', scenes: { notte: { palette: {}, vars: {} }, giorno: { palette: {}, vars: {} } } })
+      window.anteprima.tema('forma-nuova')
+    })
+    await page.waitForFunction(() => Theming.current.id === 'forma-nuova')
+    await page.waitForTimeout(200)
+    assert.equal(await page.$$eval('[data-action="artifacts"]', (b) => b.length), 1)
+    assert.deepEqual(errors, [])
+  })
+
   test(`${tema}: le conversazioni derivate stanno sotto quella di partenza`, async () => {
     await open(tema)
     await page.waitForSelector('.session-row.child')

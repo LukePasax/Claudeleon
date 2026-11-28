@@ -1138,8 +1138,33 @@
       // dell'editor si modificano
       const full = Theming.get(th.id)
       const mine = full && (full.custom || Theming.installed(th.id))
+      // Si aggiorna da sé (la struttura del kit) o ha una forma sua: per quale versione è fatto e cosa gli aggiunge
+      // Claudeleon perché non ce l'ha
+      const missing = missingFeatures(full)
+      if (full && full.layout) {
+        const kind = document.createElement('span')
+        kind.className = 'theme-kind' + (followsKit(full) ? ' auto' : ' own') + (missing.length ? ' behind' : '')
+        const own = !followsKit(full)
+        kind.textContent = own ? [t('themesOwn'), full.engine ? t('themesFor', { v: full.engine }) : ''].filter(Boolean).join(' · ') : t('themesAuto')
+        kind.title = t(own ? 'themesOwnTip' : 'themesAutoTip')
+        card.appendChild(kind)
+        if (missing.length) {
+          const m = document.createElement('span')
+          m.className = 'theme-missing'
+          m.textContent = t('themesMissing', { x: missing.map((f) => t(f.label)).join(', ') })
+          card.appendChild(m)
+        }
+      }
       const acts = document.createElement('span')
       acts.className = 'theme-actions'
+      // Un tema tuo con una forma sua a cui manca qualcosa: Claude lo aggiorna (con la skill dei temi)
+      if (missing.length && full && Theming.installed(th.id) && !full.custom) {
+        const up = document.createElement('span')
+        up.className = 'btn small theme-update'
+        label(up, 'themesUpdate')
+        up.addEventListener('click', (e) => { e.stopPropagation(); updateThemeWithClaude(th, missing) })
+        acts.appendChild(up)
+      }
       if (full && full.custom && api.saveTheme) {
         const edit = document.createElement('span')
         edit.className = 'btn small deny'
@@ -2473,6 +2498,49 @@
     paint()
     hook('scene', scene)
   })
+  // ------------------------------------------------------------------ temi e versioni di Claudeleon
+
+  // Le cose che Claudeleon ha aggiunto ai layout col tempo. I temi del kit moderno che ne usano il layout le hanno da
+  // sé; un tema con una forma sua le ha solo se il suo layout le mette. Se mancano, Claudeleon le aggiunge vicino a un
+  // pulsante che il tema ha già (prima del primo che trova in near), con la stessa classe, così prendono il suo stile.
+  // La guida dei temi ha la stessa lista ("What changed for themes")
+  let appVersion = ''
+  const ENGINE_FEATURES = [
+    { action: 'artifacts', since: '1.2.0', label: 'artifactsBtn', near: ['themes', 'settings'] },
+  ]
+  // Si aggiorna da sé: usa il layout del kit moderno così com'è (l'editor, kit.fromColors, kit.adaptive)
+  const kitLayout = () => window.SkinsKits && window.SkinsKits.moderno && window.SkinsKits.moderno.layout
+  const followsKit = (th) => !!th && !!th.layout && th.layout === kitLayout()
+  // Quello che il layout di un tema con una forma sua non ha (e che quindi aggiunge Claudeleon)
+  function missingFeatures(th) {
+    if (!th || !th.layout || followsKit(th)) return []
+    return ENGINE_FEATURES.filter((f) => !new RegExp(`data-action\\s*=\\s*["']?${f.action}\\b`).test(th.layout))
+  }
+  function addMissingActions() {
+    for (const f of missingFeatures(Theming.current)) {
+      if (app.querySelector(`[data-action="${f.action}"]`)) continue
+      const near = f.near.map((a) => app.querySelector(`[data-action="${a}"]`)).find(Boolean)
+      if (!near) continue
+      const b = document.createElement(near.tagName === 'A' ? 'button' : near.tagName.toLowerCase())
+      b.className = near.className
+      b.dataset.action = f.action
+      b.dataset.added = ''
+      if (near.textContent.trim()) label(b, f.label)
+      else { b.innerHTML = ARTIFACT_ICON; b.title = t(f.label) }
+      near.before(b)
+    }
+  }
+  // Una conversazione nuova con la richiesta a Claude di aggiornare il tema (la manda la persona, dopo averla letta)
+  async function updateThemeWithClaude(th, missing) {
+    closeThemes()
+    await newChapter()
+    const input = part('input')
+    if (!input) return
+    input.value = t('themesUpdatePrompt', { name: th.name, id: th.id, v: appVersion || '?', x: missing.map((f) => `data-action="${f.action}"`).join(', ') })
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.focus()
+  }
+
   async function mountTheme(id) {
     closeMenu()
     const convEls = [...convs.values()].map((c) => c.el)
@@ -2500,6 +2568,7 @@
     renderUpdateBanner()
     renderChapterHead()
     renderDictate()
+    addMissingActions()
     renderGit()
     // L'anteprima aperta resta aperta col tema nuovo
     if (preview && !preview.hidden) { preview = null; openPreview(previewUrl) } else preview = null
@@ -4741,6 +4810,7 @@
   document.addEventListener('mouseleave', () => { interactive = false; api.setInteractive(false) })
 
   api.info().then(async (info) => {
+    appVersion = info.version || ''
     scene = info.scene === 'giorno' ? 'giorno' : 'notte'
     Theming.setLanguage(info.language || 'en')
     workdir = info.workdir || ''
@@ -4946,7 +5016,7 @@
       // ?tema=<id>&scena=giorno nell'indirizzo per guardare un tema
       info: async () => {
         const q = new URLSearchParams(location.search)
-        return { scene: q.get('scena') || 'notte', language: q.get('lingua') || 'en', welcomed: q.get('benvenuto') !== 'si', chapter: n, theme: q.get('tema') || 'essenziale', themes: ['essenziale'], userThemes: fakeUserThemes, workdir: demoEn() ? 'C:/Projects/MapEditor' : 'C:/Workspace', workdirChosen: q.get('cartella') !== 'no', mode: q.get('modo') || 'auto' }
+        return { version: '1.2.0', scene: q.get('scena') || 'notte', language: q.get('lingua') || 'en', welcomed: q.get('benvenuto') !== 'si', chapter: n, theme: q.get('tema') || 'essenziale', themes: ['essenziale'], userThemes: fakeUserThemes, workdir: demoEn() ? 'C:/Projects/MapEditor' : 'C:/Workspace', workdirChosen: q.get('cartella') !== 'no', mode: q.get('modo') || 'auto' }
       },
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
       setMode: (m) => fire('onMode', m, 0),

@@ -269,6 +269,22 @@ L'app è in inglese o in italiano. Le `strings` di un tema possono essere per li
 descrizione possono avere la versione per lingua (`names: { it: '...' }`, `descriptions: { it: '...' }`) e la
 `persona` può essere `{ en: '...', it: '...' }`.
 
+## Tenere un tema aggiornato
+
+I temi che usano il `layout` del kit moderno così com'è (l'editor dei temi, `kit.fromColors`, `kit.adaptive`) **si
+aggiornano da sé**: i pulsanti nuovi arrivano con Claudeleon. Nel selettore dei temi c'è scritto "Si aggiorna da sé".
+
+Un tema con **una forma sua** ha il suo `layout`, e un comando nuovo c'è solo se il tema lo mette. Se manca,
+Claudeleon lo aggiunge vicino a un pulsante che il tema ha già (per esempio prima di `data-action="themes"`), con la
+stessa classe, così ne prende lo stile (`ENGINE_FEATURES` in `renderer.js`). Il selettore dice allora "Aggiunti da
+Claudeleon: …" e, per i temi installati, offre **Aggiorna con Claude**: una conversazione nuova con la richiesta già
+scritta, che Claude esegue con la skill dei temi mettendo i pezzi al posto giusto e scrivendo `engine` (la versione di
+Claudeleon per cui è fatto il tema, che il selettore mostra: "fatto per Claudeleon 1.2.0").
+
+| Versione | Novità nel layout | Dove la mette Claudeleon se manca |
+| --- | --- | --- |
+| 1.2.0 | `data-action="artifacts"`: l'elenco degli artifact di claude.ai | Prima del pulsante `themes` (o `settings`) |
+
 ## Passare un tema ad altri: il file `.skin`
 
 "Esporta" (sulla scheda del tema, nel selettore) salva un JSON `{ format: 'claude-skins-theme', version: 1, kind, … }`:

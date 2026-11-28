@@ -703,6 +703,7 @@ function registerIpc() {
     sessionCwd: config.sessionId ? (config.sessionCwd || bridge.workdir) : null,
     mode: config.permissionMode || bridge.mode,
     language: i18n.language(),
+    version: app.getVersion(),
     // Il benvenuto del primo avvio è già stato visto
     welcomed: !!config.welcomed,
   }))
@@ -1440,6 +1441,8 @@ app.on('web-contents-created', (_e, wc) => {
 process.on('uncaughtException', (err) => { logError('errore nel processo principale:', err && err.stack || err); console.error(err) })
 
 app.whenReady().then(() => {
+  // La versione, anche per Claude (la skill dei temi la scrive nei temi che fa: engine)
+  process.env.CLAUDELEON_VERSION = app.getVersion()
   serveThemes()
   servePages()
   setupClaudeSession()

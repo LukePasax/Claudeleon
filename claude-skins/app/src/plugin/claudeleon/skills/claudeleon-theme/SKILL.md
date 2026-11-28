@@ -53,6 +53,12 @@ The nine colors are background, sidebar, input box and menus, text, muted text, 
 - `theme.js`, with the wrapper every theme uses (see the examples). Its `id` must equal the folder name and
   `theme.json`'s id. In an installed theme, take the modern kit from `window.SkinsKits.moderno`.
 - `theme.css` if `theme.css = true` (or `css: true`), fonts and images with relative paths.
+- In `theme.js`, set `engine` to the Claudeleon version you are writing for: it is in the environment variable
+  `CLAUDELEON_VERSION` (e.g. `engine: '1.2.0'`). The theme picker shows it.
+
+Prefer keeping the modern kit's `layout` when the request allows it (colors, fonts, CSS, texts, hooks): such a theme
+updates by itself when Claudeleon adds buttons. Write your own `layout` only for a shape of its own, and then include
+every command in the guide's tables, including the newest ones ("What changed for themes").
 
 Start from an example and change it:
 - `examples/harbor/` — modern kit, light and dark following Windows (`kit.adaptive`): only colors.
@@ -70,6 +76,15 @@ theme and shows the error; fix the file and choose the theme again.
 
 When it is done, mention that **Themes → Export** saves it to a `.skin` file they can share, and **Import a theme**
 installs one.
+
+## Updating a theme to a newer Claudeleon
+
+When asked to update a theme (the theme picker's **Update with Claude** asks it this way): read the theme's
+`theme.js`, then the "What changed for themes" table in `reference/guide.md`. For each piece from a version newer
+than its `engine` (or all of them, if it has no `engine`) that its `layout` lacks, add it where it fits the theme's
+style, usually next to the theme's other buttons, styled like them. Then set `engine` to `CLAUDELEON_VERSION`. Change
+nothing else unless asked. The theme reloads as you save; Claudeleon stops adding its own copy of a button as soon
+as the layout has it.
 
 ## Rules
 

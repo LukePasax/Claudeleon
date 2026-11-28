@@ -263,7 +263,8 @@
     return normalizeSpec({ colors: { bg: p.bg, side: p.side, surface: p.surface, ink: p.ink, inkSoft: p.inkSoft, accent: p.accent, onAccent: p.onAccent, line: p.line, bubble: p.bubble } })
   }
 
-  Object.assign(kit, { fromColors, adaptive, normalizeSpec, colorsOf, COLOR_KEYS, FONTS, readableOn })
+  // layout: chi lo usa così com'è si aggiorna da sé coi pulsanti nuovi di Claudeleon
+  Object.assign(kit, { fromColors, adaptive, normalizeSpec, colorsOf, COLOR_KEYS, FONTS, readableOn, layout })
 
   if (typeof module === 'object' && module.exports) module.exports = kit
   else (window.SkinsKits = window.SkinsKits || {}).moderno = kit

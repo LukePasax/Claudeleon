@@ -74,6 +74,7 @@ Drawing functions only run in the window, so they can use `window.Pixel` and `do
 | `followSystem` | Night/day follow Windows' dark/light setting | Fixed scene, or the scene button |
 | `art` | Drawings by name (see below) | No drawings |
 | `edges: false` | No invisible resize handles on the window edges | Handles on |
+| `engine` | The Claudeleon version the theme was made for, e.g. `'1.2.0'`; shown in the theme picker | Nothing shown |
 
 ## The layout
 
@@ -251,6 +252,27 @@ The state is also visible to CSS: `body.busy` while Claude works, `body.giorno` 
 `kit.fromColors({ id, name, colors: { bg, side, surface, ink, inkSoft, accent, onAccent, line, bubble }, font,
 textSize, radius })` makes a single-look theme; `kit.adaptive({ …, light, dark })` one that follows Windows. Fonts:
 `sistema`, `moderno`, `serif`, `libro`, `mono`. All other variables are derived from these colors.
+
+## Keeping a theme up to date
+
+Themes built on the modern kit's layout (the theme editor, `kit.fromColors`, `kit.adaptive`, or any theme that keeps
+the kit's `layout`) **update by themselves**: new buttons arrive with Claudeleon. The theme picker marks them
+"Updates by itself".
+
+A theme with **its own shape** has its own `layout`, so a new command only appears where the theme puts it. When
+the layout lacks one, Claudeleon adds it next to a button the theme already has (e.g. before `data-action="themes"`),
+with the same class so it takes its style; the theme picker then says "Added by Claudeleon: …" and, for your
+installed themes, offers **Update with Claude**, which opens a new conversation asking Claude (with the
+`claudeleon-theme` skill) to put the missing pieces where they fit and set `engine` to the current version.
+
+### What changed for themes
+
+| Version | New in the layout | Where Claudeleon puts it if missing |
+| --- | --- | --- |
+| 1.2.0 | `data-action="artifacts"`: opens the claude.ai artifacts list | Before the `themes` (or `settings`) button |
+
+To update a theme by hand: add what is missing from the versions after its `engine`, then set `engine` to the
+current version.
 
 ## Sharing a theme: the `.skin` file
 

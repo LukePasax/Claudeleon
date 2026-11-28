@@ -550,6 +550,17 @@ rifiuterebbe l'accesso). Gli avvisi di nuovi commenti sugli artifact non arrivan
   registra (un `theme.js` scritto a metà); `themesChanged` gira in coda (`themesQueue`) e rimonta solo se il tema è
   cambiato davvero.
 
+## Temi che si aggiornano da sé e temi con una forma sua
+
+`ENGINE_FEATURES` in `renderer.js` elenca i comandi aggiunti ai layout dopo la 1.1 (per ora `artifacts`, 1.2.0), con
+`near`: i pulsanti prima dei quali metterli. `followsKit(th)` vale se il tema usa `kit.layout` (esportato dal kit
+moderno) così com'è; `missingFeatures(th)` guarda il `layout` degli altri; `addMissingActions()` (in `mountTheme`)
+crea i pulsanti mancanti con tag e classe di quello vicino (`data-added`), con la scritta se quello ha testo,
+altrimenti l'icona. Il selettore mostra `.theme-kind` (auto/own, `engine`), `.theme-missing` e per i temi installati
+`.theme-update`: `updateThemeWithClaude` apre una conversazione con `themesUpdatePrompt` nella casella (non la manda).
+`process.env.CLAUDELEON_VERSION` passa la versione a Claude; la skill scrive `engine` e ha la sezione "Updating a
+theme". La tabella "What changed for themes" di `docs/themes.md` va tenuta uguale a `ENGINE_FEATURES`.
+
 ## Prossimi passi possibili
 
 0. **Temi.**
