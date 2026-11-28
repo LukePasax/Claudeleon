@@ -23,6 +23,7 @@
     denied: 'Permission denied.',
     cancelled: 'Request cancelled.',
     themes: 'Themes',
+    artifactsBtn: 'Artifacts',
     themesTitle: 'Themes',
     themesCurrent: 'in use',
     themesClose: 'Close',

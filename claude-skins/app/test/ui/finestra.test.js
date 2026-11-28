@@ -438,6 +438,11 @@ for (const tema of TEMI) {
     assert.equal(await page.$$eval('.art-row', (r) => r.length), 2)
     assert.match(await page.textContent('.art-row'), /2 versioni/)
     assert.equal(await page.inputValue('[data-part="input"]'), '')
+    // Anche dal pulsante in fondo alla barra laterale
+    await page.click('.settings-panel .theme-picker-head button')
+    await page.click('[data-action="artifacts"]')
+    await page.waitForSelector('.set-nav-item.on[data-page="artifacts"]')
+    await page.waitForSelector('.art-row')
     // L'interruttore
     await page.click('.set-row:has-text("Claude può pubblicare artifact") .set-switch')
     await page.waitForSelector('.set-row:has-text("Claude può pubblicare artifact") .set-switch:not(.on)')

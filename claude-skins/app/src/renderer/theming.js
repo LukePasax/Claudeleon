@@ -28,6 +28,7 @@
     cancelled: 'Richiesta annullata.',
     // Il selettore dei temi
     themes: 'Temi',
+    artifactsBtn: 'Artifact',
     themesTitle: 'Temi',
     themesCurrent: 'in uso',
     themesClose: 'Chiudi',

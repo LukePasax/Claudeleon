@@ -131,7 +131,7 @@ dashboard of these numbers").
   does not work there, use **↗** and the browser.
 - While Claude writes an HTML page on your computer, **Preview · page.html** under the input box shows it in the same
   panel, and it reloads every time Claude changes the file.
-- **Settings → Artifacts** (or `/artifacts`) lists the artifacts published from the conversations on this computer,
+- **Artifacts** at the bottom of the sidebar (or Settings → Artifacts, or `/artifacts`) lists the artifacts published from the conversations on this computer,
   with their conversation, and opens the claude.ai gallery with all of them. The switch there turns artifacts off.
 
 ## Settings
