@@ -24,9 +24,9 @@ after(async () => { if (app) await app.close() })
 
 // Una pagina pulita col tema dato
 // Le prove leggono le scritte italiane; quella della lingua apre anche in inglese
-async function open(tema, lingua = 'it') {
+async function open(tema, lingua = 'it', extra = '') {
   errors = []
-  const url = require('url').pathToFileURL(INDEX).href + `?tema=${tema}&scena=giorno&veloce=1&lingua=${lingua}`
+  const url = require('url').pathToFileURL(INDEX).href + `?tema=${tema}&scena=giorno&veloce=1&lingua=${lingua}${extra}`
   await page.goto(url)
   await page.waitForSelector('[data-part="input"]')
   await page.waitForTimeout(150)
@@ -389,6 +389,21 @@ for (const tema of TEMI) {
     await page.waitForFunction(() => document.querySelector('[data-part="input"]').placeholder === 'Scrivi a Claude…')
     await page.waitForSelector('.set-nav-item[data-page="general"]:has-text("Generale")')
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'it')
+    assert.deepEqual(errors, [])
+  })
+
+  test(`${tema}: benvenuto senza Claude Code, poi le novità della versione`, async () => {
+    await open(tema, 'it', '&benvenuto=si&claude=manca&novita=si')
+    await page.waitForSelector('.welcome-panel')
+    assert.match(await page.textContent('.welcome-panel'), /irm https:\/\/claude\.ai\/install\.ps1 \| iex/)
+    assert.equal(await page.$$eval('.welcome-panel .wel-step.todo', (x) => x.length), 2)
+    // Le novità aspettano che il benvenuto sia chiuso
+    assert.equal(await page.$('.news-panel'), null)
+    await page.click('.welcome-panel .wel-foot .btn:has-text("Continua comunque")')
+    await page.waitForSelector('.news-panel')
+    assert.match(await page.textContent('.news-panel'), /Claudeleon 1\.1\.0/)
+    await page.click('.news-panel .btn:has-text("Va bene")')
+    assert.equal(await page.$('.theme-picker'), null)
     assert.deepEqual(errors, [])
   })
 

@@ -1209,6 +1209,127 @@
     api.setTheme(r.id)
   }
 
+  // ------------------------------------------------------------------ benvenuto
+
+  // Il primo avvio guidato: la lingua, e se Claude Code è installato e ha il login fatto (con i comandi da copiare
+  // se manca qualcosa). Compare la prima volta e, dopo, ogni volta che all'avvio manca Claude Code o il login. Non
+  // blocca: "Continua comunque" lo chiude (il controllo del login è una stima)
+  let welcomeFirst = false
+  async function checkWelcome(info) {
+    if (!api.claudeStatus) return
+    let st = null
+    try { st = await api.claudeStatus() } catch {}
+    if (!st) return
+    welcomeFirst = !info.welcomed
+    if (welcomeFirst || !st.found || !st.loggedIn) { openWelcome(st); return true }
+    return false
+  }
+
+  // Le novità della versione appena installata (le note della sua release su GitHub), una volta sola: dopo il
+  // benvenuto, se c'è anche quello
+  async function showWhatsNew() {
+    if (!api.whatsNew || document.querySelector('.theme-picker')) return
+    let w = null
+    try { w = await api.whatsNew() } catch {}
+    if (!w || document.querySelector('.theme-picker')) return
+    const host = app.querySelector('[data-solid]') || app
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+    const panel = document.createElement('div')
+    panel.className = 'theme-picker news-panel'
+    panel.innerHTML = '<div class="theme-picker-box settings-box news-box"><div class="theme-picker-head"><span></span></div><div class="settings-body news-body text"></div><div class="wel-foot"></div></div>'
+    label(panel.querySelector('.theme-picker-head span'), 'newsTitle', { v: w.to })
+    const body = panel.querySelector('.news-body')
+    // Le note generate da GitHub cominciano con "What's Changed": il titolo c'è già
+    const notes = String(w.notes || '').replace(/^\s*#+\s*What's Changed\s*\n/i, '').trim()
+    if (notes) body.innerHTML = Markdown.render(notes)
+    else body.appendChild(label(document.createElement('p'), 'newsNone', { v: w.to }))
+    const foot = panel.querySelector('.wel-foot')
+    const btn = (key, fn, cls) => { const b = document.createElement('button'); b.className = `btn small ${cls}`; label(b, key); b.addEventListener('click', fn); foot.appendChild(b) }
+    if (w.url) btn('newsAll', () => api.openLink(w.url), 'deny')
+    btn('newsOk', closeThemes, '')
+    panel.addEventListener('mousedown', (e) => { if (e.target === panel) closeThemes() })
+    host.appendChild(panel)
+  }
+  function openWelcome(st) {
+    closeThemes()
+    const host = app.querySelector('[data-solid]') || app
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
+    const panel = document.createElement('div')
+    panel.className = 'theme-picker welcome-panel'
+    panel.innerHTML = '<div class="theme-picker-box settings-box welcome-box"><div class="theme-picker-head"><span></span></div><div class="settings-body"></div><div class="wel-foot"></div></div>'
+    const body = panel.querySelector('.settings-body')
+    const foot = panel.querySelector('.wel-foot')
+    const ready = () => st.found && st.loggedIn
+    const fill = () => {
+      label(panel.querySelector('.theme-picker-head span'), welcomeFirst ? 'welTitle' : 'welNeedTitle')
+      body.innerHTML = ''
+      const intro = document.createElement('div')
+      intro.className = 'wel-intro'
+      body.appendChild(label(intro, welcomeFirst ? 'welIntro' : 'welNeedIntro'))
+      if (welcomeFirst && api.setSetting) {
+        const r = document.createElement('div')
+        r.className = 'set-row'
+        r.innerHTML = '<div class="set-text"><div class="set-label"></div></div><div class="set-control"><select class="set-select"></select></div>'
+        label(r.querySelector('.set-label'), 'setLanguage')
+        const sel = r.querySelector('select')
+        for (const [v, n] of [['en', 'English'], ['it', 'Italiano']]) sel.appendChild(Object.assign(document.createElement('option'), { value: v, textContent: n, selected: v === Theming.language }))
+        sel.addEventListener('change', () => api.setSetting('language', sel.value))
+        body.appendChild(r)
+      }
+      const step = (ok, key, fillNote) => {
+        const s = document.createElement('div')
+        s.className = `wel-step ${ok ? 'ok' : 'todo'}`
+        s.innerHTML = '<span class="wel-mark"></span><div class="wel-text"><div class="wel-label"></div><div class="wel-note"></div></div>'
+        s.querySelector('.wel-mark').textContent = ok ? '✓' : '!'
+        label(s.querySelector('.wel-label'), key)
+        fillNote(s.querySelector('.wel-note'))
+        body.appendChild(s)
+      }
+      const code = (box, text) => {
+        const c = document.createElement('div')
+        c.className = 'wel-code'
+        c.innerHTML = '<code></code><button class="btn small deny"></button>'
+        c.querySelector('code').textContent = text
+        const b = c.querySelector('button')
+        label(b, 'copy')
+        b.addEventListener('click', () => { copyText(text); label(b, 'copied'); setTimeout(() => label(b, 'copy'), 1500) })
+        box.appendChild(c)
+      }
+      const linkBtn = (box, key, fn) => { const b = document.createElement('button'); b.className = 'btn small deny'; label(b, key); b.addEventListener('click', fn); box.appendChild(b); return b }
+      step(st.found, 'welStepInstall', (n) => {
+        if (st.found) { n.textContent = st.version ? t('welInstalled', { v: st.version, x: st.path }) : t('welFoundAt', { x: st.path }); return }
+        n.appendChild(label(document.createElement('div'), st.platform === 'win32' ? 'welNotFound' : 'welNotFoundUnix'))
+        code(n, st.platform === 'win32' ? 'irm https://claude.ai/install.ps1 | iex' : 'curl -fsSL https://claude.ai/install.sh | bash')
+        const row = document.createElement('div')
+        row.className = 'wel-links'
+        linkBtn(row, 'welChoose', async () => { await api.setSetting('chooseClaude'); recheck() })
+        linkBtn(row, 'welDocs', () => api.openLink('https://code.claude.com/docs/en/setup'))
+        n.appendChild(row)
+      })
+      step(st.loggedIn, 'welStepLogin', (n) => {
+        if (st.loggedIn) { label(n, 'welLoggedIn'); return }
+        if (!st.found) { label(n, 'welLoginWait'); return }
+        n.appendChild(label(document.createElement('div'), 'welNotLogged'))
+        code(n, 'claude')
+      })
+      if (welcomeFirst) { const tip = document.createElement('div'); tip.className = 'folder-note wel-tip'; body.appendChild(label(tip, 'welTip')) }
+      foot.innerHTML = ''
+      if (!ready()) linkBtn(foot, 'welCheck', recheck)
+      const go = document.createElement('button')
+      go.className = `btn small${ready() ? '' : ' deny'}`
+      label(go, ready() ? 'welStart' : 'welAnyway')
+      go.addEventListener('click', () => { if (api.setSetting) api.setSetting('welcomed', true); welcomeFirst = false; closeThemes(); if (part('input')) part('input').focus(); showWhatsNew() })
+      foot.appendChild(go)
+    }
+    async function recheck() {
+      try { st = (await api.claudeStatus()) || st } catch {}
+      if (panel.isConnected) fill()
+    }
+    panel.reopen = () => openWelcome(st)
+    fill()
+    host.appendChild(panel)
+  }
+
   // ------------------------------------------------------------------ editor dei temi
 
   // Un tema nuovo (o uno dei tuoi da modificare) col kit moderno: nove colori di base, carattere, dimensione del
@@ -1870,10 +1991,12 @@
   // restano come sono); le impostazioni, se erano aperte, si riaprono sulla stessa pagina
   if (api.onLanguage) api.onLanguage(async (l) => {
     const settingsOpen = !!document.querySelector('.theme-picker.settings-panel')
+    const welcome = document.querySelector('.theme-picker.welcome-panel')
     Theming.setLanguage(l)
     await mount(Theming.current.id)
     if (sessionsPinned()) refreshSessions()
     if (settingsOpen) openSettings()
+    if (welcome && welcome.reopen) welcome.reopen()
   })
 
   // ------------------------------------------------------------------ impostazioni
@@ -4397,6 +4520,7 @@
     // La pagina è partita: l'avvio sicuro non serve
     if (api.ready) api.ready()
     if (api.safeState) api.safeState().then(showSafe).catch(() => {})
+    checkWelcome(info).then((shown) => { if (!shown) showWhatsNew() }).catch(() => {})
   })
 
   // ------------------------------------------------------------------ anteprima senza Electron
@@ -4543,7 +4667,7 @@
       // ?tema=<id>&scena=giorno nell'indirizzo per guardare un tema
       info: async () => {
         const q = new URLSearchParams(location.search)
-        return { scene: q.get('scena') || 'notte', language: q.get('lingua') || 'en', chapter: n, theme: q.get('tema') || 'essenziale', themes: ['essenziale'], userThemes: fakeUserThemes, workdir: 'C:/Workspace', workdirChosen: q.get('cartella') !== 'no', mode: q.get('modo') || 'auto' }
+        return { scene: q.get('scena') || 'notte', language: q.get('lingua') || 'en', welcomed: q.get('benvenuto') !== 'si', chapter: n, theme: q.get('tema') || 'essenziale', themes: ['essenziale'], userThemes: fakeUserThemes, workdir: 'C:/Workspace', workdirChosen: q.get('cartella') !== 'no', mode: q.get('modo') || 'auto' }
       },
       setInteractive() {}, hide() {}, quit() {}, setScene() {}, stop() {}, setTrayIcon() {}, answer() {}, gestureStart() {}, gestureEnd() {},
       setMode: (m) => fire('onMode', m, 0),
@@ -4606,6 +4730,8 @@
       writeMemory: async (_c, f, text) => { fakeMemory.set(f, text); return { ok: true } },
       openMemory: async () => true,
       dictate: async () => true,
+      whatsNew: async () => (new URLSearchParams(location.search).get('novita') === 'si' ? { from: '1.0.0', to: '1.1.0', url: 'https://github.com/LukePasax/Claudeleon/releases/tag/v1.1.0', notes: "## What's Changed\n* Settings with categories, with permissions, memory and extensions inside by @LukePasax in https://github.com/LukePasax/Claudeleon/pull/3\n* English by default, Italian from the settings by @LukePasax in https://github.com/LukePasax/Claudeleon/pull/3\n* First-run welcome and what's new after an update\n\n**Full Changelog**: https://github.com/LukePasax/Claudeleon/compare/v1.0.0...v1.1.0" } : null),
+      claudeStatus: async () => { const q = new URLSearchParams(location.search); const found = q.get('claude') !== 'manca'; return { found, path: 'C:/Users/luca/.local/bin/claude.exe', version: found ? '2.1.330' : null, loggedIn: found && q.get('login') !== 'no', platform: 'win32' } },
       retrySafeTheme: () => fireAll('onTheme', 'notturno', 0),
       dismissSafe() {},
       saveTheme: async (spec) => { const id = spec.id || String(spec.name || 'tema').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'tema'; return { ok: true, spec: Object.assign(window.SkinsKits.moderno.normalizeSpec(spec), { id }) } },

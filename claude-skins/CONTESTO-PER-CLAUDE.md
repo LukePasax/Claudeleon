@@ -314,6 +314,17 @@ scritte della finestra ci sono tutte e due con gli stessi segnaposto); le altre 
 (`setLanguage('it')`, `?lingua=it`), una della finestra prova l'inglese e il cambio. Il tema di partenza si chiama
 "Essential" ("Essenziale" in italiano).
 
+## Benvenuto e novità
+
+`claude:status` (main.js `claudeStatus()`): il programma (`claudePath()`: quello scelto, `~/.local/bin/claude(.exe)` o
+il primo del PATH con `where`/`which`, su Windows solo .exe), la versione e il login stimato (`claudeLoggedIn()`:
+variabili d'ambiente, `~/.claude/.credentials.json`, `oauthAccount` in `~/.claude.json`). La pagina apre il
+benvenuto (`openWelcome`) se `config.welcomed` manca o se manca Claude Code o il login; "Comincia"/"Continua
+comunque" mette `welcomed`. Novità: all'avvio, se `config.lastVersion` è diversa da `app.getVersion()` (o manca ma
+la configurazione c'era già: le versioni di prima della 1.1 non la ricordavano), `whatsNew`; `whatsnew:get` prende
+le note dalla API di GitHub (`releases/tags/v<versione>`, repo da `package.json` `repository`) una volta sola. La
+pagina le mostra dopo il benvenuto. Versione finta: `?benvenuto=si`, `?claude=manca`, `?login=no`, `?novita=si`.
+
 ## Impostazioni
 
 Pannello a categorie (`SETTINGS_PAGES`, `settingsPage` in localStorage); permessi, memoria ed estensioni sono gli

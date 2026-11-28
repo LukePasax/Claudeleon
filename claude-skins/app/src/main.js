@@ -39,6 +39,9 @@ let nextConv = 1
 // L'aggiornamento dal repo sul PC (vedi updater.js)
 let updater = null
 let updateNotified = 0
+// La versione è cambiata dall'ultimo avvio (un aggiornamento): { from, to }, per le novità nella finestra
+let whatsNew = null
+let configExisted = false
 // L'ultimo utilizzo del piano saputo (sessione di 5 ore, settimana)
 let lastUsage = null
 let captureMode = false
@@ -114,6 +117,7 @@ function loadConfig() {
   configFile = path.join(app.getPath('userData'), 'config.json')
   try {
     Object.assign(config, JSON.parse(fs.readFileSync(configFile, 'utf8')))
+    configExisted = true
   } catch (err) {
     // Un file che c'è ma non si legge: si mette da parte (config.rotto.json) e si riparte, dicendolo
     if (fs.existsSync(configFile)) {
@@ -238,7 +242,7 @@ function makeConv(sessionId, cwd) {
   }, config.workdir, i18n.pick(currentTheme().persona), config.permissionMode)
   const b = c.bridge
   b.entrypoint = config.entrypoint || 'cli'
-  b.claudePath = config.claudePath || null
+  b.claudePath = claudePath()
   b.setModel(config.model || null)
   b.ultracode = !!config.ultracode
   b.setEffort(config.effort || null)
@@ -489,7 +493,39 @@ function loginArgs() {
 }
 // Claude Code: quello indicato nelle impostazioni o quello di partenza, e la sua versione (claude --version)
 function claudePath() {
-  return config.claudePath || DEFAULT_CLAUDE
+  if (config.claudePath) return config.claudePath
+  if (fs.existsSync(DEFAULT_CLAUDE)) return DEFAULT_CLAUDE
+  return claudeOnPath() || DEFAULT_CLAUDE
+}
+// Claude Code installato altrove (winget, un'altra cartella nel PATH): il primo claude.exe (o claude) del PATH
+let pathClaude
+function claudeOnPath() {
+  if (pathClaude !== undefined) return pathClaude
+  pathClaude = null
+  try {
+    const out = require('child_process').execFileSync(process.platform === 'win32' ? 'where' : 'which', ['claude'], { encoding: 'utf8', timeout: 5000, windowsHide: true })
+    pathClaude = out.split(/\r?\n/).map((l) => l.trim()).find((l) => l && (process.platform !== 'win32' || /\.exe$/i.test(l))) || null
+  } catch {}
+  return pathClaude
+}
+// Il login di Claude Code: una chiave nelle variabili d'ambiente, il file delle credenziali o l'account in
+// ~/.claude.json. È una stima (sul Mac le credenziali stanno nel portachiavi): la finestra lascia andare avanti lo stesso
+function claudeLoggedIn() {
+  if (process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_AUTH_TOKEN) return true
+  const dir = process.env.CLAUDE_CONFIG_DIR || path.join(app.getPath('home'), '.claude')
+  if (fs.existsSync(path.join(dir, '.credentials.json'))) return true
+  for (const f of [path.join(app.getPath('home'), '.claude.json'), path.join(dir, '.claude.json')]) {
+    try { const j = JSON.parse(fs.readFileSync(f, 'utf8')); if (j.oauthAccount || j.primaryApiKey) return true } catch {}
+  }
+  return false
+}
+async function claudeStatus() {
+  pathClaude = undefined
+  const p = claudePath()
+  const found = fs.existsSync(p)
+  // Installato adesso, mentre l'app era aperta: le conversazioni lo usano dal prossimo avvio di Claude Code
+  if (found) for (const b of [bridge, ...allBridges()]) b.claudePath = p
+  return { found, path: p, version: found ? await claudeVersion() : null, loggedIn: found ? claudeLoggedIn() : false, platform: process.platform, custom: !!config.claudePath }
 }
 function claudeVersion() {
   return new Promise((resolve) => {
@@ -528,6 +564,7 @@ async function applySetting(key, value) {
   else if (key === 'notify') { config.notify = !!value; saveConfig() }
   else if (key === 'autoUpdate') { config.autoUpdate = !!value; saveConfig() }
   else if (key === 'worktree') { config.worktree = !!value; saveConfig() }
+  else if (key === 'welcomed') { config.welcomed = true; saveConfig() }
   else if (key === 'language') {
     // La lingua: per il processo principale (vassoio, finestre di dialogo, messaggi), per la finestra e per la
     // personalità che il tema dà a Claude (dal prossimo messaggio)
@@ -551,7 +588,7 @@ async function applySetting(key, value) {
     // Vuoto: quello di partenza (~/.local/bin/claude)
     config.claudePath = value ? String(value) : null
     saveConfig()
-    for (const b of [bridge, ...allBridges()]) b.claudePath = config.claudePath
+    for (const b of [bridge, ...allBridges()]) b.claudePath = claudePath()
     bridge.loadCommands()
   } else if (key === 'chooseClaude') {
     const r = await dialog.showOpenDialog(win, { title: tr('Dov\'è Claude Code'), defaultPath: path.dirname(claudePath()), properties: ['openFile'], filters: process.platform === 'win32' ? [{ name: 'Claude Code', extensions: ['exe', 'cmd'] }] : [] })
@@ -624,6 +661,8 @@ function registerIpc() {
     sessionCwd: config.sessionId ? (config.sessionCwd || bridge.workdir) : null,
     mode: config.permissionMode || bridge.mode,
     language: i18n.language(),
+    // Il benvenuto del primo avvio è già stato visto
+    welcomed: !!config.welcomed,
   }))
   ipcMain.on('theme:set', (_e, id) => setTheme(String(id)))
   // L'avvio sicuro: la pagina è partita; un tema non si è montato; l'avviso letto o "Riprova"; gli errori della pagina
@@ -714,6 +753,21 @@ function registerIpc() {
     return ok
   })
   ipcMain.handle('settings:get', () => settingsState())
+  // Le novità della versione appena installata: le note della sua release su GitHub, una volta sola
+  ipcMain.handle('whatsnew:get', async () => {
+    if (!whatsNew) return null
+    const w = whatsNew
+    whatsNew = null
+    const repo = (String(appMeta().repository || '').match(/github:([\w.-]+\/[\w.-]+)/) || [])[1] || 'LukePasax/Claudeleon'
+    w.url = `https://github.com/${repo}/releases/tag/v${w.to}`
+    try {
+      const res = await net.fetch(`https://api.github.com/repos/${repo}/releases/tags/v${w.to}`, { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Claudeleon' } })
+      if (res.ok) { const j = await res.json(); w.notes = String(j.body || ''); w.url = j.html_url || w.url }
+    } catch {}
+    return w
+  })
+  // Il primo avvio guidato: Claude Code c'è? il login è fatto?
+  ipcMain.handle('claude:status', () => claudeStatus())
   // L'aggiornamento: lo stato, un controllo adesso, l'aggiornamento vero
   ipcMain.handle('update:get', () => (updater ? updater.state : { state: 'unavailable' }))
   ipcMain.handle('update:check', () => (updater ? updater.check() : null))
@@ -1258,6 +1312,13 @@ app.whenReady().then(() => {
     configFile = path.join(app.getPath('temp'), 'claudeleon-prova.json')
     config = { workdir: config.workdir, position: { x: 20, y: 20 }, sizes: {}, sessionId: null, scene: capture.scene, chapter: 3, theme: capture.theme || config.theme, permissionMode: 'auto' }
   }
+  // Un aggiornamento appena installato: la finestra mostra le novità (la prima installazione no)
+  if (!capture) {
+    const v = app.getVersion()
+    // (una configurazione di prima della 1.1, che non ricordava la versione, vale come aggiornamento)
+    if (config.lastVersion ? config.lastVersion !== v : configExisted) whatsNew = { from: config.lastVersion || null, to: v }
+    if (config.lastVersion !== v) { config.lastVersion = v; saveConfig() }
+  }
   themes = allThemes()
   // Avvio sicuro: chiesto, o dopo due avvii di fila andati male
   if (!capture) {
@@ -1277,7 +1338,7 @@ app.whenReady().then(() => {
   // Come si presentano le sessioni a Claude Code (cli: visibili nel /resume e nelle altre app). Si può cambiare in
   // config.json, ad esempio "claude-desktop"
   bridge.entrypoint = config.entrypoint || 'cli'
-  bridge.claudePath = config.claudePath || null
+  bridge.claudePath = claudePath()
   bridge.setModel(config.model || null)
   captureMode = !!capture
   loadContextMax(config.contextMax)

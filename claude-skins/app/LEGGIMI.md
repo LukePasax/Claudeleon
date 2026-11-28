@@ -161,6 +161,12 @@ npm 11 altrimenti non arriva. `npm run dist` crea l'installer (serve Windows, o 
   stato, da quanto, quanti strumenti ha usato, l'ultimo e il riassunto finale, con "Ferma" e "Uscita" (il file con
   l'uscita). Mentre Claude lavora, "Manda in background" (o Ctrl+B) sposta in background il comando o il sotto-agente
   in corso, come nel terminale, e Claude va avanti. Con attività in corso la conversazione non si spegne da sola.
+- **Benvenuto:** al primo avvio un riquadro fa scegliere la lingua e controlla che Claude Code sia installato (anche
+  fuori dal posto solito, se è nel PATH) e che abbia il login fatto; se manca qualcosa dà il comando da copiare
+  (`irm https://claude.ai/install.ps1 | iex`, poi `claude` e `/login`), "Scegli il programma…" e "Controlla di
+  nuovo". Ricompare a ogni avvio in cui manca Claude Code o il login; "Continua comunque" lo chiude.
+- **Novità:** al primo avvio dopo un aggiornamento, un riquadro con le note della release di quella versione (da
+  GitHub) e il link alla sua pagina.
 - **Lingua:** l'inglese è la lingua di partenza; Impostazioni → Generale → Lingua passa all'italiano (e viceversa)
   sul posto: finestra, menu del vassoio, finestre di dialogo, notifiche, messaggi d'errore e la "personalità" che il
   tema dà a Claude. Le voci già scritte nella conversazione restano come sono; Claude risponde nella lingua in cui

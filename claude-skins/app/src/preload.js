@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('skins', {
   openLink: (url) => ipcRenderer.send('link:open', url),
   copy: (text) => ipcRenderer.send('clipboard:write', text),
   settings: () => ipcRenderer.invoke('settings:get'),
+  claudeStatus: () => ipcRenderer.invoke('claude:status'),
+  whatsNew: () => ipcRenderer.invoke('whatsnew:get'),
   updateState: () => ipcRenderer.invoke('update:get'),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   applyUpdate: () => ipcRenderer.send('update:apply'),
